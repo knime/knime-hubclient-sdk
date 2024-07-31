@@ -1,4 +1,4 @@
-autoEnabled=false
+autoEnabled=true
 bindingSuggestionsDisabled=true
 eclipse.preferences.version=1
 projectKey=KNIME_knime-hubclient-sdk

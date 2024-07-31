@@ -18,9 +18,15 @@
         <changelist>-SNAPSHOT</changelist>
         <feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
         <feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
+		<changelog.baseref>2bfb8979f4ec85bdb286cf44d894dc3282767d9a</changelog.baseref>
+		<knime.sonar-env>Sonarcloud</knime.sonar-env>
     </properties>
 
 	<modules>
+		<module>org.knime.hub.client</module>
+		<module>org.knime.hub.client.tests</module>
+		<module>org.knime.features.hub.client</module>
+		<module>org.knime.update.hub.client</module>
 	</modules>
 
 	<repositories>
@@ -28,6 +34,51 @@
 			<id>p2-knime-tp</id>
 			<layout>p2</layout>
 			<url>${knime.tp.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-core</id>
+			<layout>p2</layout>
+			<url>${knime.core.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-shared</id>
+			<layout>p2</layout>
+			<url>${knime.shared.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-server-client</id>
+			<layout>p2</layout>
+			<url>${knime.server.client.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-workbench</id>
+			<layout>p2</layout>
+			<url>${knime.workbench.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-gateway</id>
+			<layout>p2</layout>
+			<url>${knime.gateway.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-core-ui</id>
+			<layout>p2</layout>
+			<url>${knime.core.ui.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-filehandling-core</id>
+			<layout>p2</layout>
+			<url>${knime.filehandling.core.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-svg</id>
+			<layout>p2</layout>
+			<url>${knime.svg.p2}</url>
+		</repository>
+		<repository>
+			<id>p2-knime-base</id>
+			<layout>p2</layout>
+			<url>${knime.base.p2}</url>
 		</repository>
 	</repositories>
 </project>
