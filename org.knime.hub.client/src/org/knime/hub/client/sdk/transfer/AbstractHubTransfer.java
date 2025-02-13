@@ -20,8 +20,6 @@
  */
 package org.knime.hub.client.sdk.transfer;
 
-import java.io.Closeable;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -37,7 +35,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
-import java.util.function.Predicate;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -46,14 +43,13 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.exception.ResourceAccessException;
-import org.knime.hub.client.sdk.CatalogServiceClient;
-import org.knime.hub.client.sdk.ItemID;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
-
-import com.knime.enterprise.server.rest.api.v4.repository.ent.RepositoryItem;
+import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 
 import jakarta.ws.rs.core.EntityTag;
 
@@ -62,7 +58,7 @@ import jakarta.ws.rs.core.EntityTag;
  *
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-abstract class AbstractHubTransfer implements Closeable {
+class AbstractHubTransfer {
 
     /**
      * Handler for {@link Throwable}s thrown by a {@link Future} in
@@ -101,14 +97,11 @@ abstract class AbstractHubTransfer implements Closeable {
     CatalogServiceClient m_catalogClient;
 
     /**
-     * @param baseUrl base URL of the Hub API (not including {@code /knime/rest})
-     * @param authenticator Hub authenticator
-     * @param connectTimeout connect timeout for HTTP connections
-     * @param readTimeout read timeout for HTTP connections
+     * @param apiClient Hub API client
+     * @param apHeaders Header parameters specific to AP
      */
-    AbstractHubTransfer(final String baseUrl, final Authenticator authenticator, final Duration connectTimeout,
-            final Duration readTimeout) {
-        m_catalogClient = new CatalogServiceClient(baseUrl, authenticator, connectTimeout, readTimeout);
+    AbstractHubTransfer(final HubClientAPI apiClient, final Map<String, String> apHeaders) {
+        m_catalogClient = new CatalogServiceClient(apiClient, apHeaders);
     }
 
     /**
@@ -258,22 +251,17 @@ abstract class AbstractHubTransfer implements Closeable {
      *
      * @param itemId root item ID
      * @param cancelChecker for checking cancellation
-     * @param pred predicate evaluated on a shallow version of the repository item, return {@code false} to abort
-     * @return pair containing the deep repository item and its entity tag if successful,
-     *     {@link Optional#empty()} if the predicate returned {@code false}
+     * @return pair containing the deep repository item and its entity tag if successful
      * @throws ResourceAccessException
      * @throws CanceledExecutionException
      */
-    Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker,
-            final Predicate<RepositoryItem> pred) throws ResourceAccessException, CanceledExecutionException {
+    Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker) 
+            throws ResourceAccessException, CanceledExecutionException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
                 final Pair<RepositoryItem, EntityTag> itemAndETag = m_catalogClient //
                     .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
                 final RepositoryItem repoItem = itemAndETag.getLeft();
-                if (!(pred == null || pred.test(repoItem))) {
-                    return Optional.empty();
-                }
                 final EntityTag eTag = itemAndETag.getRight();
                 final Optional<Pair<RepositoryItem, EntityTag>> deep = m_catalogClient //
                     .fetchRepositoryItem(repoItem.getPath(), Map.of("deep", "true"), null, null, eTag);
@@ -282,6 +270,33 @@ abstract class AbstractHubTransfer implements Closeable {
                 }
             }
         });
+    }
+    
+    /**
+     * Retrieves the mason controls of the parent space associated with the item represented by it's ID.
+     * The controls of the given item coincide with the returned mason controls if the item is a space itself.
+     * 
+     * @param itemId The ID of the item
+     * @return The mason controls of the parent space
+     * @throws ResourceAccessException
+     */
+    Map<String, Control> getMasonControlsOfSpaceParent(final ItemID itemId) throws ResourceAccessException {
+        // Retrieve controls of the parent space
+        RepositoryItem item = m_catalogClient //
+                .fetchRepositoryItem(itemId.id(), Map.of("details", "full"), 
+                        null, null, null).orElseThrow().getLeft();
+        
+        Map<String, Control> spaceControls;
+        if (RepositoryItemType.SPACE == item.getType()) {
+            spaceControls = item.getMasonControls();
+        } else {
+            RepositoryItem space = m_catalogClient //
+                    .fetchRepositoryItem(item.getDetails().get().getSpace().getSpaceId(), 
+                            null, null, null, null).orElseThrow().getLeft();
+            spaceControls = space.getMasonControls();
+        }
+        
+        return spaceControls;
     }
 
     private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,
@@ -299,14 +314,4 @@ abstract class AbstractHubTransfer implements Closeable {
         });
     }
 
-    @Override
-    public void close() {
-        if (m_catalogClient != null) {
-            try {
-                m_catalogClient.close();
-            } finally {
-                m_catalogClient = null;
-            }
-        }
-    }
 }

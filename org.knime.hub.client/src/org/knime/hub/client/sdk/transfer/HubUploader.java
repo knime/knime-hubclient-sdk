@@ -50,29 +50,29 @@ import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.FileUtil;
-import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.gateway.impl.webui.spaces.Collision;
-import org.knime.hub.client.sdk.CatalogServiceClient;
-import org.knime.hub.client.sdk.CatalogServiceClient.ItemUploadInstructions;
-import org.knime.hub.client.sdk.CatalogServiceClient.ItemUploadRequest;
-import org.knime.hub.client.sdk.CatalogServiceClient.UploadManifest;
-import org.knime.hub.client.sdk.CatalogServiceClient.UploadStarted;
-import org.knime.hub.client.sdk.CatalogServiceClient.UploadTarget;
-import org.knime.hub.client.sdk.ItemID;
 import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
+import org.knime.hub.client.sdk.ent.ItemUploadRequest;
+import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
+import org.knime.hub.client.sdk.ent.UploadManifest;
+import org.knime.hub.client.sdk.ent.UploadStarted;
+import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.knime.hub.client.sdk.ent.WorkflowGroup;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.FilePartUploader.UploadTargetFetcher;
 import org.knime.hub.client.sdk.Result.Failure;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.LeafExecMonitor;
-import org.knime.hub.client.transfer.FilePartUploader.UploadTargetFetcher;
-import org.knime.hub.client.transfer.WorkflowExporter.ItemType;
-import org.knime.hub.client.transfer.WorkflowExporter.ResourcesToCopy;
+import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.transfer.WorkflowExporter.ItemType;
+import org.knime.hub.client.sdk.transfer.WorkflowExporter.ResourcesToCopy;
 
 import com.google.common.util.concurrent.AtomicDouble;
 import com.knime.enterprise.server.mason.Relation;
 import com.knime.enterprise.server.rest.api.KnimeRelations;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.RepositoryItem;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.WorkflowGroup;
 import com.knime.enterprise.utility.KnimeServerConstants;
 
 import jakarta.ws.rs.core.EntityTag;
@@ -125,16 +125,17 @@ public final class HubUploader extends AbstractHubTransfer {
     private final FilePartUploader m_filePartUploader;
 
     /**
-     * @param baseUrl base URL of the Hub API (not including {@code /knime/rest})
-     * @param authenticator Hub authenticator
+     * @param hubClient Hub API client
+     * @param apHeaders Header parameters specific to AP
      * @param connectTimeout connect timeout for HTTP connections
      * @param readTimeout read timeout for HTTP connections
      * @param chunkSize size of the parts used in multi-part uploads
      * @param numPartUploadRetries number of times a failing part upload is being restarted before giving up
      */
-    public HubUploader(final String baseUrl, final Authenticator authenticator, final Duration connectTimeout,
-            final Duration readTimeout, final long chunkSize, final int numPartUploadRetries) {
-        super(baseUrl, authenticator, connectTimeout, readTimeout);
+    public HubUploader(final HubClientAPI hubClient, final Map<String, String> apHeaders, 
+            final Duration connectTimeout, final Duration readTimeout, 
+            final long chunkSize, final int numPartUploadRetries) {
+        super(hubClient, apHeaders);
         m_chunkSize = chunkSize;
         m_filePartUploader = new FilePartUploader(connectTimeout, readTimeout, numPartUploadRetries);
     }
@@ -154,11 +155,12 @@ public final class HubUploader extends AbstractHubTransfer {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
 
         progMon.subTask("Fetching folder contents from Hub...");
-        final var optDeep = deepListItem(parentId, progMon::isCanceled, this::supportsAsyncUpload);
-        if (optDeep.isEmpty()) {
+        final var spaceParentControls = getMasonControlsOfSpaceParent(parentId);
+        if (!supportsAsyncUpload(spaceParentControls)) {
             return Result.failure("This Hub does not support multi-part uploads", null);
         }
 
+        final var optDeep = deepListItem(parentId, progMon::isCanceled);
         final Pair<RepositoryItem, EntityTag> parentGroupAndETag = optDeep.get();
         final var groupItem = parentGroupAndETag.getLeft();
         final WorkflowGroup parentGroup;
@@ -175,7 +177,7 @@ public final class HubUploader extends AbstractHubTransfer {
             final var relPath = pathAndType.getKey().makeRelative().removeTrailingSeparator();
             progMon.subTask("Analyzing '%s'".formatted(StringUtils.abbreviateMiddle(relPath.toString(), "...", 64)));
             final var localItemType = pathAndType.getValue();
-            final var checkResult = checkForCollision(parentGroup, relPath, localItemType);
+            final var checkResult = checkForCollision(parentGroup, relPath, localItemType, spaceParentControls);
             if (checkResult.isPresent()) {
                 final Pair<IPath, Collision> pathAndCollision = checkResult.get();
                 final IPath collisionLocation = pathAndCollision.getLeft();
@@ -190,14 +192,14 @@ public final class HubUploader extends AbstractHubTransfer {
         return Result.success(new CollisionReport(parentGroup, parentGroupAndETag.getRight(), collisions, affected));
     }
 
-    private boolean supportsAsyncUpload(final RepositoryItem shallowItem) {
+    private boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls) {
         final var overwrittenHosts = List.of(System.getProperty(FORCE_ASYNC_UPLOAD_HOSTS_FEATURE_FLAG, "").split(","));
-        return overwrittenHosts.contains(m_catalogClient.getHubAPIBaseURL().getHost())
-                || shallowItem.getControls().containsKey(CatalogServiceClient.INITIATE_UPLOAD);
+        return overwrittenHosts.contains(m_catalogClient.getHubAPIBaseURI().getHost())
+                || spaceParentControls.containsKey(CatalogServiceClient.INITIATE_UPLOAD.toString());
     }
 
     private static Optional<Pair<IPath, Collision>> checkForCollision(final WorkflowGroup remoteItem, // NOSONAR
-            final IPath path, final ItemType localItemType) {
+            final IPath path, final ItemType localItemType, final Map<String, Control> spaceControls) {
         // descend the remote tree and check all levels for conflicts
         RepositoryItem current = remoteItem;
         WorkflowGroup parent = null;
@@ -210,7 +212,7 @@ public final class HubUploader extends AbstractHubTransfer {
                     .filter(item -> IPath.forPosix(item.getPath()).lastSegment().equals(name)) //
                     .findAny().orElse(null);
                 if (current == null) {
-                    if (group.getControls().containsKey(KnimeRelations.UPLOAD)) { // NOSONAR
+                    if (spaceControls.containsKey(KnimeRelations.UPLOAD.toString())) { // NOSONAR
                         // ancestor item doesn't exist but can be created, no conflict
                         return Optional.empty();
                     } else {
@@ -221,7 +223,7 @@ public final class HubUploader extends AbstractHubTransfer {
             } else {
                 // conflict between a local ancestor folder and a non-folder item on Hub
                 final boolean canUploadToParent =
-                        parent == null || parent.getControls().containsKey(KnimeRelations.UPLOAD);
+                        parent == null || spaceControls.containsKey(KnimeRelations.UPLOAD.toString());
                 return Optional.of(Pair.of(path.uptoSegment(level),
                     new Collision(false, false, canUploadToParent)));
             }
@@ -230,7 +232,8 @@ public final class HubUploader extends AbstractHubTransfer {
         // reached the end, and an item at the path already exists
         final boolean remoteIsFolder = current instanceof WorkflowGroup;
         final boolean localIsFolder = localItemType == ItemType.WORKFLOW_GROUP;
-        final boolean canUploadToParent = parent != null && parent.getControls().containsKey(KnimeRelations.UPLOAD);
+        final boolean canUploadToParent = parent != null
+                && spaceControls.containsKey(KnimeRelations.UPLOAD.toString());
         if (remoteIsFolder && localIsFolder) {
             // copying an empty folder over an existing one is not a conflict
             return Optional.empty();
@@ -242,17 +245,16 @@ public final class HubUploader extends AbstractHubTransfer {
             return Optional.of(Pair.of(path, //
                 new Collision( //
                     isTypeCompatible(current.getType(), localItemType), //
-                    current.getControls().containsKey(Relation.EDIT), //
+                    spaceControls.containsKey(Relation.EDIT.toString()), //
                     canUploadToParent)));
         }
     }
 
-    private static boolean isTypeCompatible(final RepositoryItem.Type oldType, final ItemType newType) {
+    private static boolean isTypeCompatible(final RepositoryItemType oldType, final ItemType newType) {
         return switch (oldType) {
-            case Workflow, Component, WorkflowTemplate -> newType == ItemType.WORKFLOW_LIKE;
-            case WorkflowGroup, Space                  -> newType == ItemType.WORKFLOW_GROUP;
-            case Data                                  -> newType == ItemType.DATA_FILE;
-            case Snapshot, Trash, Unknown              -> false;
+        case WORKFLOW, COMPONENT -> newType == ItemType.WORKFLOW_LIKE;
+        case WORKFLOW_GROUP, SPACE -> newType == ItemType.WORKFLOW_GROUP;
+        case DATA -> newType == ItemType.DATA_FILE;
         };
     }
 
@@ -270,7 +272,7 @@ public final class HubUploader extends AbstractHubTransfer {
             final Map<IPath, LocalItem> items, final EntityTag parentTag,
             final int numInitialParts) throws ResourceAccessException {
 
-        final Map<IPath, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
+        final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
         int partsRemaining = CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
         for (final var entry : items.entrySet()) {
             final var itemType = entry.getValue().type();
@@ -280,7 +282,7 @@ public final class HubUploader extends AbstractHubTransfer {
                 case DATA_FILE -> MediaType.APPLICATION_OCTET_STREAM;
             };
             final var partsHere = itemType == ItemType.WORKFLOW_GROUP ? 0 : Math.min(partsRemaining, numInitialParts);
-            uploadRequests.put(entry.getKey(), new ItemUploadRequest(mediaType, partsHere));
+            uploadRequests.put(entry.getKey().toString(), new ItemUploadRequest(mediaType, partsHere));
             partsRemaining -= partsHere;
         }
 
@@ -290,7 +292,7 @@ public final class HubUploader extends AbstractHubTransfer {
             return Optional.empty();
         }
 
-        final var instructions = optInstructions.get().items();
+        final var instructions = optInstructions.get().getItems();
         final Map<IPath, ItemToUpload> out = new LinkedHashMap<>();
         for (final var item : items.entrySet()) {
             final var pathInTarget = item.getKey();
@@ -459,18 +461,18 @@ public final class HubUploader extends AbstractHubTransfer {
             }
 
             while (true) {
-                final var state = m_catalogClient.pollUploadState(instructions.uploadId());
+                final var state = m_catalogClient.pollUploadState(instructions.getUploadId());
                 LOGGER.debug(() -> "Polling state of uploaded item '%s': %s, '%s'" //
-                    .formatted(path, state.status(), state.statusMessage()));
-                switch (state.status()) {
+                    .formatted(path, state.getStatus(), state.getStatusMessage()));
+                switch (state.getStatus()) {
                     case ABORTED:
-                        return Result.failure(state.statusMessage(), null);
+                        return Result.failure(state.getStatusMessage(), null);
                     case ANALYSIS_PENDING, PREPARED:
                         break;
                     case COMPLETED:
-                        return Result.success(state.statusMessage());
+                        return Result.success(state.getStatusMessage());
                     case FAILED:
-                        return Result.failure(state.statusMessage(), null);
+                        return Result.failure(state.getStatusMessage(), null);
                 }
                 Thread.sleep(1_000);
             }
@@ -506,14 +508,14 @@ public final class HubUploader extends AbstractHubTransfer {
             final Map<Integer, EntityTag> finishedParts = awaitPartsFinished(pendingUploads, splitter.cancelChecker());
             success = true;
 
-            m_catalogClient.reportUploadFinished(instructions.uploadId(), finishedParts);
+            m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
                 LOGGER.debug(() -> "Upload of '%s' has failed, cancelling parts and notifying Catalog Service" //
                     .formatted(path));
                 // the upload didn't finish successfully, cancel pending part uploads and delete all temp files
                 pendingUploads.forEach(pending -> pending.cancel(true));
-                m_catalogClient.cancelUpload(instructions.uploadId());
+                m_catalogClient.cancelUpload(instructions.getUploadId());
                 for (final var tempFile : tempFiles) {
                     Files.deleteIfExists(tempFile);
                 }
@@ -600,12 +602,12 @@ public final class HubUploader extends AbstractHubTransfer {
             final Map<Integer, EntityTag> finishedParts = awaitPartsFinished(partUploads, splitter.cancelChecker());
             success = true;
 
-            m_catalogClient.reportUploadFinished(instructions.uploadId(), finishedParts);
+            m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
                 LOGGER.debug(() -> "Upload of '%s' has failed, cancelling parts and notifying Hub".formatted(path));
                 partUploads.forEach(pending -> pending.cancel(true));
-                m_catalogClient.cancelUpload(instructions.uploadId());
+                m_catalogClient.cancelUpload(instructions.getUploadId());
             }
         }
     }
@@ -617,8 +619,8 @@ public final class HubUploader extends AbstractHubTransfer {
         private final Map<Integer, UploadTarget> m_initialParts;
 
         public UploadPartSupplier(final ItemUploadInstructions instructions) {
-            m_uploadId = instructions.uploadId();
-            m_initialParts = new LinkedHashMap<>(instructions.parts().orElse(Map.of()));
+            m_uploadId = instructions.getUploadId();
+            m_initialParts = new LinkedHashMap<>(instructions.getParts().orElse(Map.of()));
         }
 
         @Override

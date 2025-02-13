@@ -22,14 +22,14 @@ package org.knime.hub.client.sdk.transfer;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Future;
@@ -48,23 +48,23 @@ import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
 import org.knime.core.util.FileUtil;
-import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.exception.ResourceAccessException;
-import org.knime.hub.client.sdk.ItemID;
 import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.ent.Component;
+import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.Data;
+import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
+import org.knime.hub.client.sdk.ent.Sized;
+import org.knime.hub.client.sdk.ent.Workflow;
+import org.knime.hub.client.sdk.ent.WorkflowGroup;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.Result.Success;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.api.HubClientAPI;
 
 import com.knime.enterprise.server.rest.api.KnimeRelations;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.Component;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.Data;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.RepositoryItem;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.RepositoryItem.Type;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.Template;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.Workflow;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.WorkflowGroup;
 
 /**
  * Downloader for sets of items from a Hub.
@@ -78,23 +78,22 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @param type the item's type
      * @param path the item's path in the Hub's file system
      */
-    public record HubItem(ItemID id, RepositoryItem.Type type, IPath path) {
+    public record HubItem(ItemID id, RepositoryItem.RepositoryItemType type, IPath path) {
         /**
          * @return {@code true} if this represents a folder-like item (folder or space), {@code false} otherwise
          */
         public boolean isFolder() {
-            return type == Type.WorkflowGroup || type == Type.Space;
+            return type == RepositoryItemType.WORKFLOW_GROUP || type == RepositoryItemType.SPACE;
         }
     }
 
     /**
      * @param item description of the item on the Hub
      * @param pathInTarget path below the download root to download to
-     * @param method HTTP method
-     * @param url URL to download from
+     * @param path Path to download from
      * @param size item download size if known
      */
-    public record DownloadInfo(HubItem item, IPath pathInTarget, String method, URI url, OptionalLong size) {}
+    public record DownloadInfo(HubItem item, IPath pathInTarget, IPath path, OptionalLong size) {}
 
     /**
      * @param itemsToDownload list of items to download
@@ -106,14 +105,13 @@ public final class HubDownloader extends AbstractHubTransfer {
     private static final NodeLogger LOGGER = NodeLogger.getLogger(HubDownloader.class);
 
     /**
-     * @param hubBaseUrl base URL of the Hub API (not including {@code /knime/rest})
+     * @param hubClient Hub API client
      * @param authenticator Hub authenticator
      * @param connectTimeout connect timeout for HTTP connections
      * @param readTimeout read timeout for HTTP connections
      */
-    public HubDownloader(final String hubBaseUrl, final Authenticator authenticator,
-            final Duration connectTimeout, final Duration readTimeout) {
-        super(hubBaseUrl, authenticator, connectTimeout, readTimeout);
+    public HubDownloader(final HubClientAPI hubClient, final Map<String, String> apHeaders) {
+        super(hubClient, apHeaders);
     }
 
     /**
@@ -133,17 +131,32 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         final Map<IPath, Failure<Void>> notDownloadable = new LinkedHashMap<>();
         if (!itemIds.isEmpty()) {
+            // get the common parent (we expect all items to stem from the same group)
+            final RepositoryItem firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).getLeft();
+            
+            // if the common parent is not the account group we need to fetch the download control from the parent space
+            final var isAccountGroup = IPath.forPosix(firstParent.getPath()).segmentCount() == 2;
+            Map<String, Control> parentSpaceControls = new HashMap<>();
+            if (!isAccountGroup) {
+                parentSpaceControls = getMasonControlsOfSpaceParent(itemIds.get(0));
+            }
+            
             final Map<String, RepositoryItem> deepListedItems;
             if (itemIds.size() == 1) {
                 final var itemId = itemIds.get(0);
                 deepListedItems = Map.of(itemId.id(),
-                    deepListItem(itemId, progMon::isCanceled, item -> true).orElseThrow().getLeft());
+                    deepListItem(itemId, progMon::isCanceled).orElseThrow().getLeft());
             } else {
-                // we expect all items to stem from the same group, so we cache the first item's siblings
-                final RepositoryItem firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).getLeft();
+                // we cache the first item's siblings, since all items are expected to stem from the same group
                 deepListedItems = ClassUtils.castStream(WorkflowGroup.class, firstParent) //
                     .flatMap(group -> group.getChildren().stream()) //
-                    .collect(Collectors.toMap(ch -> ch.getItemId().orElseThrow(), Function.identity()));
+                    .filter(ch -> {
+                        if (ch.getId() == null) {
+                            throw new NoSuchElementException();
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toMap(ch -> ch.getId(), Function.identity()));
             }
 
             for (final var itemId : itemIds) {
@@ -151,6 +164,13 @@ public final class HubDownloader extends AbstractHubTransfer {
                 if (repositoryItem == null) {
                     notDownloadable.put(IPath.forPosix(itemId.id()),
                         Result.failure("Item '%s' could not be found", null));
+                } else if (RepositoryItemType.SPACE == repositoryItem.getType() && 
+                        !repositoryItem.getMasonControls().containsKey(KnimeRelations.DOWNLOAD.toString())) {
+                    notDownloadable.put(IPath.forPosix(itemId.id()),
+                            Result.failure("Item at '" + repositoryItem.getPath() + "' cannot be downloaded.", null));
+                } else if (!isAccountGroup && !parentSpaceControls.containsKey(KnimeRelations.DOWNLOAD.toString())) {
+                    notDownloadable.put(IPath.forPosix(itemId.id()),
+                            Result.failure("Item at '" + repositoryItem.getPath() + "' cannot be downloaded.", null));
                 } else {
                     final var rootPath = IPath.forPosix(repositoryItem.getPath());
                     progMon.subTask("Analyzing '%s'".formatted(shortenedPath(rootPath.toString())));
@@ -288,7 +308,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         var tempFile = new AtomicReference<>(FileUtil.createTempFile("KNIMEHubItem", ".download", false).toPath());
         try {
             LOGGER.debug(() -> "Downloading '%s' into file '%s'".formatted(download.item().path(), tempFile.get()));
-            final var file = m_catalogClient.downloadItem(download.method(), download.url(), (in, contentLength) -> { // NOSONAR
+            final var file = m_catalogClient.downloadItem(download.path(), download.item().type(), (in, contentLength) -> { // NOSONAR
                 // prefer size from the HTTP request if available, fall back to Catalog information otherwise
                 final var numBytes = contentLength.orElse(download.size().orElse(-1));
                 final var bufferSize = (int)(FileUtils.ONE_MB / 2);
@@ -321,7 +341,11 @@ public final class HubDownloader extends AbstractHubTransfer {
 
     private static long collectItems(final RepositoryItem repositoryItem, final IPath rootPath,
             final Map<IPath, Pair<HubItem, Result<DownloadInfo>>> results) {
-        final var itemId = new ItemID(repositoryItem.getItemId().orElseThrow());
+        final var repositoryItemId = repositoryItem.getId();
+        if (repositoryItemId == null) {
+            throw new NoSuchElementException();
+        }
+        final var itemId = new ItemID(repositoryItem.getId());
         final var itemPath = IPath.forPosix(repositoryItem.getPath());
         final var hubItem = new HubItem(itemId, repositoryItem.getType(), itemPath);
         final var targetPath = itemPath.makeRelativeTo(rootPath).makeAbsolute();
@@ -329,30 +353,20 @@ public final class HubDownloader extends AbstractHubTransfer {
         if (repositoryItem instanceof WorkflowGroup group) { // also covers spaces
             var totalSize = 0L;
             results.put(targetPath, Pair.of(hubItem,
-                Result.success(new DownloadInfo(hubItem, targetPath, null, null, OptionalLong.empty()))));
+                Result.success(new DownloadInfo(hubItem, targetPath, null, OptionalLong.empty()))));
             for (final var childItem : Optional.ofNullable(group.getChildren()).orElse(List.of())) {
                 totalSize = addIfKnown(totalSize, collectItems(childItem, rootPath, results));
             }
             return totalSize;
         }
 
-        final var downloadControl = repositoryItem.getControls().get(KnimeRelations.DOWNLOAD);
-        if (downloadControl == null) {
-            results.put(targetPath, Pair.of(hubItem,
-                Result.failure("Item at '" + itemPath + "' cannot be downloaded.", null)));
-            return 0L;
-        }
-
-        final var method = downloadControl.getMethod();
-        final var downloadUrl = URI.create(downloadControl.getHref());
         final var size = getSize(repositoryItem);
         if (repositoryItem instanceof Data) {
-            results.put(targetPath, Pair.of(hubItem, Result.success(new DownloadInfo(hubItem, targetPath, method,
-                downloadUrl, size < 0 ? OptionalLong.empty() : OptionalLong.of(size)))));
-        } else if (repositoryItem instanceof Workflow || repositoryItem instanceof Component
-                || repositoryItem instanceof Template) {
-            results.put(targetPath, Pair.of(hubItem, Result.success(new DownloadInfo(hubItem, targetPath, method,
-                downloadUrl, size < 0 ? OptionalLong.empty() : OptionalLong.of(size)))));
+            results.put(targetPath, Pair.of(hubItem, Result.success(new DownloadInfo(hubItem, targetPath, 
+                itemPath, size < 0 ? OptionalLong.empty() : OptionalLong.of(size)))));
+        } else if (repositoryItem instanceof Workflow || repositoryItem instanceof Component) {
+            results.put(targetPath, Pair.of(hubItem, Result.success(new DownloadInfo(hubItem, targetPath, 
+                itemPath, size < 0 ? OptionalLong.empty() : OptionalLong.of(size)))));
         } else {
             results.put(targetPath, Pair.of(hubItem,
                 Result.failure("Unexpected item type at '" + itemPath + "': " + repositoryItem.getType(), null)));
@@ -366,12 +380,10 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static long getSize(final RepositoryItem item) {
-        return switch (item.getType()) {
-            case Component        -> ((Component)item).getSize().orElse(-1L);
-            case Data             -> ((Data)item).getSize();
-            case Workflow         -> ((Workflow)item).getSize().orElse(-1L);
-            case WorkflowTemplate -> ((Template)item).getSize().orElse(-1L);
-            default               -> -1L;
-        };
+        if (item instanceof Sized s) {
+            return s.getSize();
+        } else {
+            return -1L;
+        }
     }
 }

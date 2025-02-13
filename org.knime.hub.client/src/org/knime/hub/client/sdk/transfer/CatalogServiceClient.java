@@ -23,52 +23,59 @@ package org.knime.hub.client.sdk.transfer;
 import static com.knime.enterprise.server.rest.api.KnimeRelations.KNIME_SERVER_NAMESPACE;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.OptionalLong;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.cxf.jaxrs.client.ClientProperties;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.Path;
 import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
-import org.knime.core.util.auth.Authenticator;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.HubItemVersion;
+import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
+import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
+import org.knime.hub.client.sdk.ent.UploadManifest;
+import org.knime.hub.client.sdk.ent.UploadStarted;
+import org.knime.hub.client.sdk.ent.UploadStatus;
+import org.knime.hub.client.sdk.ent.UploadTarget;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.knime.enterprise.server.mason.MasonUtil;
 import com.knime.enterprise.server.mason.Relation;
-import com.knime.enterprise.server.rest.api.v4.repository.ent.RepositoryItem;
-
-import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.core.UriBuilder;
+import jakarta.ws.rs.ext.RuntimeDelegate;
+import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
 
 /**
   * Wrapper for all REST endpoint calls needed for catalog operations.
  *
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public class CatalogServiceClient extends AbstractHubServiceClient {
-    /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
-    private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
-
+public class CatalogServiceClient {
+    
+    static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
+            RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
+    
     /** Maximum number of pre-fetched upload URLs per upload. */
     public static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
@@ -86,105 +93,19 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
 
     /** Relation that allows the requester to abort an item upload. */
     public static final Relation ABORT_UPLOAD_PART =  Relation.create(KNIME_SERVER_NAMESPACE, "abort-upload");
+    
+    private static final String COULD_NOT_AUTHORIZE = "Could not authorize Hub REST call: ";
+    
+    private static final MediaType KNIME_WORKFLOW_MEDIA_TYPE =
+            new MediaType("application", "vnd.knime.workflow+zip");
+    private static final MediaType KNIME_WORKFLOW_GROUP_MEDIA_TYPE =
+            new MediaType("application", "vnd.knime.workflow-group+zip");
+    
+    private static final String REPOSITORY_PATH_PIECE = "repository";
 
-    /**
-     * Callback interface for endpoints returning larger binary results.
-     * @param <R> type of the result value
-     */
-    @FunctionalInterface
-    public interface DownloadContentHandler<R> {
-        /**
-         * Called if the request succeeded, may consume the input stream and return a result, which is passed out of the
-         * method doing the request. The input stream is closed after this method returns.
-         *
-         * @param data response data as input stream
-         * @param contentLength content length if available
-         * @return result value
-         * @throws IOException
-         * @throws CanceledExecutionException
-         */
-        R handleDownload(InputStream data, OptionalLong contentLength) // NOSONAR `OptionalLong` is fine
-                throws IOException, CanceledExecutionException;
-    }
-
-    private static final String VERSION_QUERY_PARAM = "version";
-
-    /**
-     * Manifest describing which items are intended to be uploaded.
-     *
-     * @param items mapping from relative path inside the group to description of the item to upload
-     */
-    @JsonSerialize
-    public record UploadManifest(Map<IPath, ItemUploadRequest> items) {}
-
-    /**
-     * Request to upload a single file.
-     *
-     * @param itemContentType content type of the item
-     * @param initialPartCount number of multi-part upload parts to request
-     */
-    @JsonSerialize
-    public record ItemUploadRequest(String itemContentType, int initialPartCount) {}
-
-    /**
-     * Response containing instructions for how to upload the items contained in the {@link UploadManifest}.
-     *
-     * @param items mapping from relative path inside the group to upload instructions
-     */
-    @JsonSerialize
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record UploadStarted(Map<String, ItemUploadInstructions> items) {}
-
-    /**
-     * Instructions for uploading one item.
-     *
-     * @param uploadId ID of the initiated upload
-     * @param parts mapping from part number to upload target for all requested upload parts (may be absent)
-     */
-    @JsonSerialize
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ItemUploadInstructions(String uploadId, Optional<Map<Integer, UploadTarget>> parts) {}
-
-    /**
-     * Target description for a file part HTTP upload.
-     *
-     * @param method HTTP method to use
-     * @param url request URL
-     * @param header request headers to send
-     */
-    @JsonSerialize
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record UploadTarget(String method, URL url, Map<String, List<String>> header) {}
-
-    /**
-     * Current status of a single-file upload.
-     *
-     * @param uploadId ID of the upload
-     * @param initiatorAccountId account ID of the user who initiated the upload
-     * @param status status of the upload
-     * @param statusMessage message describing the status
-     * @param lastUpdated timestamp indicating when the status last changed
-     * @param targetCanonicalPath canonical destination path in the Hub catalog
-     */
-    @JsonSerialize
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record UploadStatus(String uploadId, String initiatorAccountId, UploadStatus.Status status,
-            String statusMessage, Instant lastUpdated, String targetCanonicalPath) {
-
-        /** Stages of the upload lifecycle. */
-        public enum Status {
-            /** Waiting for item upload to finish. */
-            PREPARED,
-            /** Item has been uploaded and is currently being analyzed. */
-            ANALYSIS_PENDING,
-            /** Upload has been completed successfully. */
-            COMPLETED,
-            /** Upload has failed. */
-            FAILED,
-            /** Upload has been aborted by the user. */
-            ABORTED
-        }
-    }
+    final URI m_hubBaseURI;
+    
+    final NodeLogger m_logger;
 
     /**
      * Target description for a file HTTP download.
@@ -195,20 +116,24 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      */
     @JsonSerialize
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record DownloadTarget(String name, RepositoryItem.Type type, URL url) {}
+    public record DownloadTarget(String name, RepositoryItem.RepositoryItemType type, URL url) {
+    }
 
-    private final Duration m_readTimeout;
-
+    private HubClientAPI m_hubClient;
+    
+    private Map<String, String> m_apHeaders;
+    
     /**
-     * @param hubBaseUrl base URL of the Hub API (not including {@code /knime/rest})
+     * @param apiClient Hub API client
      * @param authenticator Hub authenticator
      * @param connectTimeout connect timeout for connections
      * @param readTimeout read timeout for connections
      */
-    public CatalogServiceClient(final String hubBaseUrl, final Authenticator authenticator,
-            final Duration connectTimeout, final Duration readTimeout) {
-        super(createClientBuilder(connectTimeout, readTimeout), hubBaseUrl, authenticator);
-        m_readTimeout = readTimeout;
+    public CatalogServiceClient(final HubClientAPI hubClient, final Map<String, String> apHeaders) {
+        m_hubClient = hubClient;
+        m_apHeaders = apHeaders;
+        m_hubBaseURI = hubClient.getApiClient().getBaseURI();
+        m_logger = NodeLogger.getLogger(getClass());
     }
 
     /**
@@ -223,29 +148,27 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      */
     public Optional<UploadStarted> initiateUpload(final ItemID parentId,
             final UploadManifest manifest, final EntityTag eTag) throws ResourceAccessException {
-        m_logger.debug(() -> "Initiating upload of %d items".formatted(manifest.items().size()));
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl).segment("repository", parentId.id(), "manifest");
-
-        // this call can be very slow, and the user can abort at any point in time
-        final WebTarget target = m_client.target(uriBuilder) //
-            .property(ClientProperties.HTTP_RECEIVE_TIMEOUT_PROP,
-                Math.max(SLOW_OPERATION_READ_TIMEOUT.toMillis(), m_readTimeout.toMillis()));
-
-        final var request = authorizedRequest(target, true);
+        m_logger.debug(() -> "Initiating upload of %d items".formatted(manifest.getItems().size()));
+        
+        Map<String, String> additionalHeaders = new HashMap<>(m_apHeaders);
         if (eTag != null) {
-            request.header(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(eTag));
+            additionalHeaders.put(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(eTag));
         }
-
+        
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = request.post(Entity.json(manifest))) {
-            if (response.getStatus() == Status.PRECONDITION_FAILED.getStatusCode()) {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_hubClient.initiateUpload(parentId.id(), manifest, additionalHeaders);
+            if (response.getStatusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
             } else {
                 checkSuccessful(response);
-                return Optional.of(response.readEntity(UploadStarted.class));
+                return response.getResult().toOptional();
             }
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI)
+                    .segment(REPOSITORY_PATH_PIECE, parentId.id(), "manifest");
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(), // NOSONAR
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -261,18 +184,18 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      */
     public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
             throws ResourceAccessException {
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl) //
-            .segment("uploads", uploadId, "parts") //
-            .queryParam("partNumber", Integer.toString(partNumber));
-        final var request = authorizedRequest(m_client.target(uriBuilder), true) //
-            .accept(MediaType.APPLICATION_JSON_TYPE);
-
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = request.post(null)) {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_hubClient.requestPartUpload(uploadId, partNumber, 
+                    new HashMap<>(m_apHeaders));
             checkSuccessful(response);
-            return response.readEntity(UploadTarget.class);
+            return response.getResult().toOptional().get();
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI) //
+                    .segment("uploads", uploadId, "parts") //
+            .queryParam("partNumber", Integer.toString(partNumber));
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(),
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -286,14 +209,15 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      * @throws ResourceAccessException if the request failed
      */
     public UploadStatus pollUploadState(final String uploadId) throws ResourceAccessException {
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl).segment("uploads", uploadId, "status");
-
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = authorizedRequest(m_client.target(uriBuilder), true).get()) {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_hubClient.pollUploadStatus(uploadId, new HashMap<>(m_apHeaders));
             checkSuccessful(response);
-            return response.readEntity(UploadStatus.class);
+            return response.getResult().toOptional().get();
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI).segment("uploads", uploadId, "status");
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(),
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -308,19 +232,20 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      */
     public void reportUploadFinished(final String uploadId, final Map<Integer, EntityTag> artifactETags)
         throws ResourceAccessException {
-
         final Map<Integer, String> artifactETagMap = artifactETags.entrySet().stream() //
             .sorted(Comparator.comparingInt(Entry::getKey)) //
             .collect(Collectors.toMap(Entry::getKey, e -> ETAG_DELEGATE.toString(e.getValue()), (a, b) -> a,
                 LinkedHashMap::new));
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl).segment("uploads", uploadId);
-        final var request = authorizedRequest(m_client.target(uriBuilder), true);
-        final var t0 = System.currentTimeMillis();
 
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = request.post(Entity.json(artifactETagMap))) {
+        final var t0 = System.currentTimeMillis();
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_hubClient.reportUploadFinished(uploadId, artifactETagMap, 
+                    new HashMap<>(m_apHeaders));
             checkSuccessful(response);
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI).segment("uploads", uploadId);
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(),
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -333,13 +258,15 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      * @throws ResourceAccessException if the request failed
      */
     public void cancelUpload(final String uploadId) throws ResourceAccessException {
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl).segment("uploads", uploadId);
 
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = authorizedRequest(m_client.target(uriBuilder), true).delete()) {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_hubClient.cancelUpload(uploadId, new HashMap<>(m_apHeaders));
             checkSuccessful(response);
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI).segment("uploads", uploadId);
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(),
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -358,37 +285,51 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      *     {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
      * @throws ResourceAccessException
      */
-    public Optional<Pair<RepositoryItem, EntityTag>> fetchRepositoryItem(final String itemIdOrPath,
+    public Optional<Pair<RepositoryItem, EntityTag>> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final HubItemVersion version, final EntityTag ifNoneMatch,
             final EntityTag ifMatch) throws ResourceAccessException {
-        final var uriBuilder = UriBuilder.fromUri(m_hubBaseUrl).segment("repository").path(itemIdOrPath);
-        if (version != null) {
-            uriBuilder.queryParam(VERSION_QUERY_PARAM, version.getQueryParameterValue());
-        }
-
-        if (queryParams != null) {
-            queryParams.forEach(uriBuilder::queryParam);
-        }
-
-        final var request = authorizedRequest(m_client.target(uriBuilder), false) //
-            .accept(MasonUtil.MEDIATYPE_APPLICATION_MASON);
+        Map<String, String> additionalHeaders = new HashMap<>(m_apHeaders);
+        additionalHeaders.put(HttpHeaders.ACCEPT, MasonUtil.MEDIATYPE_APPLICATION_MASON);
         if (ifNoneMatch != null) {
-            request.header(HttpHeaders.IF_NONE_MATCH, ifNoneMatch);
+            additionalHeaders.put(HttpHeaders.IF_NONE_MATCH, ETAG_DELEGATE.toString(ifNoneMatch));
         }
         if (ifMatch != null) {
-            request.header(HttpHeaders.IF_MATCH, ifMatch);
+            additionalHeaders.put(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(ifMatch));
         }
 
+        Map<String, String> nonNullQueryParams = new HashMap<>();
+        if (queryParams != null) {
+            nonNullQueryParams = new HashMap<>(queryParams);
+        }
+        
+        final var detailsParam = nonNullQueryParams.get("details");
+        final var deepParam = Boolean.valueOf(nonNullQueryParams.get("deep"));
+        final var spaceDetailsParam = Boolean.valueOf(nonNullQueryParams.get("spaceDetails"));
+        final var contribSpacesParam = nonNullQueryParams.get("contribSpaces");
+        String versionParam = null;
+        if (version != null) {
+            versionParam = version.getQueryParameterValue().orElse(null);
+        }
+        final var spaceVersionParam = nonNullQueryParams.get("spaceVersion");
+        
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = request.get()) {
-            if ((ifNoneMatch != null && response.getStatus() == Status.NOT_MODIFIED.getStatusCode())
-                    || (ifMatch != null && response.getStatus() == Status.PRECONDITION_FAILED.getStatusCode())) {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = itemIDOrPath.startsWith("*") ? 
+                    m_hubClient.getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam, spaceDetailsParam, 
+                            contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders) : 
+                    m_hubClient.getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam, 
+                            spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders);
+            if ((ifNoneMatch != null && response.getStatusCode() == Status.NOT_MODIFIED.getStatusCode())
+                    || (ifMatch != null && response.getStatusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
                 return Optional.empty();
             }
             checkSuccessful(response);
-            return Optional.of(Pair.of(response.readEntity(RepositoryItem.class), response.getEntityTag()));
+            return Optional.of(Pair.of(response.getResult().toOptional().get(), response.getETag().get()));
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         } finally {
+            final var uriBuilder = UriBuilder.fromUri(m_hubBaseURI)
+                    .segment(REPOSITORY_PATH_PIECE).path(itemIDOrPath);
             m_logger.debug(() -> "Request '%s' took %.3fs".formatted(uriBuilder.toTemplate(),
                 (System.currentTimeMillis() - t0) / 1000.0));
         }
@@ -398,27 +339,52 @@ public class CatalogServiceClient extends AbstractHubServiceClient {
      * Downloads an item from the repository.
      *
      * @param <R> type of the result value
-     * @param method HTTP method to use
-     * @param url URL to request
+     * @param path the path of the item which should be downloaded
      * @param contentHandler callback consuming the response data
      * @return value returned by the callback
      * @throws IOException
      * @throws CanceledExecutionException
      */
-    public <R> R downloadItem(final String method, final URI url, final DownloadContentHandler<R> contentHandler)
-            throws IOException, CanceledExecutionException {
+    public <R> R downloadItem(final IPath path, final RepositoryItemType itemType, 
+            final DownloadContentHandler<R> contentHandler) throws IOException, CanceledExecutionException {
         final var t0 = System.currentTimeMillis();
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var response = authorizedRequest(m_client.target(url), true).method(method)) {
-            checkSuccessful(response);
-            final var length = response.getLength();
-            try (final var inStream = response.readEntity(InputStream.class)) {
-                return contentHandler.handleDownload(inStream,
-                    length < 0 ? OptionalLong.empty() : OptionalLong.of(length));
-            } finally {
-                m_logger.debug(() -> "Request '%s' took %.3fs".formatted(url,
-                    (System.currentTimeMillis() - t0) / 1000.0));
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            MediaType accept = MediaType.WILDCARD_TYPE;
+            if (RepositoryItemType.WORKFLOW_GROUP == itemType) {
+                accept = KNIME_WORKFLOW_GROUP_MEDIA_TYPE;
+            } else if (RepositoryItemType.WORKFLOW == itemType || RepositoryItemType.COMPONENT == itemType) {
+                accept = KNIME_WORKFLOW_MEDIA_TYPE;
             }
+            final var response = m_hubClient.downloadItemByPath(path, null,
+                    null, accept, contentHandler, new HashMap<>(m_apHeaders));
+            checkSuccessful(response);
+            return response.getResult().toOptional().get();
+        } catch (CouldNotAuthorizeException e) {
+            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } finally {
+            m_logger.debug(() -> "Request '%s' took %.3fs".formatted(path, (System.currentTimeMillis() - t0) / 1000.0));
         }
     }
+    
+    /**
+     * @return the Hub API's base URI (e.g. {@code "https://api.hub.knime.com"})
+     */
+    public URI getHubAPIBaseURI() {
+        return m_hubBaseURI;
+    }
+    
+    /**
+     * Checks that the given response signals success (via a 4XX HTTP status code).
+     *
+     * @param response response to check
+     * @throws ResourceAccessException if the request was unsuccessful
+     */
+    static void checkSuccessful(final ApiResponse<?> response) throws ResourceAccessException {
+        final var result = response.getResult();
+        if (!result.successful()) {
+            final var failure = (Result.Failure<?>)result;
+            throw HttpExceptionUtils.wrapException(response.getStatusCode(), failure.message());
+        }
+    }
+    
 }

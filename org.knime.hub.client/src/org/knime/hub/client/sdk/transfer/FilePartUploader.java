@@ -51,8 +51,9 @@ import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.proxy.URLConnectionFactory;
-import org.knime.hub.client.sdk.CatalogServiceClient.UploadTarget;
-import org.knime.hub.client.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.FilePartUploader;
+import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -231,13 +232,13 @@ public final class FilePartUploader {
     @SuppressWarnings("unused")
     private HttpURLConnection prepareConnection(final UploadTarget uploadTarget, final long numBytes,
             final String md5Hash) throws IOException {
-        final var conn = (HttpURLConnection)URLConnectionFactory.getConnection(uploadTarget.url());
-        conn.setRequestMethod(uploadTarget.method());
+        final var conn = (HttpURLConnection)URLConnectionFactory.getConnection(uploadTarget.getUrl());
+        conn.setRequestMethod(uploadTarget.getMethod());
         conn.setFixedLengthStreamingMode(numBytes);
         conn.setDoOutput(true);
         conn.setConnectTimeout(Math.toIntExact(m_connectTimeout.toMillis()));
         conn.setReadTimeout(Math.toIntExact(m_readTimeout.toMillis()));
-        uploadTarget.header().forEach((key, vals) -> vals.forEach(val -> conn.addRequestProperty(key, val)));
+        uploadTarget.getHeader().forEach((key, vals) -> vals.forEach(val -> conn.addRequestProperty(key, val)));
         if (SEND_CONTENT_MD5 && md5Hash != null) {
             conn.addRequestProperty("Content-MD5", md5Hash);
         }
