@@ -1,0 +1,130 @@
+/*
+ * ------------------------------------------------------------------------
+ *  Copyright by KNIME AG, Zurich, Switzerland
+ *  Website: http://www.knime.com; Email: contact@knime.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License, Version 3, as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  Hence, KNIME and ECLIPSE are both independent programs and are not
+ *  derived from each other. Should, however, the interpretation of the
+ *  GNU GPL Version 3 ("License") under any applicable laws result in
+ *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+ *  you the additional permission to use and propagate KNIME together with
+ *  ECLIPSE with only the license terms in place for ECLIPSE applying to
+ *  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+ *  license terms of ECLIPSE themselves allow for the respective use and
+ *  propagation of ECLIPSE together with KNIME.
+ *
+ *  Additional permission relating to nodes for KNIME that extend the Node
+ *  Extension (and in particular that are based on subclasses of NodeModel,
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  standard APIs ("Nodes"):
+ *  Nodes are deemed to be separate and independent programs and to not be
+ *  covered works.  Notwithstanding anything to the contrary in the
+ *  License, the License does not apply to Nodes, you are not required to
+ *  license Nodes under the License, and you are granted a license to
+ *  prepare and propagate Nodes, in each case even if such Nodes are
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  may freely choose the license terms applicable to such Node, including
+ *  when such Node is propagated with or for interoperation with KNIME.
+ * -------------------------------------------------------------------
+ *
+ * History
+ *   Nov 6, 2024 (magnus): created
+ */
+
+package org.knime.hub.client.sdk.ent;
+
+import java.util.Map;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
+/**
+ * POJO representing a workflow
+ * 
+ * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class Workflow extends RepositoryItem implements Sized {
+
+    static final String TYPE = "Workflow";
+
+    private static final String JSON_PROPERTY_SIZE = "size";
+    private final int m_size;
+
+    @JsonCreator
+    private Workflow(
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) String path,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) String id,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) String owner,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) String description,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) MetaInfo details,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) Map<String, Control> masonControls,
+            @JsonProperty(value = Workflow.JSON_PROPERTY_SIZE, required = true) Integer size) {
+        super(path, id, owner, description, details, masonControls);
+        this.m_size = size.intValue();
+    }
+
+    /**
+     * Retrieves the compressed workflows file size in bytes.
+     * 
+     * @return size
+     */
+    @JsonProperty(JSON_PROPERTY_SIZE)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @Override
+    public long getSize() {
+        return m_size;
+    }
+
+    @Override
+    public RepositoryItemType getType() {
+        return RepositoryItemType.WORKFLOW;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var workflow = (Workflow) o;
+        return Objects.equals(this.m_size, workflow.m_size) && super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_size, super.hashCode());
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
+        }
+    }
+}
