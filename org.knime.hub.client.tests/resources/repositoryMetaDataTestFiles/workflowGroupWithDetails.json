@@ -1,0 +1,135 @@
+{
+  "id" : "*CF2J49sBBfZBibC8",
+  "type" : "WorkflowGroup",
+  "path" : "/Users/jdoe/Space/WorkflowGroup",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "downloadCount" : 0,
+  "children" : [ {
+    "id" : "*iMLnw_ejyqC_DiiE",
+    "type" : "Component",
+    "path" : "/Users/jdoe/Space/WorkflowGroup/NestedComponent",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "richDescription" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  }, {
+    "id" : "*QSvc9nCKIaDzLI7z",
+    "type" : "Data",
+    "path" : "/Users/jdoe/Space/WorkflowGroup/NestedData",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  }, {
+    "id" : "*myJj0QRaql_4_PNf",
+    "type" : "Workflow",
+    "path" : "/Users/jdoe/Space/WorkflowGroup/NestedWorkflow",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "richDescription" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  } ],
+  "details" : {
+    "space" : {
+      "owner" : "jdoe",
+      "ownerAccountId" : "",
+      "accesses" : [ ],
+      "contributors" : [ ],
+      "private" : true,
+      "spaceId" : "*mTRjZD2LAbPevhGj",
+      "spaceName" : "Space"
+    }
+  },
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:upload" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup/{name}:data",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload a new item"
+    },
+    "knime:create" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/WorkflowGroup/{name}",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Create a new item"
+    },
+    "knime:initiate-upload" : {
+      "href" : "https://api.hub.com/repository/*CF2J49sBBfZBibC8/manifest",
+      "method" : "POST",
+      "title" : "Upload child to item"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*CF2J49sBBfZBibC8/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

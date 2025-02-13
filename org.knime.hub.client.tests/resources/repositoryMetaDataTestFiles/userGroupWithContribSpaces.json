@@ -1,0 +1,269 @@
+{
+  "id" : "*excWR8gSWMrx6TRv",
+  "type" : "WorkflowGroup",
+  "path" : "/Users/jdoe",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "downloadCount" : 0,
+  "children" : [ {
+    "id" : "*i-jJ7Q2agCnGBcEF",
+    "type" : "Space",
+    "path" : "/Users/jdoe/Private",
+    "canonicalPath" : "",
+    "_class" : "",
+    "lastEditedOn" : "",
+    "private" : true,
+    "tags" : [ ],
+    "contributors" : [ ],
+    "accesses" : [ ],
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "downloadCount" : 0,
+    "kudosCount" : 0,
+    "@controls" : {
+      "self" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private",
+        "method" : "GET"
+      },
+      "knime:download" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private:data",
+        "method" : "GET"
+      },
+      "knime:delete" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private",
+        "method" : "DELETE"
+      },
+      "edit" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private:data",
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload new version"
+      },
+      "knime:upload" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private/{name}:data",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload a new item"
+      },
+      "knime:create" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Private/{name}",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Create a new item"
+      },
+      "knime:initiate-upload" : {
+        "href" : "https://api.hub.com/repository/*i-jJ7Q2agCnGBcEF/manifest",
+        "method" : "POST",
+        "title" : "Upload child to item"
+      },
+      "knime:manifest-download" : {
+        "href" : "https://api.hub.com/repository/*i-jJ7Q2agCnGBcEF/manifest",
+        "method" : "GET",
+        "title" : "Download item"
+      }
+    },
+    "@namespaces" : {
+      "knime" : {
+        "name" : ""
+      }
+    }
+  }, {
+    "id" : "*vOIzZKEIv3iccZJc",
+    "type" : "Space",
+    "path" : "/Users/jdoe/Public",
+    "canonicalPath" : "",
+    "_class" : "",
+    "lastEditedOn" : "",
+    "private" : false,
+    "tags" : [ ],
+    "contributors" : [ ],
+    "accesses" : [ ],
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "downloadCount" : 0,
+    "kudosCount" : 0,
+    "@controls" : {
+      "self" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public",
+        "method" : "GET"
+      },
+      "knime:download" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public:data",
+        "method" : "GET"
+      },
+      "knime:delete" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public",
+        "method" : "DELETE"
+      },
+      "edit" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public:data",
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload new version"
+      },
+      "knime:upload" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public/{name}:data",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload a new item"
+      },
+      "knime:create" : {
+        "href" : "https://api.hub.com/repository/Users/jdoe/Public/{name}",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Create a new item"
+      },
+      "knime:initiate-upload" : {
+        "href" : "https://api.hub.com/repository/*vOIzZKEIv3iccZJc/manifest",
+        "method" : "POST",
+        "title" : "Upload child to item"
+      },
+      "knime:manifest-download" : {
+        "href" : "https://api.hub.com/repository/*vOIzZKEIv3iccZJc/manifest",
+        "method" : "GET",
+        "title" : "Download item"
+      }
+    },
+    "@namespaces" : {
+      "knime" : {
+        "name" : ""
+      }
+    }
+  }, {
+    "id" : "*3mpbRn9wOffgSZyG",
+    "type" : "Space",
+    "path" : "/Users/idoe/ContributorSpace",
+    "canonicalPath" : "",
+    "_class" : "",
+    "lastEditedOn" : "",
+    "private" : false,
+    "tags" : [ ],
+    "contributors" : [ "jdoe" ],
+    "accesses" : [ {
+      "identity" : "jdoe",
+      "role" : "contributor",
+      "accountId" : ""
+    } ],
+    "ownerAccountId" : "",
+    "owner" : "idoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "downloadCount" : 0,
+    "kudosCount" : 0,
+    "@controls" : {
+      "self" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace",
+        "method" : "GET"
+      },
+      "knime:download" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace:data",
+        "method" : "GET"
+      },
+      "knime:delete" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace",
+        "method" : "DELETE"
+      },
+      "edit" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace:data",
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload new version"
+      },
+      "knime:upload" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace/{name}:data",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Upload a new item"
+      },
+      "knime:create" : {
+        "href" : "https://api.hub.com/repository/Users/idoe/ContributorSpace/{name}",
+        "isHrefTemplate" : true,
+        "method" : "PUT",
+        "accept" : [ "*/*" ],
+        "encoding" : "Raw",
+        "title" : "Create a new item"
+      },
+      "knime:initiate-upload" : {
+        "href" : "https://api.hub.com/repository/*3mpbRn9wOffgSZyG/manifest",
+        "method" : "POST",
+        "title" : "Upload child to item"
+      },
+      "knime:manifest-download" : {
+        "href" : "https://api.hub.com/repository/*3mpbRn9wOffgSZyG/manifest",
+        "method" : "GET",
+        "title" : "Download item"
+      }
+    },
+    "@namespaces" : {
+      "knime" : {
+        "name" : ""
+      }
+    }
+  } ],
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe:data",
+      "method" : "GET"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:upload" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/{name}:data",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload a new item"
+    },
+    "knime:create" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/{name}",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Create a new item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "id" : "*mTRjZD2LAbPevhGj",
+  "type" : "Space",
+  "path" : "/Users/jdoe/Space",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "description" : "This is a description",
+  "richDescription" : "",
+  "downloadCount" : 0,
+  "kudosCount" : 0,
+  "lastEditedOn" : "",
+  "private" : true,
+  "tags" : [ ],
+  "contributors" : [ ],
+  "accesses" : [ ],
+  "children" : [ {
+    "id" : "*iMLnw_ejyqC_DiiE",
+    "type" : "Component",
+    "path" : "/Users/jdoe/Space/Component",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "richDescription" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  }, {
+    "id" : "*QSvc9nCKIaDzLI7z",
+    "type" : "Data",
+    "path" : "/Users/jdoe/Space/Data",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  }, {
+    "id" : "*Kl06C8NRxUPriipo",
+    "type" : "Workflow",
+    "path" : "/Users/jdoe/Space/Workflow",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "description" : "This is a description",
+    "richDescription" : "",
+    "downloadCount" : 0,
+    "lastEditedOn" : "",
+    "lastUploadedOn" : "",
+    "size" : 1337,
+    "kudosCount" : 0,
+    "updateCount" : 0,
+    "updateCheckCount" : 0
+  }, {
+    "id" : "*CF2J49sBBfZBibC8",
+    "type" : "WorkflowGroup",
+    "path" : "/Users/jdoe/Space/WorkflowGroup",
+    "canonicalPath" : "",
+    "_class" : "",
+    "ownerAccountId" : "",
+    "owner" : "jdoe",
+    "author" : "",
+    "createdOn" : "",
+    "itemVersionId" : "",
+    "downloadCount" : 0
+  } ],
+  "actions" : [ "ADD_KUDOS", "CREATE_WORKFLOW_GROUP", "DELETE_ITEM", "DELETE_SPACE", "DOWNLOAD_LEAF_ITEM", "DOWNLOAD_WORKFLOW_GROUP", "DOWNLOAD_SPACE", "EDIT_SPACE_DESCRIPTION", "EDIT_SPACE_VISIBILITY", "READ_ITEM", "READ_SPACE", "REMOVE_KUDOS", "REMOVE_SELF_USER", "RENAME_ITEM", "RENAME_SPACE", "UPLOAD_ITEM" ],
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:upload" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/{name}:data",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload a new item"
+    },
+    "knime:create" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/{name}",
+      "isHrefTemplate" : true,
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Create a new item"
+    },
+    "knime:initiate-upload" : {
+      "href" : "https://api.hub.com/repository/*mTRjZD2LAbPevhGj/manifest",
+      "method" : "POST",
+      "title" : "Upload child to item"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*mTRjZD2LAbPevhGj/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

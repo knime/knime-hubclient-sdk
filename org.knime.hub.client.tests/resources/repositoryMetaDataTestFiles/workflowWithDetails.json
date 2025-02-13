@@ -1,0 +1,103 @@
+{
+  "id" : "*Kl06C8NRxUPriipo",
+  "type" : "Workflow",
+  "path" : "/Users/jdoe/Space/Workflow",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "description" : "This is a description",
+  "richDescription" : "",
+  "downloadCount" : 0,
+  "lastEditedOn" : "",
+  "lastUploadedOn" : "",
+  "size" : 1337,
+  "kudosCount" : 0,
+  "updateCount" : 0,
+  "updateCheckCount" : 0,
+  "hasReport" : false,
+  "version" : "",
+  "createdBy" : "",
+  "details" : {
+    "name" : "Workflow",
+    "annotations" : [ ],
+    "nodes" : [ {
+      "factoryName" : "org.knime.base.node.io.tablecreator.TableCreator2NodeFactory",
+      "nodeInstanceId" : "3",
+      "type" : "NativeNode",
+      "nodeAndBundleInformation" : {
+        "bundleVersion" : "5.3.2.v202409100934",
+        "bundleName" : "KNIME Base Nodes",
+        "bundleSymbolicName" : "org.knime.base",
+        "bundleVendor" : "KNIME AG, Zurich, Switzerland",
+        "nodeName" : "Table Creator",
+        "factoryClass" : "org.knime.base.node.io.tablecreator.TableCreator2NodeFactory",
+        "featureSymbolicName" : "org.knime.features.base",
+        "featureName" : "KNIME Base nodes",
+        "featureVersion" : "5.3.2.v202409100934",
+        "featureVendor" : "KNIME AG, Zurich, Switzerland"
+      }
+    } ],
+    "encryption" : {
+      "containsEncrypted" : false
+    },
+    "kudos" : [ ],
+    "links" : [ ],
+    "tags" : [ ],
+    "workflowSvg" : {
+      "width" : 142,
+      "height" : 100
+    },
+    "space" : {
+      "owner" : "jdoe",
+      "ownerAccountId" : "",
+      "accesses" : [ ],
+      "contributors" : [ ],
+      "private" : true,
+      "spaceId" : "*mTRjZD2LAbPevhGj",
+      "spaceName" : "Space"
+    }
+  },
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:configuration" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow:configuration",
+      "method" : "GET"
+    },
+    "knime:openapi" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Workflow:openapi",
+      "method" : "GET"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*Kl06C8NRxUPriipo/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

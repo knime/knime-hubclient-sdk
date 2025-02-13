@@ -1,0 +1,75 @@
+{
+  "items": {
+    "/my-workflow": {
+      "workflowGroup": false,
+      "uploadId": "d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0"
+    },
+    "/my-group/my-data-file": {
+      "workflowGroup": false,
+      "uploadId": "7227362d-c1ae-452c-a53c-cf0d609caef4~874d4805-f51f-4c83-81c1-10919e3dee48",
+      "parts": {
+        "1": {
+          "method": "PUT",
+          "url": "https://example.com/foo?X-Amz-Algorithm=...",
+          "header": {
+            "Host": [
+              "example.com"
+            ]
+          }
+        },
+        "2": {
+          "method": "PUT",
+          "url": "https://example.com/foo?X-Amz-Algorithm=...",
+          "header": {
+            "Host": [
+              "example.com"
+            ]
+          }
+        },
+        "3": {
+          "method": "PUT",
+          "url": "https://example.com/foo?X-Amz-Algorithm=...",
+          "header": {
+            "Host": [
+              "example.com"
+            ]
+          }
+        }
+      }
+    },
+    "/my-group/my-empty-group": {
+      "workflowGroup": true
+    }
+  },
+  "@namespaces": {
+    "knime": {
+      "name": "http://www.knime.com/server/rels#"
+    }
+  },
+  "@controls": {
+    "knime:upload-status": {
+      "href": "http://localhost:9080/uploads/{uploadId}/status",
+      "isHrefTemplate": true,
+      "method": "GET",
+      "title": "Retrieves the status of the upload process"
+    },
+    "knime:create-upload-part": {
+      "href": "http://localhost:9080/uploads/{uploadId}/parts{?partNumber}",
+      "isHrefTemplate": true,
+      "method": "POST",
+      "title": "Creates a URI to upload another part"
+    },
+    "knime:complete-upload": {
+      "href": "http://localhost:9080/uploads/{uploadId}",
+      "isHrefTemplate": true,
+      "method": "POST",
+      "title": "Completes the upload process"
+    },
+    "knime:abort-upload": {
+      "href": "http://localhost:9080/uploads/{uploadId}",
+      "isHrefTemplate": true,
+      "method": "DELETE",
+      "title": "Aborts the upload process"
+    }
+  }
+}

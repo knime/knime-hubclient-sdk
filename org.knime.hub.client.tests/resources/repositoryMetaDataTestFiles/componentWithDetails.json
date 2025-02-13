@@ -1,0 +1,100 @@
+{
+  "id" : "*iMLnw_ejyqC_DiiE",
+  "type" : "Component",
+  "path" : "/Users/jdoe/Space/Component",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "description" : "This is a description",
+  "richDescription" : "",
+  "downloadCount" : 0,
+  "lastEditedOn" : "",
+  "lastUploadedOn" : "",
+  "size" : 1337,
+  "kudosCount" : 0,
+  "updateCount" : 0,
+  "updateCheckCount" : 0,
+  "version" : "",
+  "createdBy" : "",
+  "details" : {
+    "name" : "Component",
+    "annotations" : [ ],
+    "nodes" : [ {
+      "factoryName" : "org.knime.base.node.io.tablecreator.TableCreator2NodeFactory",
+      "nodeInstanceId" : "3",
+      "type" : "NativeNode",
+      "nodeAndBundleInformation" : {
+        "bundleVersion" : "5.3.2.v202409100934",
+        "bundleName" : "KNIME Base Nodes",
+        "bundleSymbolicName" : "org.knime.base",
+        "bundleVendor" : "KNIME AG, Zurich, Switzerland",
+        "nodeName" : "Table Creator",
+        "factoryClass" : "org.knime.base.node.io.tablecreator.TableCreator2NodeFactory",
+        "featureSymbolicName" : "org.knime.features.base",
+        "featureName" : "KNIME Base nodes",
+        "featureVersion" : "5.3.2.v202409100934",
+        "featureVendor" : "KNIME AG, Zurich, Switzerland"
+      }
+    } ],
+    "encryption" : {
+      "isEncrypted" : false,
+      "encryptionType" : "NONE",
+      "containsEncrypted" : false
+    },
+    "kudos" : [ ],
+    "templateInformation" : {
+      "timeStamp" : "2024-11-06T07:36:28+00:00",
+      "templateType" : "SubNode"
+    },
+    "links" : [ ],
+    "tags" : [ ],
+    "inPorts" : [ ],
+    "outPorts" : [ ],
+    "dialog" : [ ],
+    "views" : [ ],
+    "space" : {
+      "owner" : "jdoe",
+      "ownerAccountId" : "",
+      "accesses" : [ ],
+      "contributors" : [ ],
+      "private" : true,
+      "spaceId" : "*mTRjZD2LAbPevhGj",
+      "spaceName" : "Space"
+    }
+  },
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*iMLnw_ejyqC_DiiE/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

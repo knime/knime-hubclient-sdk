@@ -1,0 +1,14 @@
+{
+  "items": {
+    "/my-workflow": {
+      "itemContentType": "application/vnd.knime.workflow+zip"
+    },
+    "/my-group/my-data-file": {
+      "itemContentType": "text/plain",
+      "initialPartCount": 3
+    },
+    "/my-group/my-empty-group": {
+      "itemContentType": "application/vnd.knime.workflow-group"
+    }
+  }
+}

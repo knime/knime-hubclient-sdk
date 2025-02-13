@@ -1,0 +1,63 @@
+{
+    "uploadId": "d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0",
+    "initiatorAccountId": "account:user:c1df863a-0410-4b27-97fc-5ceb3a515176",
+    "status": "PREPARED",
+    "statusMessage": "Waiting for item to be fully uploaded.",
+    "lastUpdated": "2023-08-22T09:11:02+00:00",
+    "targetCanonicalPath": "/Users/account:user:c1df863a-0410-4b27-97fc-5ceb3a515176/my-space/my-workflow",
+    "@controls": {
+      "additionalProp1": {
+        "href": "string",
+        "isHrefTemplate": true,
+        "accept": [
+          "string"
+        ],
+        "output": [
+          "string"
+        ],
+        "template": {},
+        "title": "string",
+        "encoding": "None",
+        "method": "string"
+      },
+      "additionalProp2": {
+        "href": "string",
+        "isHrefTemplate": true,
+        "accept": [
+          "string"
+        ],
+        "output": [
+          "string"
+        ],
+        "template": {},
+        "title": "string",
+        "encoding": "None",
+        "method": "string"
+      },
+      "additionalProp3": {
+        "href": "string",
+        "isHrefTemplate": true,
+        "accept": [
+          "string"
+        ],
+        "output": [
+          "string"
+        ],
+        "template": {},
+        "title": "string",
+        "encoding": "None",
+        "method": "string"
+      }
+    },
+    "@namespaces": {
+      "additionalProp1": {
+        "name": "string"
+      },
+      "additionalProp2": {
+        "name": "string"
+      },
+      "additionalProp3": {
+        "name": "string"
+      }
+    }
+}

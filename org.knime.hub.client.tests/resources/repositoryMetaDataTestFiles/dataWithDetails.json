@@ -1,0 +1,61 @@
+{
+  "id" : "*QSvc9nCKIaDzLI7z",
+  "type" : "Data",
+  "path" : "/Users/jdoe/Space/Data",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "downloadCount" : 0,
+  "lastEditedOn" : "",
+  "lastUploadedOn" : "",
+  "size" : 1337,
+  "kudosCount" : 0,
+  "updateCount" : 0,
+  "updateCheckCount" : 0,
+  "details" : {
+    "space" : {
+      "owner" : "mgohm",
+      "ownerAccountId" : "",
+      "accesses" : [ ],
+      "contributors" : [ ],
+      "private" : true,
+      "spaceId" : "*mTRjZD2LAbPevhGj",
+      "spaceName" : "Space"
+    }
+  },
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Data",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Data:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Data",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Data:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*QSvc9nCKIaDzLI7z/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}
