@@ -51,24 +51,22 @@ package org.knime.hub.client.sdk.ent;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 
 /**
  * POJO representing the status of an asynchronous upload.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UploadStatus {
-    
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new Jdk8Module());
 
     private static final String JSON_PROPERTY_UPLOAD_ID = "uploadId";
     private final String m_uploadId;
@@ -80,15 +78,20 @@ public final class UploadStatus {
      * Upload status enum.
      */
     public enum StatusEnum {
+        /** Upload Prepared */
         PREPARED("PREPARED"),
+        /** Waiting on upload analysis */
         ANALYSIS_PENDING("ANALYSIS_PENDING"),
+        /** Upload completed */
         COMPLETED("COMPLETED"),
+        /** Upload failed */
         FAILED("FAILED"),
+        /** Upload aborted */
         ABORTED("ABORTED");
 
         private String m_value;
 
-        StatusEnum(String value) {
+        StatusEnum(final String value) {
             this.m_value = value;
         }
 
@@ -103,7 +106,7 @@ public final class UploadStatus {
         }
 
         @JsonCreator
-        private static StatusEnum fromValue(String value) {
+        private static StatusEnum fromValue(final String value) {
             for (StatusEnum b : StatusEnum.values()) {
                 if (b.m_value.equals(value)) {
                     return b;
@@ -126,14 +129,25 @@ public final class UploadStatus {
     private static final String JSON_PROPERTY_TARGET_CANONICAL_PATH = "targetCanonicalPath";
     private final String m_targetCanonicalPath;
 
+    /**
+     * The upload status
+     *
+     * @param uploadId the ID of the upload
+     * @param initiatorAccountId the account ID of the upload initiator
+     * @param status the upload status
+     * @param statusMessage the upload status message
+     * @param lastUpdated the time of the last update
+     * @param targetCanonicalPath the canonical path of the target
+     */
     @JsonCreator
     public UploadStatus(
-            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID, required = true) String uploadId,
-            @JsonProperty(value = JSON_PROPERTY_INITIATOR_ACCOUNT_ID, required = true) String initiatorAccountId,
-            @JsonProperty(value = JSON_PROPERTY_STATUS, required = true) StatusEnum status,
-            @JsonProperty(value = JSON_PROPERTY_STATUS_MESSAGE, required = true) String statusMessage,
-            @JsonProperty(value = JSON_PROPERTY_LAST_UPDATED, required = true) Instant lastUpdated,
-            @JsonProperty(value = JSON_PROPERTY_TARGET_CANONICAL_PATH, required = true) String targetCanonicalPath) {
+            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID, required = true) final String uploadId,
+            @JsonProperty(value = JSON_PROPERTY_INITIATOR_ACCOUNT_ID, required = true) final String initiatorAccountId,
+            @JsonProperty(value = JSON_PROPERTY_STATUS, required = true) final StatusEnum status,
+            @JsonProperty(value = JSON_PROPERTY_STATUS_MESSAGE, required = true) final String statusMessage,
+            @JsonProperty(value = JSON_PROPERTY_LAST_UPDATED, required = true) final Instant lastUpdated,
+            @JsonProperty(value = JSON_PROPERTY_TARGET_CANONICAL_PATH, required = true) final String targetCanonicalPath
+            ) {
         this.m_uploadId = uploadId;
         this.m_initiatorAccountId = initiatorAccountId;
         this.m_status = status;
@@ -144,7 +158,7 @@ public final class UploadStatus {
 
     /**
      * Retrieves the ID of the upload process.
-     * 
+     *
      * @return uploadId
      */
     @JsonProperty(JSON_PROPERTY_UPLOAD_ID)
@@ -155,7 +169,7 @@ public final class UploadStatus {
 
     /**
      * Retrieves the account ID of the user who initiated the upload process.
-     * 
+     *
      * @return initiatorAccountId
      */
     @JsonProperty(JSON_PROPERTY_INITIATOR_ACCOUNT_ID)
@@ -166,7 +180,7 @@ public final class UploadStatus {
 
     /**
      * Retrieves the status of the upload process.
-     * 
+     *
      * @return status
      */
     @JsonProperty(JSON_PROPERTY_STATUS)
@@ -177,7 +191,7 @@ public final class UploadStatus {
 
     /**
      * Retrieves a human readable message describing the upload process status.
-     * 
+     *
      * @return statusMessage
      */
     @JsonProperty(JSON_PROPERTY_STATUS_MESSAGE)
@@ -188,7 +202,7 @@ public final class UploadStatus {
 
     /**
      * Retrieves the date/time the status was last updated.
-     * 
+     *
      * @return lastUpdated
      */
     @JsonProperty(JSON_PROPERTY_LAST_UPDATED)
@@ -198,9 +212,9 @@ public final class UploadStatus {
     }
 
     /**
-     * Retrieves the target location of the upload process, e.g. 
+     * Retrieves the target location of the upload process, e.g.
      * the canonical path the item is being uploaded to
-     * 
+     *
      * @return targetCanonicalPath
      */
     @JsonProperty(JSON_PROPERTY_TARGET_CANONICAL_PATH)
@@ -210,7 +224,7 @@ public final class UploadStatus {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -228,16 +242,14 @@ public final class UploadStatus {
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_uploadId, m_initiatorAccountId, m_status, 
+        return Objects.hash(m_uploadId, m_initiatorAccountId, m_status,
                 m_statusMessage, m_lastUpdated, m_targetCanonicalPath);
     }
 
     @Override
     public String toString() {
         try {
-            synchronized (MAPPER) {
-                return MAPPER.writeValueAsString(this);
-            }
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

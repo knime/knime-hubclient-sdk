@@ -68,6 +68,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -75,6 +76,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -144,15 +146,13 @@ class HubClientAPITest {
 	    serverMock.start();
 	    final var serverAdress = HttpMockServiceFactory.getBaseUri(serverMock);
 
-	    // Create the API client and get the associated object mapper.
-	    apiClient = new ApiClient(serverAdress, Duration.ofSeconds(0), Duration.ofSeconds(0));
-	    mapper = apiClient.getObjectMapper();
-	    
 	    // Create the HUB client API.
 	    final var authMock = Mockito.mock(Authenticator.class);
 	    authToken = UUID.randomUUID().toString();
 	    when(authMock.getAuthorization()).thenReturn(authToken);
-	    hubClientAPIMock = new HubClientAPI(apiClient, authMock);
+        apiClient = new ApiClient(serverAdress, authMock, Duration.ofSeconds(0), Duration.ofSeconds(0));
+        mapper = apiClient.getObjectMapper();	    
+	    hubClientAPIMock = new HubClientAPI(apiClient);
 	    
 	    // Configure JsonPath to use Jackson for JsonNode compatibility
 	    // Returns a null node if a JSON property is missing.
@@ -163,10 +163,11 @@ class HubClientAPITest {
                 .build();
 	}
 		
-	private JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId, 
-	        final Map<String, String> queryParams) throws IOException {
+	private static JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId, 
+	        final Map<String, String> queryParams) throws IOException, URISyntaxException {
         // Path to the file inside test file folder.
-        String filePath = "/%s/%s/%s".formatted(RESOURCE_FOLDER_NAME, TEST_FILE_FOLDER_NAME, testFileName);
+	    final var filePath = IPath.forPosix(HubClientAPITest.RESOURCE_FOLDER_NAME)
+	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(testFileName);
 
         // Obtain file object from bundle activator class.
         File file = HubClientSDKPlugin.resolvePath(filePath).toFile();
@@ -202,6 +203,7 @@ class HubClientAPITest {
 	 * @param repoItemName the name of the repository item
 	 * @throws IOException
 	 * @throws CouldNotAuthorizeException 
+	 * @throws URISyntaxException 
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -212,7 +214,7 @@ class HubClientAPITest {
         "space.json,           Space"
     })
 	void testGetRepositoryItemMetaDataWithoutDetails(final String testFileName, final String repoItemName) 
-			throws IOException, CouldNotAuthorizeException {
+			throws IOException, CouldNotAuthorizeException, URISyntaxException {
 	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = null;
         boolean deep = false;
@@ -248,6 +250,7 @@ class HubClientAPITest {
      * @param repoItemName the name of the repository item
 	 * @throws IOException
 	 * @throws CouldNotAuthorizeException 
+	 * @throws URISyntaxException 
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -258,7 +261,7 @@ class HubClientAPITest {
         // Space does not provide details if requested.
     })
     void testGetRepositoryItemMetaDataWithDetails(final String testFileName, final String repoItemName) 
-            throws IOException, CouldNotAuthorizeException {
+            throws IOException, CouldNotAuthorizeException, URISyntaxException {
         String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);        
         String details = "full";
         boolean deep = false;
@@ -295,6 +298,7 @@ class HubClientAPITest {
      * @param repoItemName the name of the repository item
 	 * @throws IOException
 	 * @throws CouldNotAuthorizeException 
+	 * @throws URISyntaxException 
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -302,7 +306,7 @@ class HubClientAPITest {
         "space.json,           Space"    
     })
 	void testGetRepositoryItemMetaDataWithChildren(final String testFileName, final String repoItemName) 
-	        throws IOException, CouldNotAuthorizeException {
+	        throws IOException, CouldNotAuthorizeException, URISyntaxException {
 	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);        
         String details = null;
         boolean deep = false;
@@ -337,9 +341,11 @@ class HubClientAPITest {
 	 * 
 	 * @throws IOException
 	 * @throws CouldNotAuthorizeException 
+	 * @throws URISyntaxException 
 	 */
 	@Test
-	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException, CouldNotAuthorizeException {
+	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException, CouldNotAuthorizeException, 
+	URISyntaxException {
         String path = "Users/%s".formatted(DEFAULT_USERNAME);        
         String details = null;
         boolean deep = false;
@@ -371,10 +377,10 @@ class HubClientAPITest {
         assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
     }
 	
-	private <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse, 
+	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse, 
 			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) {
 	    // Create the actual JSON node response object.
-	    var responseEntity = actualApiResponse.getResult().toOptional().get();
+	    var responseEntity = actualApiResponse.result().toOptional().get();
         JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);
 
         // Compare the JSON properties queried using the expected JSON paths.

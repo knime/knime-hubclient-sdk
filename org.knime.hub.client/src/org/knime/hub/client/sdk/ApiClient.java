@@ -64,6 +64,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 
@@ -72,6 +73,7 @@ import org.apache.cxf.jaxrs.client.ClientProperties;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.KNIMEServerHostnameVerifier;
 import org.knime.core.util.auth.Authenticator;
@@ -109,15 +111,29 @@ public class ApiClient {
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
     private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
+    /**
+     * HTTP request method
+     */
     public enum Method {
+        /** GET request method */
         GET,
+
+        /** POST request method */
         POST,
+
+        /** PUT request method */
         PUT,
+
+        /** HEAD request method */
         HEAD,
+
+        /** DELETE request method */
         DELETE,
+
+        /** PATCH request method */
         PATCH
     }
-    
+
     private final URI m_baseURI;
     private Client m_httpClient;
 
@@ -125,17 +141,26 @@ public class ApiClient {
     private final Duration m_connectionTimeout;
     private final Duration m_readTimeout;
 
+    private final Authenticator m_auth;
+
+    final NodeLogger m_logger;
+
     /**
-     * Builds the {@link ApiClient} with the given base URL of the server 
+     * Builds the {@link ApiClient} with the given base URL of the server
      * and specified connection and read timeouts.
-     * 
+     *
      * @param baseURI base URL of the server.
+     * @param auth the {@link Authenticator}
      * @param connectionTimeout the time (in ms) it takes until the connection gets a timeout
      * @param readTimeout the time (in ms) it takes until the read process gets a timeout
      */
-    public ApiClient(final URI baseURI, final Duration connectionTimeout, final Duration readTimeout) {
+    public ApiClient(final URI baseURI, final Authenticator auth,
+            final Duration connectionTimeout, final Duration readTimeout) {
         // Set base path
         m_baseURI = baseURI;
+
+        // Set authentication
+        m_auth = auth;
 
         // Configure the object mapper for the JSON provider
         m_objectMapper = new ObjectMapper();
@@ -147,11 +172,11 @@ public class ApiClient {
         m_objectMapper.enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING);
         m_objectMapper.registerModule(new JavaTimeModule());
         m_objectMapper.registerModule(new Jdk8Module()); // Needed for Optional support.
-        
+
         // Set timeouts
         m_connectionTimeout = connectionTimeout;
         m_readTimeout = readTimeout;
-        
+
         // Create a http client builder and register the defined JSON provider
         final var clientBuilder = ClientBuilder.newBuilder();
         clientBuilder.hostnameVerifier(KNIMEServerHostnameVerifier.getInstance());
@@ -165,29 +190,35 @@ public class ApiClient {
 
         // Enable automatic redirects (e.g. for download)
         clientBuilder.property(ClientProperties.HTTP_AUTOREDIRECT_PROP, true);
-        
+
         // Set timeouts for connection
         clientBuilder.connectTimeout(m_connectionTimeout.toMillis(), TimeUnit.MILLISECONDS);
         clientBuilder.readTimeout(m_readTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        clientBuilder.property(ClientProperties.HTTP_RECEIVE_TIMEOUT_PROP, 
+        clientBuilder.property(ClientProperties.HTTP_RECEIVE_TIMEOUT_PROP,
                 Math.max(SLOW_OPERATION_READ_TIMEOUT.toMillis(), m_readTimeout.toMillis()));
 
         final var client = clientBuilder.build();
         m_httpClient = client;
+
+        m_logger = NodeLogger.getLogger(getClass());
     }
 
     /**
      * Creates and retrieves a new {@link ApiRequest}.
-     * 
+     *
      * @return {@link ApiRequest}
      */
     public ApiRequest createApiRequest() {
-        return new ApiRequest(m_baseURI, m_httpClient, 
-                m_connectionTimeout, m_readTimeout);
+        return new ApiRequest(m_baseURI, m_httpClient, m_connectionTimeout, m_readTimeout, m_logger);
     }
 
+    /**
+     * Request builder for the API client
+     *
+     * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+     */
     public final class ApiRequest {
-        
+
         private final Map<String, String> m_headerParams = new HashMap<>();
         private final Map<String, String> m_queryParams = new HashMap<>();
         private final Map<String, String> m_cookieParams = new HashMap<>();
@@ -195,22 +226,26 @@ public class ApiClient {
         private MediaType m_contentType = DEFAULT_CONTENT_TYPE;
         private String m_headerAccept;
 
-        private final URI m_baseURI;
-        private final Client m_httpClient;
-        private final Duration m_connectionTimeout;
-        private final Duration m_readTimeout;
+        private final URI m_requestBaseURI;
+        private final Client m_requestHTTPClient;
+        private final Duration m_requestConnectionTimeout;
+        private final Duration m_requestReadTimeout;
+        private final NodeLogger m_requestLogger;
 
-        private ApiRequest(final URI baseURI, final Client httpClient, 
-                final Duration connectionTimeout, final Duration readTimeout) {
-            m_baseURI = baseURI;
-            m_httpClient = httpClient;
-            m_connectionTimeout = connectionTimeout;
-            m_readTimeout = readTimeout;
+        private static final String REQUEST_LENGTH_MESSAGE = "Request '%s' took %.3fs";
+
+        private ApiRequest(final URI baseURI, final Client httpClient, final Duration connectionTimeout,
+            final Duration readTimeout, final NodeLogger logger) {
+            m_requestBaseURI = baseURI;
+            m_requestHTTPClient = httpClient;
+            m_requestConnectionTimeout = connectionTimeout;
+            m_requestReadTimeout = readTimeout;
+            m_requestLogger = logger;
         }
 
         /**
-         * Adds a header parameter to the request. 
-         * 
+         * Adds a header parameter to the request.
+         *
          * @param key the name of the header parameter
          * @param value the value of the header parameter
          * @return {@link ApiRequest}
@@ -221,23 +256,23 @@ public class ApiClient {
             }
             return this;
         }
-        
+
         /**
-         * Adds header parameters to the request. 
-         * 
+         * Adds header parameters to the request.
+         *
          * @param headerMap the map of headers
          * @return {@link ApiRequest}
          */
-        public ApiRequest withHeaders(Map<String, String> headerMap) {
+        public ApiRequest withHeaders(final Map<String, String> headerMap) {
             if (headerMap != null) {
                 m_headerParams.putAll(headerMap);
             }
             return this;
         }
-        
+
         /**
-         * Adds a query parameter to the request. 
-         * 
+         * Adds a query parameter to the request.
+         *
          * @param name the name of the query parameter
          * @param value the value of the query parameter
          * @return {@link ApiRequest}
@@ -248,14 +283,14 @@ public class ApiClient {
             }
             return this;
         }
-        
+
         /**
-         * Adds query parameters to the request. 
-         * 
+         * Adds query parameters to the request.
+         *
          * @param queryParamMap the map of query parameters
          * @return {@link ApiRequest}
          */
-        public ApiRequest withQueryParams(Map<String, String> queryParamMap) {
+        public ApiRequest withQueryParams(final Map<String, String> queryParamMap) {
             if (queryParamMap != null) {
                 m_queryParams.putAll(queryParamMap);
             }
@@ -263,8 +298,8 @@ public class ApiClient {
         }
 
         /**
-         * Adds a cookie parameter to the request. 
-         * 
+         * Adds a cookie parameter to the request.
+         *
          * @param key the key of the cookie parameter
          * @param value the value of the cookie parameter
          * @return {@link ApiRequest}
@@ -275,14 +310,14 @@ public class ApiClient {
             }
             return this;
         }
-        
+
         /**
-         * Adds cookie parameters to the request. 
-         * 
+         * Adds cookie parameters to the request.
+         *
          * @param cookieParamMap the map of cookie parameters
          * @return {@link ApiRequest}
          */
-        public ApiRequest withCookieParams(Map<String, String> cookieParamMap) {
+        public ApiRequest withCookieParams(final Map<String, String> cookieParamMap) {
             if (cookieParamMap != null) {
                 m_cookieParams.putAll(cookieParamMap);
             }
@@ -291,7 +326,7 @@ public class ApiClient {
 
         /**
          * Adds the content type to the request.
-         * 
+         *
          * @param contentType the content type
          * @return {@link ApiResponse}
          */
@@ -306,7 +341,7 @@ public class ApiClient {
 
         /**
          * Set the accept headers to the request.
-         * 
+         *
          * @param accepts the accept header values
          * @return {@link ApiRequest}
          */
@@ -316,7 +351,7 @@ public class ApiClient {
             } else if (accepts[0] == null) {
                 m_headerAccept = null;
             } else {
-                m_headerAccept = accepts.length == 0 ? null : 
+                m_headerAccept = accepts.length == 0 ? null :
                     String.join(", ", Arrays.asList(accepts).stream().map(Object::toString).toList());
             }
             return this;
@@ -329,18 +364,18 @@ public class ApiClient {
          * @param path The sub path.
          * @return The full URL
          * @throws UnsupportedEncodingException
-         * @throws URISyntaxException 
+         * @throws URISyntaxException
          */
         private URI buildUrl(final IPath path) {
-            var uriBuilder = new URIBuilder(m_baseURI);
+            var uriBuilder = new URIBuilder(m_requestBaseURI);
             final var segments = new ArrayList<>(uriBuilder.getPathSegments());
             segments.addAll(Arrays.asList(path.segments()));
             uriBuilder.setPathSegments(segments);
-            
+
             for (var entry : m_queryParams.entrySet()) {
                 uriBuilder.addParameter(entry.getKey(), entry.getValue());
             }
-            
+
             try {
                 return uriBuilder.build();
             } catch (URISyntaxException e) {
@@ -350,7 +385,7 @@ public class ApiClient {
 
         /**
          * Retrieves the API response of the Hub API.
-         * 
+         *
          * @param path        the API path
          * @param method      the API method
          * @param requestBody the request body
@@ -359,15 +394,14 @@ public class ApiClient {
          * @param authNames   the valid authentication names
          * @return the {@link Response} of the Hub API
          * @throws UnsupportedEncodingException
-         * @throws URISyntaxException 
-         * @throws CouldNotAuthorizeException 
+         * @throws URISyntaxException
+         * @throws CouldNotAuthorizeException
          */
-        private Response getAPIResponse(final IPath path, final Method method, 
-                final Object requestBody, final Authenticator auth) 
+        private Response getAPIResponse(final URI uri, final Method method,
+                final Object requestBody, final Authenticator auth)
                         throws CouldNotAuthorizeException {
             // Build the invocation builder which makes the request
-            final var url = buildUrl(path);
-            var builder = createInvocationBuilder(url, auth);
+            var builder = createInvocationBuilder(uri, auth);
 
             // Execute the request and retrieve the response
             return executeHttpRequest(builder, method, requestBody);
@@ -375,31 +409,31 @@ public class ApiClient {
 
         /**
          * Creates the {@link Invocation.Builder} for the HTTP request.
-         * 
+         *
          * @param uri the request URL
          * @return the {@link Invocation.Builder}
-         * @throws CouldNotAuthorizeException 
+         * @throws CouldNotAuthorizeException
          */
-        private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth) 
+        private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth)
                 throws CouldNotAuthorizeException {
             Invocation.Builder builder;
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
-            
-            // Update accept header and set content-type header 
+
+            // Update accept header and set content-type header
             // which got possibly modified through the additional headers
             if (m_headerParams.containsKey(HttpHeaders.ACCEPT)) {
                 m_headerAccept = m_headerParams.get(HttpHeaders.ACCEPT);
             }
-            
+
             if (!m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
                 m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
             }
-                
+
             if (m_headerAccept == null) {
-                builder = m_httpClient.target(uri).request();
+                builder = m_requestHTTPClient.target(uri).request();
             } else {
-                builder = m_httpClient.target(uri).request(m_headerAccept);
+                builder = m_requestHTTPClient.target(uri).request(m_headerAccept);
                 m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
@@ -410,13 +444,13 @@ public class ApiClient {
             for (final Entry<String, String> keyValue : m_cookieParams.entrySet()) {
                 builder = builder.cookie(keyValue.getKey(), keyValue.getValue());
             }
-            
+
             return builder;
         }
 
         /**
          * Executes the HTTP request.
-         * 
+         *
          * @param builder     the {@link Invocation.Builder}
          * @param method      the request method
          * @param requestBody the request body
@@ -425,187 +459,194 @@ public class ApiClient {
         private static Response executeHttpRequest(final Invocation.Builder builder, final Method method,
                 final Object requestBody) {
             return switch (method) {
-                case POST, PUT, PATCH -> builder.build(method.name(), 
+                case POST, PUT, PATCH -> builder.build(method.name(),
                     requestBody != null ? Entity.entity(requestBody, DEFAULT_CONTENT_TYPE) : null).invoke();
                 case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
             };
         }
-        
+
         /**
          * Invoke API by sending HTTP request with the given options.
          *
-         * @param path        The sub-path of the HTTP URL.
-         * @param method      The request method, one of "GET", "POST",
-         * @param body        The request body object - if it is not binary, otherwise
-         *                    null.
-         * @param returnType  The {@link GenericType} which should be returned
-         * @param accept      The request's Accept header.
-         * @param contentType The request's Content-Type header.
-         * @param authNames   The authentications to apply.
-         * 
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST",
+         * @param body              The request body object - if it is not binary, otherwise
+         *                          null.
+         * @param returnType        The {@link GenericType} which should be returned
+         *
          * @return {@link ApiResponse}
-         * @throws CouldNotAuthorizeException 
-         * @throws URISyntaxException 
-         * @throws UnsupportedEncodingException 
+         * @throws CouldNotAuthorizeException
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
-                final GenericType<R> returnType, final Authenticator auth) 
-                        throws CouldNotAuthorizeException {
+                final GenericType<R> returnType) throws CouldNotAuthorizeException {
             CheckUtils.checkNotNull(returnType, "Missing return type for '%s' '%s'".formatted(method, path));
-            
-            // Retrieve the API response
-            final var response = getAPIResponse(path, method, body, auth);
-            final var responseHeaders = response.getHeaders();
 
-            // Get the status info and set the response content-type to
-            // null in case the response does not have any content.
-            final var responseStatusInfo = response.getStatusInfo();
-            String responseContentType = null;
-            if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).get(0).toString();
-            }
-            
-            R responseEntity = null;
-            final var responseStatusFamily = responseStatusInfo.getFamily();
-            final var responseStatusCode = responseStatusInfo.getStatusCode();
-            final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-            final var responseEtag = response.getEntityTag();
-            if (Family.SUCCESSFUL == responseStatusFamily) {
-                if (responseContentType == null) {
+            // Retrieve the API response
+            final var t0 = System.currentTimeMillis();
+            final var uri = buildUrl(path);
+            try (final var response = getAPIResponse(uri, method, body, m_auth)) {
+                final var responseHeaders = response.getHeaders();
+
+                // Get the status info and set the response content-type to
+                // null in case the response does not have any content.
+                final var responseStatusInfo = response.getStatusInfo();
+                String responseContentType = null;
+                if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
+                    responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).get(0).toString();
+                }
+
+                R responseEntity = null;
+                final var responseStatusFamily = responseStatusInfo.getFamily();
+                final var responseStatusCode = responseStatusInfo.getStatusCode();
+                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
+                final var responseEtag = response.getEntityTag();
+                if (Family.SUCCESSFUL == responseStatusFamily) {
+                    if (responseContentType == null) {
+                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
+                    }
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                            Optional.ofNullable(responseEtag), Result.success(response.readEntity(returnType)));
+                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
+                        Family.SERVER_ERROR == responseStatusFamily) {
+                    // TODO JSON error handling
+                    String message;
+                    if (responseStatusFamily == Family.REDIRECTION
+                            && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                        message = "Redirect failed (firewall?): '%s'".formatted(location);
+                    } else {
+                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                                null, responseStatusInfo::getReasonPhrase);
+                    }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, responseEtag, Result.success(responseEntity));
-                }
-                return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, responseEtag, Result.success(response.readEntity(returnType)));
-            } else if(Family.CLIENT_ERROR == responseStatusFamily || 
-                    Family.SERVER_ERROR == responseStatusFamily) {
-                // TODO JSON error handling
-                String message;
-                if (responseStatusFamily == Family.REDIRECTION
-                        && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                    message = "Redirect failed (firewall?): '%s'".formatted(location);
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
                 } else {
-                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
-                            responseStatusInfo::getReasonPhrase);
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                            Optional.ofNullable(responseEtag), null);
                 }
-                return new ApiResponse<>(responseHeaders, responseStatusCode,
-                        responseStatusMessage, responseEtag, Result.failure(message, null));
-            } else {
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage, 
-                        responseEtag, null);
+            } finally {
+                m_requestLogger.debug(() -> REQUEST_LENGTH_MESSAGE
+                    .formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
             }
+
         }
 
         /**
          * Invoke API by sending HTTP request with the given options. This method
          * handles binary response downloads.
+         * @param <R>
          *
-         * @param path           The sub-path of the HTTP URL.
-         * @param method         The request method, one of "GET", "POST", "PUT" and
-         *                       "DELETE".
-         * @param body           The request body object - if it is not binary,
-         *                       otherwise null.
-         * @param authNames      The authentications to apply.
-         * @param contentHandler The {@link DownloadContentHandler}.
-         * 
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and
+         *                          "DELETE".
+         * @param body              The request body object - if it is not binary,
+         *                          otherwise null.
+         * @param contentHandler    The {@link DownloadContentHandler}.
+         *
          * @return {@link ApiResponse}
          * @throws IOException
-         * @throws CouldNotAuthorizeException 
-         * @throws URISyntaxException 
+         * @throws CanceledExecutionException
+         * @throws CouldNotAuthorizeException
          */
-        public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body, 
-                final Authenticator auth, final DownloadContentHandler<R> contentHandler)
-                throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
+                final DownloadContentHandler<R> contentHandler)
+                        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+
             // Retrieve the API response
-            final var response = getAPIResponse(path, method, body, auth);
-            final var responseHeaders = response.getHeaders();
+            final var t0 = System.currentTimeMillis();
+            final var uri = buildUrl(path);
+            try(final var response = getAPIResponse(uri, method, body, m_auth)) {
+                final var responseHeaders = response.getHeaders();
 
-            // Get the status info and set the response content-type to
-            // null in case the response does not have any content.
-            final var responseStatusInfo = response.getStatusInfo();
-            String responseContentType = null;
-            if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).toString();
-            }
-
-            R responseEntity = null;
-            final var responseStatusFamily = responseStatusInfo.getFamily();
-            final var responseStatusCode = responseStatusInfo.getStatusCode();
-            final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-            final var responseEtag = response.getEntityTag(); 
-            if (Family.SUCCESSFUL == responseStatusFamily) {
-                if (responseContentType == null) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, responseEtag, Result.success(responseEntity));
+                // Get the status info and set the response content-type to
+                // null in case the response does not have any content.
+                final var responseStatusInfo = response.getStatusInfo();
+                String responseContentType = null;
+                if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
+                    responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).toString();
                 }
-                
-                // Read the content from the response input stream
-                final var length = response.getLength();
-                try (final var inStream = response.readEntity(InputStream.class)) {
-                    responseEntity = contentHandler.handleDownload(inStream,
+
+                R responseEntity = null;
+                final var responseStatusFamily = responseStatusInfo.getFamily();
+                final var responseStatusCode = responseStatusInfo.getStatusCode();
+                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
+                final var responseEtag = response.getEntityTag();
+                if (Family.SUCCESSFUL == responseStatusFamily) {
+                    if (responseContentType == null) {
+                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
+                    }
+
+                    // Read the content from the response input stream
+                    final var length = response.getLength();
+                    try (final var inStream = response.readEntity(InputStream.class)) {
+                        responseEntity = contentHandler.handleDownload(inStream,
                             length < 0 ? OptionalLong.empty() : OptionalLong.of(length));
+                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
+                    }
+                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
+                        Family.SERVER_ERROR == responseStatusFamily) {
+                    // TODO JSON error handling
+                    String message;
+                    if (responseStatusFamily == Family.REDIRECTION
+                            && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                        message = "Redirect failed (firewall?): '%s'".formatted(location);
+                    } else {
+                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                            null, responseStatusInfo::getReasonPhrase);
+                    }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, responseEtag, Result.success(responseEntity));
-                }
-            } else if(Family.CLIENT_ERROR == responseStatusFamily || 
-                    Family.SERVER_ERROR == responseStatusFamily) {
-                // TODO JSON error handling
-                String message;
-                if (responseStatusFamily == Family.REDIRECTION
-                        && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                    message = "Redirect failed (firewall?): '%s'".formatted(location);
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
                 } else {
-                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
-                            responseStatusInfo::getReasonPhrase);
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                            Optional.ofNullable(responseEtag), null);
                 }
-                return new ApiResponse<>(responseHeaders, responseStatusCode, 
-                        responseStatusMessage, responseEtag, Result.failure(message, null));
-            } else {
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage, 
-                        responseEtag, null);
+            } finally {
+                m_requestLogger.debug(() -> REQUEST_LENGTH_MESSAGE
+                    .formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
             }
+
         }
 
         /**
          * Invoke API by sending HTTP request with the given options. This method
          * handles uploads of zip files (binary request bodies).
-         * 
+         *
          * @param <R>
          *
-         * @param path           The sub-path of the HTTP URL.
-         * @param method         The request method, one of "GET", "POST", "PUT" and
-         *                       "DELETE".
-         * @param authNames      The authentications to apply.
-         * @param contentHandler The {@link UploadContentHandler}.
-         * 
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and
+         *                          "DELETE".
+         * @param contentHandler    The {@link UploadContentHandler}.
+         *
          * @return {@link ApiResponse}
          * @throws IOException
          * @throws CanceledExecutionException if the invocation was canceled through the
          *                                    content handler
-         * @throws CouldNotAuthorizeException 
-         * @throws URISyntaxException 
+         * @throws CouldNotAuthorizeException
          */
-        public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, 
-                final Authenticator auth, final UploadContentHandler<R> contentHandler)
-                throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method,
+                final UploadContentHandler<R> contentHandler)
+                        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
 
-            m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
+            m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
             m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
             if (m_headerAccept != null) {
-                m_headerParams.put(HttpHeaders.ACCEPT, 
+                m_headerParams.put(HttpHeaders.ACCEPT,
                         String.join(", ", Arrays.asList(m_headerAccept).stream().map(Object::toString).toList()));
             }
-            
+
             // Create http url connection for upload stream.
             final var conn = prepareAuthenticatedConnection(buildUrl(path).toURL(), method);
             conn.connect();
 
             // Perform upload
             R responseEntity = null;
-            try {
-                responseEntity = contentHandler.handleUpload(conn.getOutputStream());
+            try(final var out = conn.getOutputStream()) {
+                responseEntity = contentHandler.handleUpload(out);
             } catch (final CanceledExecutionException e) {
                 conn.disconnect();
                 throw e;
@@ -624,7 +665,7 @@ public class ApiClient {
             if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
                 responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).toString();
             }
-            
+
             final var responseStatusInfo = Response.Status.fromStatusCode(conn.getResponseCode());
             final var responseStatusFamily = responseStatusInfo.getFamily();
             final var responseStatusCode = responseStatusInfo.getStatusCode();
@@ -637,19 +678,13 @@ public class ApiClient {
                 return new ApiResponse<>(responseHeaders, responseStatusCode,
                             responseStatusMessage, null, Result.success(responseEntity));
 
-            } else if (Family.CLIENT_ERROR == responseStatusFamily || 
+            } else if (Family.CLIENT_ERROR == responseStatusFamily ||
                     Family.SERVER_ERROR == responseStatusFamily) {
                 // TODO JSON error handling
                 String message;
-                if (responseStatusFamily == Family.REDIRECTION) {
-                    final var location = conn.getURL();
-                    message = "Redirect failed (firewall?): '%s'".formatted(location);
-                } else {
-                    try (final var errStream = conn.getErrorStream()) {
-                        message = errStream != null ? 
-                                new String(errStream.readAllBytes(), StandardCharsets.UTF_8) 
-                                : responseStatusMessage;
-                    }
+                try (final var errStream = conn.getErrorStream()) {
+                    message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
+                        : responseStatusMessage;
                 }
                 conn.disconnect();
                 return new ApiResponse<>(responseHeaders, responseStatusCode,
@@ -661,28 +696,28 @@ public class ApiClient {
 
         /**
          * Prepares the authenticated HTTP connection to perform an upload.
-         * 
+         *
          * @param url    the request URL
          * @param method the request method
          * @return the {@link HttpURLConnection}
          * @throws IOException
          */
-        private HttpURLConnection prepareAuthenticatedConnection(final URL url, final Method method) 
+        private HttpURLConnection prepareAuthenticatedConnection(final URL url, final Method method)
                 throws IOException {
             final var conn = (HttpURLConnection) URLConnectionFactory.getConnection(url);
             conn.setRequestMethod(method.name());
             conn.setDoOutput(true);
-            conn.setConnectTimeout(Math.toIntExact(m_connectionTimeout.toMillis()));
-            conn.setReadTimeout(Math.toIntExact(m_readTimeout.toMillis()));
+            conn.setConnectTimeout(Math.toIntExact(m_requestConnectionTimeout.toMillis()));
+            conn.setReadTimeout(Math.toIntExact(m_requestReadTimeout.toMillis()));
             m_headerParams.forEach(conn::addRequestProperty);
             return conn;
         }
-        
+
     }
-    
+
     /**
      * Returns the associated http client.
-     * 
+     *
      * @return {@link Client}
      */
     public Client getHttpClient() {
@@ -691,7 +726,7 @@ public class ApiClient {
 
     /**
      * Retrieves the base path of the API client.
-     * 
+     *
      * @return the base URI
      */
     public URI getBaseURI() {
@@ -701,7 +736,7 @@ public class ApiClient {
     /**
      * Returns the current object mapper used for JSON
      * serialization/deserialization.
-     * 
+     *
      * @return Object mapper
      */
     public ObjectMapper getObjectMapper() {
@@ -710,7 +745,7 @@ public class ApiClient {
 
     /**
      * Retrieves the connection timeout duration.
-     * 
+     *
      * @return {@link Duration} connection timeout
      */
     public Duration getConnectTimeout() {
@@ -719,7 +754,7 @@ public class ApiClient {
 
     /**
      * Retrieves the read timeout duration
-     * 
+     *
      * @return {@link Duration} read timeout
      */
     public Duration getReadTimeout() {
@@ -728,7 +763,7 @@ public class ApiClient {
 
     /**
      * Callback interface for endpoints returning larger binary results.
-     * 
+     *
      * @param <R> type of the result value
      */
     @FunctionalInterface
@@ -750,7 +785,7 @@ public class ApiClient {
 
     /**
      * Callback interface for endpoints uploading larger binary results.
-     * 
+     *
      * @param <R> type of the upload result
      */
     @FunctionalInterface

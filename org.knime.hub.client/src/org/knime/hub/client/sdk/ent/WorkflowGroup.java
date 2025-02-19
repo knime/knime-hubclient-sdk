@@ -67,7 +67,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a workflow group.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -78,29 +78,42 @@ import com.fasterxml.jackson.core.JsonProcessingException;
         visible = true, //
         requireTypeIdForSubtypes = OptBoolean.TRUE
 )
-@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE) })
+@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE_VALUE) })
 public sealed class WorkflowGroup extends RepositoryItem permits Space {
 
+    /** Type of a workflow group and space */
     protected static final String TYPE = "WorkflowGroup";
 
+    /** JSON key of the workflow groups children property */
     protected static final String JSON_PROPERTY_CHILDREN = "children";
     private final List<RepositoryItem> m_children;
 
+    /**
+     * Workflow group
+     *
+     * @param path the path of a workflow group
+     * @param id the ID of a workflow group
+     * @param owner the owner of a workflow group
+     * @param description the description of a workflow group
+     * @param details the details of a workflow group
+     * @param masonControls the mason controls of a workflow group
+     * @param children the children of a workflow group
+     */
     @JsonCreator
-    protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) Map<String, Control> masonControls,
-            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) List<RepositoryItem> children) {
+    protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
         super(path, id, owner, description, details, masonControls);
         this.m_children = children;
     }
 
     /**
      * Retrieves the workflow groups children.
-     * 
+     *
      * @return children
      */
     @JsonProperty(JSON_PROPERTY_CHILDREN)
@@ -115,7 +128,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -134,7 +147,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

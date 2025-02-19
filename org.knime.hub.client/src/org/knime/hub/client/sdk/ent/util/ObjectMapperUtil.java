@@ -58,22 +58,10 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
  */
 public final class ObjectMapperUtil {
 
-    private static final ObjectMapperUtil INSTANCE = new ObjectMapperUtil();
-
-    /**
-     * Returns the singleton instance of this class.
-     *
-     * @return the singleton instance
-     */
-    public static ObjectMapperUtil getInstance() {
-        return INSTANCE;
-    }
-
-    private final ObjectMapper m_mapper;
+    private static final ObjectMapper mapper = new ObjectMapper().registerModule(new Jdk8Module());
 
     private ObjectMapperUtil() {
-        m_mapper = new ObjectMapper();
-        m_mapper.registerModule(new Jdk8Module());
+        // utility class
     }
 
     /**
@@ -81,8 +69,8 @@ public final class ObjectMapperUtil {
      *
      * @return an object mapper
      */
-    public ObjectMapper getObjectMapper() {
-        return m_mapper;
+    public static ObjectMapper getObjectMapper() {
+        return mapper;
     }
     
 }

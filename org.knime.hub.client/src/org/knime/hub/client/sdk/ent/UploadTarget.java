@@ -53,6 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -68,8 +70,6 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UploadTarget {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new Jdk8Module());
 
     private static final String JSON_PROPERTY_METHOD = "method";
     private final String m_method;
@@ -145,9 +145,7 @@ public final class UploadTarget {
     @Override
     public String toString() {
         try {
-            synchronized (MAPPER) {
-                return MAPPER.writeValueAsString(this);
-            }
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

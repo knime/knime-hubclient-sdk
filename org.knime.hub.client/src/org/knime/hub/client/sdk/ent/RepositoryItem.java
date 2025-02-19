@@ -68,7 +68,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a repository item.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(value = RepositoryItem.JSON_PROPERTY_TYPE, allowSetters = true, ignoreUnknown = true)
@@ -87,20 +87,25 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 })
 @JsonPropertyOrder({ RepositoryItem.JSON_PROPERTY_TYPE, RepositoryItem.JSON_PROPERTY_ID }) // Serialize first
 public abstract sealed class RepositoryItem permits Component, Data, Workflow, WorkflowGroup {
-    
+
     /**
      * Repository item type enum.
      */
     public enum RepositoryItemType {
+        /** Workflow Group */
         WORKFLOW_GROUP(WorkflowGroup.TYPE), //
+        /** Workflow */
         WORKFLOW(Workflow.TYPE), //
+        /** Component */
         COMPONENT(Component.TYPE), //
+        /** Data */
         DATA(Data.TYPE), //
-        SPACE(Space.TYPE);
+        /** Space */
+        SPACE(Space.TYPE_VALUE);
 
         private final String m_value;
 
-        RepositoryItemType(String value) {
+        RepositoryItemType(final String value) {
             this.m_value = value;
         }
 
@@ -115,7 +120,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
         }
 
         @JsonCreator
-        private static RepositoryItemType fromValue(String value) {
+        private static RepositoryItemType fromValue(final String value) {
             for (RepositoryItemType b : RepositoryItemType.values()) {
                 if (b.m_value.equals(value)) {
                     return b;
@@ -125,34 +130,67 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
         }
     }
 
+    /**
+     * JSON key name for for item type property
+     */
     protected static final String JSON_PROPERTY_TYPE = "type";
     // no member for type, instead use overridden #getType()
 
+    /**
+     * JSON key name for for item path property
+     */
     protected static final String JSON_PROPERTY_PATH = "path";
     private final String m_path;
 
+    /**
+     * JSON key name for for item ID property
+     */
     protected static final String JSON_PROPERTY_ID = "id";
     private final String m_id;
 
+    /**
+     * JSON key name for for item owner property
+     */
     protected static final String JSON_PROPERTY_OWNER = "owner";
     private final String m_owner;
 
+    /**
+     * JSON key name for for item description property
+     */
     protected static final String JSON_PROPERTY_DESCRIPTION = "description";
     private final String m_description;
 
+    /**
+     * JSON key name for for item details property
+     */
     protected static final String JSON_PROPERTY_DETAILS = "details";
     private final MetaInfo m_details;
 
+    /**
+     * JSON key name for for item controls property
+     */
     protected static final String JSON_PROPERTY_MASON_CONTROLS = "@controls";
     private final Map<String, Control> m_masonControls;
 
+    /**
+     * Repository item on the KNIME HUB
+     *
+     * @param path the item path
+     * @param id the item ID
+     * @param owner the item owner
+     * @param description the item description
+     * @param details the item details
+     * @param masonControls the item mason controls
+     */
     @JsonCreator
-    protected RepositoryItem(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) Map<String, Control> masonControls) {
+    protected RepositoryItem(
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls
+            ) {
         this.m_path = path;
         this.m_id = id;
         this.m_owner = owner;
@@ -163,7 +201,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the items absolute path in the repository.
-     * 
+     *
      * @return path
      */
     @JsonProperty(JSON_PROPERTY_PATH)
@@ -175,7 +213,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     /**
      * Retrieves the items unique ID which does not change when the item is renamed
      * or moved.
-     * 
+     *
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
@@ -186,7 +224,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the items owner.
-     * 
+     *
      * @return owner
      */
     @JsonProperty(JSON_PROPERTY_OWNER)
@@ -197,7 +235,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the optional plain text description for this item
-     * 
+     *
      * @return description
      */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
@@ -208,7 +246,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the optional item details.
-     * 
+     *
      * @return details
      */
     @JsonProperty(JSON_PROPERTY_DETAILS)
@@ -219,7 +257,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the (possibly empty) map with all controls for this item.
-     * 
+     *
      * @return masonControls
      */
     @JsonProperty(JSON_PROPERTY_MASON_CONTROLS)
@@ -230,7 +268,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * Retrieves the item type.
-     * 
+     *
      * @return type
      */
     @JsonProperty(JSON_PROPERTY_TYPE)
@@ -238,7 +276,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     public abstract RepositoryItemType getType();
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -262,7 +300,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

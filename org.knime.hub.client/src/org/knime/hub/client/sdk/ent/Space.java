@@ -68,7 +68,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Space extends WorkflowGroup {
 
-    static final String TYPE = "Space";
+    static final String TYPE_VALUE = "Space";
 
     private static final String JSON_PROPERTY_PRIVATE = "private";
     private final boolean m_private;
@@ -123,7 +123,7 @@ public final class Space extends WorkflowGroup {
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

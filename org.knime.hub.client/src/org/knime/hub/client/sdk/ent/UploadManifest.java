@@ -61,7 +61,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the upload manifest.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -70,15 +70,20 @@ public final class UploadManifest {
     private static final String JSON_PROPERTY_ITEMS = "items";
     private final Map<String, ItemUploadRequest> m_items;
 
+    /**
+     * Upload manifest
+     *
+     * @param items the items which are uploaded
+     */
     @JsonCreator
     public UploadManifest(
-            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) Map<String, ItemUploadRequest> items) {
+            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) final Map<String, ItemUploadRequest> items) {
         this.m_items = items;
     }
 
     /**
      * Retrieves the items which should be uploaded.
-     * 
+     *
      * @return items
      */
     @JsonProperty(JSON_PROPERTY_ITEMS)
@@ -88,7 +93,7 @@ public final class UploadManifest {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -107,7 +112,7 @@ public final class UploadManifest {
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

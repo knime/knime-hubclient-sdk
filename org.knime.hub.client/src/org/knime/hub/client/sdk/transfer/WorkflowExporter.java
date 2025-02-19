@@ -61,6 +61,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -80,7 +81,6 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.workflow.SingleNodeContainer;
 import org.knime.core.node.workflow.WorkflowPersistor;
 import org.knime.core.util.VMFileLocker;
-import org.knime.gateway.impl.webui.spaces.local.LocalSpace;
 
 /**
  * Exporter saving one or more items (workflows, templates or data files) as one zipped file.
@@ -208,19 +208,20 @@ public final class WorkflowExporter {
      * Enumerates all items in the subtree of the given path in a local workspace.
      *
      * @param root root path, may be a single item or a workflow group (folder)
+     * @param isValidItem predicate which tests if the item is valid
      * @param visitor called for every item
      * @throws IOException in case of problems during the file system traversal
      * @throws CanceledExecutionException passed through from the visitor
      */
     @SuppressWarnings("java:S1130") // `CanceledExecutionException` is sneakily thrown
-    public static void visitWorkspaceItems(final Path root,
+    public static void visitWorkspaceItems(final Path root, final Predicate<Path> isValidItem,
             final FailableBiConsumer<Path, ItemType, CanceledExecutionException> visitor)
             throws IOException, CanceledExecutionException {
         Files.walkFileTree(root, new SimpleFileVisitor<Path>() { // NOSONAR
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, final BasicFileAttributes attrs)
                     throws IOException {
-                if (!LocalSpace.isValidItem(dir)) {
+                if (!isValidItem.test(dir)) {
                     return FileVisitResult.SKIP_SUBTREE;
                 } else if (Files.isRegularFile(dir.resolve(WorkflowPersistor.WORKFLOW_FILE))) {
                     visit(dir, ItemType.WORKFLOW_LIKE);
@@ -233,7 +234,7 @@ public final class WorkflowExporter {
 
             @Override
             public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) throws IOException {
-                if (LocalSpace.isValidItem(file)) {
+                if (isValidItem.test(file)) {
                     visit(file, ItemType.DATA_FILE);
                 }
                 return FileVisitResult.CONTINUE;

@@ -49,17 +49,18 @@
 package org.knime.hub.client;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
 
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
 import org.eclipse.ui.plugin.AbstractUIPlugin;
-import org.knime.core.node.NodeLogger;
+import org.knime.core.util.FileUtil;
 import org.osgi.framework.FrameworkUtil;
 
 /**
  * The activator class controls the plug-in life cycle.
- *  
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 public class HubClientSDKPlugin extends AbstractUIPlugin {
@@ -70,23 +71,22 @@ public class HubClientSDKPlugin extends AbstractUIPlugin {
     public HubClientSDKPlugin() {
         // activator class
     }
-    
+
     /**
      * Resolves a path relative to the plug-in or any fragment's root into an absolute path.
      *
      * @param relativePath a relative path
      * @return the resolved absolute path
+     * @throws URISyntaxException
      */
-    public static IPath resolvePath(final String relativePath) {
+    public static Path resolvePath(final IPath relativePath) throws URISyntaxException {
         var myself = FrameworkUtil.getBundle(HubClientSDKPlugin.class);
         try {
-            var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, new Path(relativePath), null));
-            return IPath.forPosix(fileUrl.getPath());
-        } catch (IOException ex) {
-            NodeLogger.getLogger(HubClientSDKPlugin.class)
-                .error("Could not resolve relativ path '" + relativePath + "': " + ex.getMessage(), ex);
-            return IPath.forPosix("");
+            var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
+            return FileUtil.resolveToPath(fileUrl);
+        } catch (IOException | URISyntaxException e) {
+            throw new IllegalStateException("Could not resolve resource: %s".formatted(relativePath), e);
         }
     }
-    
+
 }

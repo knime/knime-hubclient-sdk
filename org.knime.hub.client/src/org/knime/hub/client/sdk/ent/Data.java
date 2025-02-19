@@ -121,7 +121,7 @@ public final class Data extends RepositoryItem implements Sized {
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }

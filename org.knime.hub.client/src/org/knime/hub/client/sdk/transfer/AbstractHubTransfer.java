@@ -45,9 +45,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
-import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 
@@ -98,10 +96,10 @@ class AbstractHubTransfer {
 
     /**
      * @param apiClient Hub API client
-     * @param apHeaders Header parameters specific to AP
+     * @param additionalHeaders additional headers for up and download
      */
-    AbstractHubTransfer(final HubClientAPI apiClient, final Map<String, String> apHeaders) {
-        m_catalogClient = new CatalogServiceClient(apiClient, apHeaders);
+    AbstractHubTransfer(final HubClientAPI apiClient, final Map<String, String> additionalHeaders) {
+        m_catalogClient = new CatalogServiceClient(apiClient, additionalHeaders);
     }
 
     /**
@@ -270,33 +268,6 @@ class AbstractHubTransfer {
                 }
             }
         });
-    }
-    
-    /**
-     * Retrieves the mason controls of the parent space associated with the item represented by it's ID.
-     * The controls of the given item coincide with the returned mason controls if the item is a space itself.
-     * 
-     * @param itemId The ID of the item
-     * @return The mason controls of the parent space
-     * @throws ResourceAccessException
-     */
-    Map<String, Control> getMasonControlsOfSpaceParent(final ItemID itemId) throws ResourceAccessException {
-        // Retrieve controls of the parent space
-        RepositoryItem item = m_catalogClient //
-                .fetchRepositoryItem(itemId.id(), Map.of("details", "full"), 
-                        null, null, null).orElseThrow().getLeft();
-        
-        Map<String, Control> spaceControls;
-        if (RepositoryItemType.SPACE == item.getType()) {
-            spaceControls = item.getMasonControls();
-        } else {
-            RepositoryItem space = m_catalogClient //
-                    .fetchRepositoryItem(item.getDetails().get().getSpace().getSpaceId(), 
-                            null, null, null, null).orElseThrow().getLeft();
-            spaceControls = space.getMasonControls();
-        }
-        
-        return spaceControls;
     }
 
     private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,

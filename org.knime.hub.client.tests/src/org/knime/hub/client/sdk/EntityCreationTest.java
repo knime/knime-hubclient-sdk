@@ -54,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.time.Duration;
@@ -61,6 +62,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 
+import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.HubClientSDKPlugin;
 import org.knime.hub.client.sdk.ent.Component;
@@ -85,7 +87,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-final class EntityCreationTest {
+class EntityCreationTest {
 	
     /** Expected values from JSON files */
     private static final String EXPECTED_COMPONENT_ID = "*iMLnw_ejyqC_DiiE";
@@ -104,21 +106,21 @@ final class EntityCreationTest {
     private static final String EXPECTED_DESCRIPTION = "This is a description";
     private static final long EXPECTED_SIZE = 1337L;
     
-    private static final ObjectMapper MAPPER = new ApiClient(null, Duration.ofSeconds(0), 
+    private static final ObjectMapper MAPPER = new ApiClient(null, null, Duration.ofSeconds(0), 
 	        Duration.ofSeconds(0)).getObjectMapper();
 	
-	private static <T> T load(String filename, Class<T> clazz) throws IOException {
+	private static <T> T load(String filename, Class<T> clazz) throws IOException, URISyntaxException {
 		// Path to the file inside test file folder.
-		final var filePath = "/%s/%s/%s".formatted(HubClientAPITest.RESOURCE_FOLDER_NAME,
-				HubClientAPITest.TEST_FILE_FOLDER_NAME, filename);
+	    final var filePath = IPath.forPosix(HubClientAPITest.RESOURCE_FOLDER_NAME)
+	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(filename);
 
-		// Obtain file object from bundle activator class.
-		final var file = HubClientSDKPlugin.resolvePath(filePath);
-		return MAPPER.readValue(Files.readString(file.toPath()), clazz);
+		// Obtain path object from bundle activator class.
+		final var path = HubClientSDKPlugin.resolvePath(filePath);
+		return MAPPER.readValue(Files.readString(path), clazz);
 	}
 	
 	@Test
-	void testCreateComponent() throws IOException {
+	void testCreateComponent() throws IOException, URISyntaxException {
 		final var component = load("component.json", Component.class);
 		assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, component.getType(), "Unexpected type");
 		assertEquals(EXPECTED_COMPONENT_PATH, component.getPath(), "Unexpected path");
@@ -142,7 +144,7 @@ final class EntityCreationTest {
 	}
 
 	@Test
-	void testCreateData() throws IOException {
+	void testCreateData() throws IOException, URISyntaxException {
 		final var data = load("data.json", Data.class);
 		assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
         assertEquals(EXPECTED_DATA_PATH, data.getPath(), "Unexpected path");
@@ -166,7 +168,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateWorkflow() throws IOException {
+	void testCreateWorkflow() throws IOException, URISyntaxException {
         final var workflow = load("workflow.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflow.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflow.getPath(), "Unexpected path");
@@ -190,7 +192,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateWorkflowGroup() throws IOException {
+	void testCreateWorkflowGroup() throws IOException, URISyntaxException {
 		final var workflowGroup = load("workflowGroup.json", WorkflowGroup.class);
 		assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroup.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroup.getPath(), "Unexpected path");
@@ -215,7 +217,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateSpace() throws IOException {
+	void testCreateSpace() throws IOException, URISyntaxException {
 		final var space = load("space.json", Space.class);
         assertEquals(RepositoryItem.RepositoryItemType.SPACE, space.getType(), "Unexpected type");
         assertEquals(EXPECTED_SPACE_PATH, space.getPath(), "Unexpected path");
@@ -228,7 +230,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateUploadManifest() throws IOException {
+	void testCreateUploadManifest() throws IOException, URISyntaxException {
 	    final var uploadManifest = load("uploadManifest.json", UploadManifest.class);
 	    final var items = uploadManifest.getItems();
 	    assertEquals(3, items.size(), "Unexpected number of items");
@@ -250,7 +252,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateUploadStarted() throws IOException {
+	void testCreateUploadStarted() throws IOException, URISyntaxException {
 	    final var uploadStarted = load("uploadStarted.json", UploadStarted.class);
 	    final var items = uploadStarted.getItems();
 	    assertEquals(3, items.size(), "Unexpected number of items");
@@ -297,7 +299,7 @@ final class EntityCreationTest {
 	}
 	
 	@Test
-	void testCreateUploadStatus() throws IOException {
+	void testCreateUploadStatus() throws IOException, URISyntaxException {
 	    final var uploadStatus = load("uploadStatus.json", UploadStatus.class);
 	    assertEquals("d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0", 
 	            uploadStatus.getUploadId(), "Unexpected upload ID");

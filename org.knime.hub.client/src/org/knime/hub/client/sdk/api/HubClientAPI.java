@@ -48,52 +48,48 @@
 
 package org.knime.hub.client.sdk.api;
 
-import jakarta.ws.rs.core.GenericType;
-import jakarta.ws.rs.core.MediaType;
+import java.io.IOException;
+import java.util.Map;
 
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.core.runtime.Path;
 import org.knime.core.node.CanceledExecutionException;
+import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
 import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiClient.UploadContentHandler;
+import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 
-import java.io.IOException;
-import java.net.URI;
-import java.time.Duration;
-import java.util.Map;
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.MediaType;
 
 /**
  * Client API for KNIME Hub used by the space explorer.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable 
+@SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
 public class HubClientAPI {
-    
+
     /** API paths */
     private static final String REPOSITORY_API_PATH = "repository";
     private static final String UPLOAD_API_PATH = "uploads";
-    
+
     /** Path pieces */
     private static final String PATH_PIECE_USERS = "Users";
     private static final String PATH_PIECE_DATA = ":data";
     private static final String PATH_PIECE_UPLOAD_MANIFEST = "manifest";
     private static final String PATH_PIECE_UPLOAD_STATUS = "status";
     private static final String PATH_PIECE_UPLOAD_PARTS = "parts";
-    
+
     /** Query parameters */
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
     private static final String QUERY_PARAM_MOVE = "move";
@@ -105,49 +101,37 @@ public class HubClientAPI {
     private static final String QUERY_PARAM_SPACE_DETAILS = "spaceDetails";
     private static final String QUERY_PARAM_CONTRIB_SPACES = "contribSpaces";
     private static final String QUERY_PARAM_PART_NUMBER = "partNumber";
-    
+
     /** Return Types */
     private static final GenericType<Void> VOID = new GenericType<Void>() {};
     private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<RepositoryItem>() {};
     private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<UploadStatus>() {};
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
-    
+
     private final ApiClient m_apiClient;
-    private final Authenticator m_authenticator;
+
+    final NodeLogger m_logger;
 
     /**
      * Create the {@link HubClientAPI} given an {@link ApiClient}
-     * 
+     *
      * @param apiClient the {@link ApiClient}
      */
-    public HubClientAPI(final ApiClient apiClient, final Authenticator auth) {
+    public HubClientAPI(final ApiClient apiClient) {
         m_apiClient = apiClient;
-        m_authenticator = auth;
-    }
-
-    /**
-     * Create the {@link HubClientAPI} given a hub base URL.
-     *       
-     * @param hubUrl the hub base URL
-     * @param connectionTimeout the {@link Duration} of the connection timeout
-     * @param readTimeout the {@link Duration} of the read timeout
-     */
-    public HubClientAPI(final URI hubURI, final Authenticator auth, 
-            final Duration connectionTimeout, final Duration readTimeout) {
-        m_authenticator = auth;
-        m_apiClient = new ApiClient(hubURI, connectionTimeout, readTimeout);
+        m_logger = NodeLogger.getLogger(getClass());
     }
 
     /**
      * Retrieves the associated {@link ApiClient}.
-     * 
+     *
      * @return {@link ApiClient}
      */
     public ApiClient getApiClient() {
         return m_apiClient;
     }
-    
+
     /**
      * Creates the metadata of a repository item at the given path. Currently, only
      * workflow groups and spaces are supported. To create a new workflow group,
@@ -169,10 +153,10 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
-            final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders) 
+            final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -185,7 +169,7 @@ public class HubClientAPI {
         final Object localVarPostBody = spaceRequestBody;
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, localVarPostBody, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, localVarPostBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -206,19 +190,19 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody, 
+    public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path); 
+                .append(path);
 
         final Object localVarPostBody = spaceRequestBody;
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, localVarPostBody, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, localVarPostBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -234,19 +218,19 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete, 
+    public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path); 
+                .append(path);
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
-                .invokeAPI(requestPath, Method.DELETE, null, VOID, m_authenticator);
+                .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
     /**
@@ -263,10 +247,10 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<Void> deleteItemByCanonicalPath(final String accountId, final IPath subPath,
-            final boolean softDelete, final Map<String, String> additionalHeaders) 
+            final boolean softDelete, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -274,12 +258,12 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath); 
+                .append(subPath);
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
-                .invokeAPI(requestPath, Method.DELETE, null, VOID, m_authenticator);
+                .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
     /**
@@ -295,9 +279,9 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete, 
+    public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(id);
 
@@ -307,7 +291,7 @@ public class HubClientAPI {
         return m_apiClient.createApiRequest()
                 .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.DELETE, null, VOID, m_authenticator);
+                .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
     /**
@@ -320,9 +304,9 @@ public class HubClientAPI {
      * @param subPath           The "/" delimited path to the resource below
      *                          the account root level (required)
      * @param version           Optional query parameter which specifies the version of
-     *                          the item to retrieve. 
+     *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -335,14 +319,14 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
-     *                           </ul> 
+     *                           </ul>
      *                          If used together with query
      *                          parameter "version" the two parameters need to
      *                          refer to the same version. Clients are encouraged to
@@ -355,13 +339,13 @@ public class HubClientAPI {
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final String version,
-            final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler, 
-            final Map<String, String> additionalHeaders) 
+            final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
+            final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -369,18 +353,18 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath + PATH_PIECE_DATA); 
-     
+                .append(subPath + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withAcceptHeaders(responseType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
     /**
-     * Downloads the given repository item. The returned content depends on the items type. 
+     * Downloads the given repository item. The returned content depends on the items type.
      * If its a workflow then a ZIP archive is returned. If its a data file then the file will be
      * returned as is with an auto-guessed content types (based on the file extension).
      *
@@ -393,9 +377,9 @@ public class HubClientAPI {
      *                          that cannot handle the new URI format which adds the ID
      *                          to the end of the path. (required)
      * @param version           Optional query parameter which specifies the version of
-     *                          the item to retrieve. 
+     *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -408,14 +392,14 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
-     *                           </ul>     
+     *                           </ul>
      *                          If used together with query
      *                          parameter "version" the two parameters need to
      *                          refer to the same version. Clients are encouraged to
@@ -429,13 +413,13 @@ public class HubClientAPI {
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItemById(final String id, final String version, final String spaceVersion,
-            final MediaType responseType, final DownloadContentHandler<R> contentHandler, 
-            final Map<String, String> additionalHeaders) 
+            final MediaType responseType, final DownloadContentHandler<R> contentHandler,
+            final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(id);
 
@@ -447,11 +431,11 @@ public class HubClientAPI {
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
     /**
-     * Downloads the given repository item. The returned content depends on the items type. 
+     * Downloads the given repository item. The returned content depends on the items type.
      * If its a workflow then a ZIP archive is returned. If its a data file then the file will be
      * returned as is with an auto-guessed content types (based on the file extension).
      *
@@ -459,7 +443,7 @@ public class HubClientAPI {
      * @param version           Optional query parameter which specifies the version of
      *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -472,12 +456,12 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
      *                           </ul>
      *                          If used together with query
@@ -493,25 +477,25 @@ public class HubClientAPI {
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final String version, final String spaceVersion,
-            final MediaType responseType, final DownloadContentHandler<R> contentHandler, 
-            final Map<String, String> additionalHeaders) 
+            final MediaType responseType, final DownloadContentHandler<R> contentHandler,
+            final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path + PATH_PIECE_DATA); 
+                .append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest()
                 .withAcceptHeaders(responseType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
     /**
@@ -537,7 +521,7 @@ public class HubClientAPI {
      * @param version           Optional query parameter which specifies the version of
      *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -550,12 +534,12 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
      *                           </ul>
      *                          If used together with query
@@ -566,11 +550,11 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
             final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
-            final String version, final String spaceVersion, final Map<String, String> additionalHeaders) 
+            final String version, final String spaceVersion, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -578,8 +562,8 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath); 
-        
+                .append(subPath);
+
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_DETAILS, details)
@@ -588,12 +572,12 @@ public class HubClientAPI {
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
     /**
      * Returns the repository item at the given path in the server repository.
-     * 
+     *
      * @param path              The absolute path to the repository item. (required)
      * @param details           Specifies whether details should be shown and in what
      *                          form (full details, aggregated, ...). (optional)
@@ -611,7 +595,7 @@ public class HubClientAPI {
      * @param version           Optional query parameter which specifies the version of
      *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -624,14 +608,14 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
-     *                           </ul> 
+     *                           </ul>
      *                          If used together with query
      *                          parameter "version" the two parameters need to
      *                          refer to the same version. Clients are encouraged to
@@ -640,16 +624,16 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
             final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
-            final String spaceVersion, final Map<String, String> additionalHeaders) 
+            final String spaceVersion, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path); 
+                .append(path);
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
@@ -659,7 +643,7 @@ public class HubClientAPI {
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
     /**
@@ -690,7 +674,7 @@ public class HubClientAPI {
      * @param version           Optional query parameter which specifies the version of
      *                          the item to retrieve.
      *                          <ul>
-     *                              <li>The version number of an existing item version. 
+     *                              <li>The version number of an existing item version.
      *                              Must be a positive integer.</li>
      *                              <li>The special value "most-recent", which points
      *                          to the latest version of the item.</li>
@@ -702,12 +686,12 @@ public class HubClientAPI {
      *                          current-state)
      * @param spaceVersion      Legacy: Optional query parameter which indicates the
      *                          version of the space where the item is stored. It can
-     *                          be either: 
+     *                          be either:
      *                          <ul>
      *                              <li>The version number of an existing space version (e.g. "1")</li>
      *                              <li>"latest" to target the latest space version (corresponds to value
      *                          "most-recent" of query parameter "version")</li>
-     *                              <li>"-1" to target the current state, i.e. including unversioned changes 
+     *                              <li>"-1" to target the current state, i.e. including unversioned changes
      *                          (corresponds to value "current-state" of query parameter "version".) </li>
      *                           </ul>
      *                          If used together with query
@@ -718,17 +702,17 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
             final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
-            final String spaceVersion, final Map<String, String> additionalHeaders) 
+            final String spaceVersion, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(id);
-        
+
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_DETAILS, details)
@@ -737,14 +721,14 @@ public class HubClientAPI {
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
-                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
     /**
-     * Performs a server side copy of a repository item by canonical path. 
+     * Performs a server side copy of a repository item by canonical path.
      * Depending on the content type of the request the server side copy is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target
      * repository item.
      *
      * @param accountId         The ID of the account the repository item is associated
@@ -753,13 +737,13 @@ public class HubClientAPI {
      *                          the account root level (required)
      * @param fromRepository    Source canonical path of the repository item which gets copied (required).
      * @param contentType       The content type of the request body (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> serverCopyByCanonicalPath(final String accountId, final IPath subPath,
-            final String fromRepository, final MediaType contentType, 
+            final String fromRepository, final MediaType contentType,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(accountId);
@@ -769,21 +753,21 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath + PATH_PIECE_DATA); 
-        
+                .append(subPath + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
-     * Performs a server side move of a repository item by canonical path. 
+     * Performs a server side move of a repository item by canonical path.
      * Depending on the content type of the request the server side move is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository
      * item with the KNIME ID of the source repository item.
      *
      * @param accountId         The ID of the account the repository item is associated
@@ -792,13 +776,13 @@ public class HubClientAPI {
      *                          the account root level (required)
      * @param fromRepository    Source canonical path of the repository item which gets moved (required).
      * @param contentType       The content type of the request body (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> serverMoveByCanonicalPath(final String accountId, final IPath subPath,
-            final String fromRepository, final MediaType contentType, 
+            final String fromRepository, final MediaType contentType,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(accountId);
@@ -808,22 +792,22 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath + PATH_PIECE_DATA); 
-        
+                .append(subPath + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
-     * Uploads a workflow, component, workflow group or data file by canonical path. Depending on the 
+     * Uploads a workflow, component, workflow group or data file by canonical path. Depending on the
      * content type of the request the upload is either a workflow/component
-     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preserves the KNIME ID of 
-     * the target repository item. 
+     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preserves the KNIME ID of
+     * the target repository item.
      *
      * @param accountId         The ID of the account the repository item is associated
      *                          with (required)
@@ -832,18 +816,18 @@ public class HubClientAPI {
      * @param contentType       The content type of the request body (required).
      * @param contentHandler    The content handler to out source the input stream to a
      *                          provided output stream (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId, 
-            final IPath subPath, final MediaType contentType, 
-            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders) 
+    public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId,
+            final IPath subPath, final MediaType contentType,
+            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -851,19 +835,19 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(PATH_PIECE_USERS)
                 .append(accountId)
-                .append(subPath + PATH_PIECE_DATA); 
-        
+                .append(subPath + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.PUT, contentHandler);
     }
 
     /**
-     * Performs a server side copy of a repository item by ID. 
+     * Performs a server side copy of a repository item by ID.
      * Depending on the content type of the request the server side copy is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target
      * repository item.
      *
      * @param id                The repository items unique ID. It always starts
@@ -871,34 +855,34 @@ public class HubClientAPI {
      *                          item is renamed or moved. (required)
      * @param fromRepository    Source ID of the repository item which gets copied (required).
      * @param contentType       The content type of the request body (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
-            final MediaType contentType, final Map<String, String> additionalHeaders) 
+            final MediaType contentType, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(id);
         CheckUtils.checkNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(id + PATH_PIECE_DATA); 
-        
+                .append(id + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
-     * Performs a server side move of a repository item by ID. 
+     * Performs a server side move of a repository item by ID.
      * Depending on the content type of the request the server side move is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository
      * item with the KNIME ID of the source repository item.
      *
      * @param id                The repository items unique ID. It always starts
@@ -906,34 +890,34 @@ public class HubClientAPI {
      *                          item is renamed or moved. (required)
      * @param fromRepository    Source ID of the repository item which gets moved (required).
      * @param contentType       The content type of the request body (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
-            final MediaType contentType, final Map<String, String> additionalHeaders) 
+            final MediaType contentType, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(id);
         CheckUtils.checkNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(id + PATH_PIECE_DATA); 
-        
+                .append(id + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
      * Uploads a workflow, component, workflow group or data file by ID. Depending on the content type
      * of the request the upload is either a workflow/component
-     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preserves the KNIME ID of 
+     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preserves the KNIME ID of
      * the target repository item.
      *
      * @param id                The repository items unique ID. It always starts
@@ -942,34 +926,34 @@ public class HubClientAPI {
      * @param contentType       The content type of the request body (required).
      * @param contentHandler    The content handler to out source the input stream to a
      *                          provided output stream (required).
-     * @param additionalHeaders Map of additional headers                      
+     * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType, 
-            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders) 
+    public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
+            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(id + PATH_PIECE_DATA); 
-        
+                .append(id + PATH_PIECE_DATA);
+
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.PUT, contentHandler);
     }
 
     /**
-     * Performs a server side copy of a repository item by path. 
+     * Performs a server side copy of a repository item by path.
      * Depending on the content type of the request the server side copy is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preservers the KNIME ID of the target
      * repository item.
      *
      * @param path              The absolute path to the repository item. (required)
@@ -978,30 +962,30 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository, 
-            final MediaType contentType, final Map<String, String> additionalHeaders) 
+    public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
+            final MediaType contentType, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(path);
         CheckUtils.checkNotNull(fromRepository);
 
-        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA); 
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
-     * Performs a server side move of a repository item by path. 
+     * Performs a server side move of a repository item by path.
      * Depending on the content type of the request the server side move is either a workflow/component
-     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository 
+     * (application/vnd.knime.workflow+zip) workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting updates the KNIME ID of the target repository
      * item with the KNIME ID of the source repository item.
      *
      * @param path              The absolute path to the repository item. (required)
@@ -1010,31 +994,31 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository, 
-            final MediaType contentType, final Map<String, String> additionalHeaders) 
+    public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
+            final MediaType contentType, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(path);
         CheckUtils.checkNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path + PATH_PIECE_DATA); 
+                .append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
                 .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
-                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM, m_authenticator);
+                .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
-    
+
     /**
      * Uploads a workflow, component, workflow group or data file by path. Depending on the content type
      * of the request the upload is either a workflow/component
-     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip) 
-     * or a data file (all other content types). Overwriting preserves the KNIME ID of 
+     * (application/vnd.knime.workflow+zip), workflow group (application/vnd.knime.workflow-group+zip)
+     * or a data file (all other content types). Overwriting preserves the KNIME ID of
      * the target repository item.
      *
      * @param path              The absolute path to the repository item. (required)
@@ -1046,22 +1030,22 @@ public class HubClientAPI {
      *
      * @throws IOException
      * @throws CanceledExecutionException
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> uploadItemByPath(final IPath path,final MediaType contentType, 
-            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders) 
+    public <R> ApiResponse<R> uploadItemByPath(final IPath path,final MediaType contentType,
+            final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
+        CheckUtils.checkNotNull(contentHandler, null);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
-                .append(path + PATH_PIECE_DATA); 
+                .append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(contentType)
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, m_authenticator, contentHandler);
+                .invokeAPI(requestPath, Method.PUT, contentHandler);
     }
 
     /**
@@ -1070,19 +1054,19 @@ public class HubClientAPI {
      * @param uploadId          The ID of the upload process (required)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
-     * 
-     * @throws CouldNotAuthorizeException 
+     *
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<Void> cancelUpload(final String uploadId, 
+    public ApiResponse<Void> cancelUpload(final String uploadId,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH)
-                .append(uploadId); 
-        
+                .append(uploadId);
+
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.DELETE, null, VOID, m_authenticator);
+                .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
     /**
@@ -1097,21 +1081,23 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId,
-            final UploadManifest requestBody, final Map<String, String> additionalHeaders) 
+            final UploadManifest requestBody, final Map<String, String> additionalHeaders)
                     throws CouldNotAuthorizeException {
+        m_logger.debug(() -> "Initiating upload of %d items".formatted(requestBody.getItems().size()));
+
         CheckUtils.checkNotNull(parentId);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(parentId)
                 .append(PATH_PIECE_UPLOAD_MANIFEST);
-        
+
         final Object localVarPostBody = requestBody;
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.POST, localVarPostBody, UPLOAD_STARTED, m_authenticator);
+                .invokeAPI(requestPath, Method.POST, localVarPostBody, UPLOAD_STARTED);
     }
 
     /**
@@ -1121,11 +1107,10 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId, 
+    public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-
         CheckUtils.checkNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH)
@@ -1134,7 +1119,7 @@ public class HubClientAPI {
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.GET, null, UPLOAD_STATUS, m_authenticator);
+                .invokeAPI(requestPath, Method.GET, null, UPLOAD_STATUS);
     }
 
     /**
@@ -1145,18 +1130,18 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
-    public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody, 
+    public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH)
                 .append(uploadId);
-        
+
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.POST, requestBody, VOID, m_authenticator);
+                .invokeAPI(requestPath, Method.POST, requestBody, VOID);
     }
 
     /**
@@ -1167,7 +1152,7 @@ public class HubClientAPI {
      * @param additionalHeaders Map of additional parameters
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException 
+     * @throws CouldNotAuthorizeException
      */
     public ApiResponse<UploadTarget> requestPartUpload(final String uploadId, final Integer partNumber,
             final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -1177,11 +1162,11 @@ public class HubClientAPI {
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH)
                 .append(uploadId)
                 .append(PATH_PIECE_UPLOAD_PARTS);
-        
+
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
-                .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET, m_authenticator);
+                .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
     }
 
 }

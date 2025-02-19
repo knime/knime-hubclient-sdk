@@ -58,85 +58,18 @@ import jakarta.ws.rs.core.EntityTag;
  * API response class which combines response details from {@link ApiClient} and
  * response entities from the API class.
  *
+ * @param headers       the response headers
+ * @param statusCode    the response status code
+ * @param statusMessage the response status message
+ * @param etag          the response etag
+ * @param result        {@link Result} the response result
+ * @param <R>           the response type
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public class ApiResponse<R> {
-
-    /** Response information */
-    private Map<String, List<Object>> m_headers;
-    private int m_statusCode;
-    private String m_statusMessage;
-    private Optional<EntityTag> m_etag;
-    
-    /** Response result */
-    private Result<R> m_result;
-
-    /**
-     * Creates an API response objects which combines the response entity with
-     * request and response information.
-     * 
-     * @param responseHeaders the response headers
-     * @param responseStatusCode the response status code
-     * @param responseStatusMessage the response status message
-     * @param responseResult {@link Result<R>} the response result
-     */
-    public ApiResponse(final Map<String, List<Object>> responseHeaders, final int responseStatusCode, 
-            final String responseStatusMessage, final EntityTag etag, final Result<R> responseResult) {
-        this.m_headers = responseHeaders;
-        this.m_statusCode = responseStatusCode;
-        this.m_statusMessage = responseStatusMessage;
-        this.m_etag = Optional.ofNullable(etag);
-        this.m_result = responseResult;
-    }
-
-    /**
-     * Creates a empty API response object.
-     */
-    public ApiResponse() {}
-
-    /**
-     * Retrieves the response headers.
-     * 
-     * @return the response headers
-     */
-    public Map<String, List<Object>> getHeaders() {
-        return m_headers;
-    }
-
-    /**
-     * Retrieves the response status code.
-     * 
-     * @return the response status code
-     */
-    public int getStatusCode() {
-        return m_statusCode;
-    }
-
-    /**
-     * Retrieves the response status message.
-     * 
-     * @return the response status message
-     */
-    public String getStatusMessage() {
-        return m_statusMessage;
-    }
-    
-    /**
-     * Retrieves the response entity tag.
-     * 
-     * @return the response etag
-     */
-    public Optional<EntityTag> getETag() {
-        return m_etag;
-    }
-
-    /**
-     * Retrieves the response result.
-     * 
-     * @return {@link Result<R>} the response result
-     */
-    public Result<R> getResult() {
-        return m_result;
-    }
-    
-}
+public record ApiResponse<R> (
+        Map<String, List<Object>> headers,
+        int statusCode,
+        String statusMessage,
+        Optional<EntityTag> etag,
+        Result<R> result) {}

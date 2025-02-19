@@ -60,7 +60,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the request to upload a single item.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -72,17 +72,23 @@ public final class ItemUploadRequest {
     private static final String JSON_PROPERTY_INITIAL_PART_COUNT = "initialPartCount";
     private final Integer m_initialPartCount;
 
+    /**
+     * Item upload request body
+     *
+     * @param itemContentType the content type of the uploaded item
+     * @param initialPartCount the initial part count of the uploaded item
+     */
     @JsonCreator
     public ItemUploadRequest(
-            @JsonProperty(value = JSON_PROPERTY_ITEM_CONTENT_TYPE, required = true) String itemContentType,
-            @JsonProperty(value = JSON_PROPERTY_INITIAL_PART_COUNT) Integer initialPartCount) {
+            @JsonProperty(value = JSON_PROPERTY_ITEM_CONTENT_TYPE, required = true) final String itemContentType,
+            @JsonProperty(value = JSON_PROPERTY_INITIAL_PART_COUNT) final Integer initialPartCount) {
         this.m_itemContentType = itemContentType;
         this.m_initialPartCount = initialPartCount;
     }
 
     /**
      * Retrieves the media type of the item to upload
-     * 
+     *
      * @return itemContentType
      */
     @JsonProperty(JSON_PROPERTY_ITEM_CONTENT_TYPE)
@@ -93,7 +99,7 @@ public final class ItemUploadRequest {
 
     /**
      * Retrieves the number of initial upload parts (pre-signed URLs) minimum: 0
-     * 
+     *
      * @return initialPartCount
      */
     @JsonProperty(JSON_PROPERTY_INITIAL_PART_COUNT)
@@ -103,7 +109,7 @@ public final class ItemUploadRequest {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -123,7 +129,7 @@ public final class ItemUploadRequest {
     @Override
     public String toString() {
         try {
-            return ObjectMapperUtil.getInstance().getObjectMapper().writeValueAsString(this);
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
