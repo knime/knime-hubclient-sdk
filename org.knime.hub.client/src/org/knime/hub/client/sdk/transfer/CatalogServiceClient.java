@@ -152,8 +152,6 @@ public class CatalogServiceClient {
             additionalHeaders.put(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(eTag));
         }
 
-        m_additionalHeaders.put(COMPLETE_UPLOAD_PART, ABORT_UPLOAD_PART);
-
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_hubClient.initiateUpload(parentId.id(), manifest, additionalHeaders);
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
