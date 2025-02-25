@@ -41,6 +41,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
@@ -103,7 +104,7 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @param hubClient Hub API client
      * @param additionalHeaders additional header parameters
      */
-    public HubDownloader(final HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
+    public HubDownloader(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
         super(hubClient, additionalHeaders);
     }
 

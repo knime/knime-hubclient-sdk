@@ -44,6 +44,7 @@ import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.io.input.RandomAccessFileInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
@@ -51,7 +52,6 @@ import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.proxy.URLConnectionFactory;
-import org.knime.hub.client.sdk.transfer.FilePartUploader;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 
@@ -101,10 +101,9 @@ public final class FilePartUploader {
     static {
         final var idSupplier = new AtomicInteger();
         final var threadNamePrefix = "KNIME-" + FilePartUploader.class.getSimpleName() + "-";
-        final var executorService = new ThreadPoolExecutor(PARALLELISM, PARALLELISM, 10, TimeUnit.SECONDS,
+        FILE_PART_UPLOAD_POOL = new ThreadPoolExecutor(PARALLELISM, PARALLELISM, 10, TimeUnit.SECONDS,
             new LinkedBlockingDeque<>(), r -> new Thread(r, threadNamePrefix + idSupplier.getAndIncrement()));
-        executorService.allowCoreThreadTimeOut(true);
-        FILE_PART_UPLOAD_POOL = executorService;
+        ((ThreadPoolExecutor)FILE_PART_UPLOAD_POOL).allowCoreThreadTimeOut(true);
     }
 
     private final Duration m_connectTimeout;
@@ -191,7 +190,7 @@ public final class FilePartUploader {
     }
 
     @SuppressWarnings("resource")
-    private static InputStream newFileRangeInputStream(final Path file, final long offset, final long length)
+    private static @Owning InputStream newFileRangeInputStream(final Path file, final long offset, final long length)
             throws IOException {
         final var raf = new RandomAccessFile(file.toFile(), "r"); // NOSONAR closed by the caller
         raf.seek(offset);

@@ -72,6 +72,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.cxf.jaxrs.client.ClientProperties;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
@@ -106,7 +108,7 @@ import jakarta.ws.rs.core.Response.Status.Family;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public class ApiClient {
+public class ApiClient implements AutoCloseable {
 
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
     private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
@@ -135,7 +137,7 @@ public class ApiClient {
     }
 
     private final URI m_baseURI;
-    private Client m_httpClient;
+    private @Owning Client m_httpClient;
 
     private final ObjectMapper m_objectMapper;
     private final Duration m_connectionTimeout;
@@ -209,7 +211,7 @@ public class ApiClient {
      * @return {@link ApiRequest}
      */
     public ApiRequest createApiRequest() {
-        return new ApiRequest(m_baseURI, m_httpClient, m_connectionTimeout, m_readTimeout, m_logger);
+        return new ApiRequest();
     }
 
     /**
@@ -226,21 +228,9 @@ public class ApiClient {
         private MediaType m_contentType = DEFAULT_CONTENT_TYPE;
         private String m_headerAccept;
 
-        private final URI m_requestBaseURI;
-        private final Client m_requestHTTPClient;
-        private final Duration m_requestConnectionTimeout;
-        private final Duration m_requestReadTimeout;
-        private final NodeLogger m_requestLogger;
-
         private static final String REQUEST_LENGTH_MESSAGE = "Request '%s' took %.3fs";
 
-        private ApiRequest(final URI baseURI, final Client httpClient, final Duration connectionTimeout,
-            final Duration readTimeout, final NodeLogger logger) {
-            m_requestBaseURI = baseURI;
-            m_requestHTTPClient = httpClient;
-            m_requestConnectionTimeout = connectionTimeout;
-            m_requestReadTimeout = readTimeout;
-            m_requestLogger = logger;
+        private ApiRequest() {
         }
 
         /**
@@ -367,7 +357,7 @@ public class ApiClient {
          * @throws URISyntaxException
          */
         private URI buildUrl(final IPath path) {
-            var uriBuilder = new URIBuilder(m_requestBaseURI);
+            var uriBuilder = new URIBuilder(m_baseURI);
             final var segments = new ArrayList<>(uriBuilder.getPathSegments());
             segments.addAll(Arrays.asList(path.segments()));
             uriBuilder.setPathSegments(segments);
@@ -397,9 +387,8 @@ public class ApiClient {
          * @throws URISyntaxException
          * @throws CouldNotAuthorizeException
          */
-        private Response getAPIResponse(final URI uri, final Method method,
-                final Object requestBody, final Authenticator auth)
-                        throws CouldNotAuthorizeException {
+        private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody,
+            final Authenticator auth) throws CouldNotAuthorizeException {
             // Build the invocation builder which makes the request
             var builder = createInvocationBuilder(uri, auth);
 
@@ -431,9 +420,9 @@ public class ApiClient {
             }
 
             if (m_headerAccept == null) {
-                builder = m_requestHTTPClient.target(uri).request();
+                builder = m_httpClient.target(uri).request();
             } else {
-                builder = m_requestHTTPClient.target(uri).request(m_headerAccept);
+                builder = m_httpClient.target(uri).request(m_headerAccept);
                 m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
@@ -526,8 +515,7 @@ public class ApiClient {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                m_requestLogger.debug(() -> REQUEST_LENGTH_MESSAGE
-                    .formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
+                m_logger.debug(() -> REQUEST_LENGTH_MESSAGE.formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
             }
 
         }
@@ -605,8 +593,7 @@ public class ApiClient {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                m_requestLogger.debug(() -> REQUEST_LENGTH_MESSAGE
-                    .formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
+                m_logger.debug(() -> REQUEST_LENGTH_MESSAGE.formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
             }
 
         }
@@ -645,7 +632,7 @@ public class ApiClient {
 
             // Perform upload
             R responseEntity = null;
-            try(final var out = conn.getOutputStream()) {
+            try (final var out = conn.getOutputStream()) {
                 responseEntity = contentHandler.handleUpload(out);
             } catch (final CanceledExecutionException e) {
                 conn.disconnect();
@@ -707,8 +694,8 @@ public class ApiClient {
             final var conn = (HttpURLConnection) URLConnectionFactory.getConnection(url);
             conn.setRequestMethod(method.name());
             conn.setDoOutput(true);
-            conn.setConnectTimeout(Math.toIntExact(m_requestConnectionTimeout.toMillis()));
-            conn.setReadTimeout(Math.toIntExact(m_requestReadTimeout.toMillis()));
+            conn.setConnectTimeout(Math.toIntExact(m_connectionTimeout.toMillis()));
+            conn.setReadTimeout(Math.toIntExact(m_readTimeout.toMillis()));
             m_headerParams.forEach(conn::addRequestProperty);
             return conn;
         }
@@ -720,7 +707,7 @@ public class ApiClient {
      *
      * @return {@link Client}
      */
-    public Client getHttpClient() {
+    public @NotOwning Client getHttpClient() {
         return m_httpClient;
     }
 
@@ -779,7 +766,7 @@ public class ApiClient {
          * @throws IOException
          * @throws CanceledExecutionException in case the download was canceled
          */
-        R handleDownload(InputStream data, OptionalLong contentLength) // NOSONAR `OptionalLong` is fine
+        R handleDownload(@Owning InputStream data, OptionalLong contentLength) // NOSONAR `OptionalLong` is fine
                 throws IOException, CanceledExecutionException;
     }
 
@@ -800,12 +787,10 @@ public class ApiClient {
          * @throws IOException                if an I/O error occurred
          * @throws CanceledExecutionException if the upload was canceled
          */
-        R handleUpload(OutputStream out) throws IOException, CanceledExecutionException;
+        R handleUpload(@Owning OutputStream out) throws IOException, CanceledExecutionException;
     }
 
-    /**
-     * Closes the associated HTTP client.
-     */
+    @Override
     public void close() {
         m_httpClient.close();
     }

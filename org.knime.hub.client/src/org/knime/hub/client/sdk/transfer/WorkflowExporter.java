@@ -72,6 +72,7 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.function.FailableBiConsumer;
 import org.apache.commons.lang3.function.FailableConsumer;
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.ExecutionMonitor;
 import org.knime.core.node.FileNodePersistor;
@@ -213,7 +214,6 @@ public final class WorkflowExporter {
      * @throws IOException in case of problems during the file system traversal
      * @throws CanceledExecutionException passed through from the visitor
      */
-    @SuppressWarnings("java:S1130") // `CanceledExecutionException` is sneakily thrown
     public static void visitWorkspaceItems(final Path root, final Predicate<Path> isValidItem,
             final FailableBiConsumer<Path, ItemType, CanceledExecutionException> visitor)
             throws IOException, CanceledExecutionException {
@@ -394,7 +394,7 @@ public final class WorkflowExporter {
 
         private final byte[] m_buffer = new byte[BUFFER_SIZE];
 
-        private ZipOutputStream m_zipOutStream;
+        private @Owning ZipOutputStream m_zipOutStream;
 
         Zipper(final OutputStream outputStream) {
             m_zipOutStream = new ZipOutputStream(new BufferedOutputStream(outputStream, BUFFER_SIZE));
@@ -435,12 +435,8 @@ public final class WorkflowExporter {
 
         @Override
         public void close() throws IOException {
-            if (m_zipOutStream != null) {
-                try {
-                    m_zipOutStream.close();
-                } finally {
-                    m_zipOutStream = null;
-                }
+            try (final var zipOut = m_zipOutStream) {
+                m_zipOutStream = null;
             }
         }
     }

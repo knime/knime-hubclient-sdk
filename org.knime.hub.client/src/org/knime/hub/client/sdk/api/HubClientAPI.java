@@ -52,6 +52,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IPath;
+import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
@@ -77,7 +79,7 @@ import jakarta.ws.rs.core.MediaType;
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
-public class HubClientAPI {
+public class HubClientAPI implements AutoCloseable {
 
     /** API paths */
     private static final String REPOSITORY_API_PATH = "repository";
@@ -109,7 +111,7 @@ public class HubClientAPI {
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
 
-    private final ApiClient m_apiClient;
+    private final @Owning ApiClient m_apiClient;
 
     final NodeLogger m_logger;
 
@@ -118,7 +120,7 @@ public class HubClientAPI {
      *
      * @param apiClient the {@link ApiClient}
      */
-    public HubClientAPI(final ApiClient apiClient) {
+    public HubClientAPI(final @Owning ApiClient apiClient) {
         m_apiClient = apiClient;
         m_logger = NodeLogger.getLogger(getClass());
     }
@@ -128,7 +130,7 @@ public class HubClientAPI {
      *
      * @return {@link ApiClient}
      */
-    public ApiClient getApiClient() {
+    public @NotOwning ApiClient getApiClient() {
         return m_apiClient;
     }
 
@@ -1169,4 +1171,8 @@ public class HubClientAPI {
                 .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
     }
 
+    @Override
+    public void close() {
+        m_apiClient.close();
+    }
 }

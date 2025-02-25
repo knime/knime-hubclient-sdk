@@ -45,6 +45,7 @@ import org.apache.commons.lang3.function.FailableConsumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
@@ -534,7 +535,7 @@ public final class HubUploader extends AbstractHubTransfer {
         return finished;
     }
 
-    private OutputStream uploadingOutputStream(final String path, final UploadPartSupplier partSupplier,
+    private @Owning OutputStream uploadingOutputStream(final String path, final UploadPartSupplier partSupplier,
             final Consumer<Future<Pair<Integer, EntityTag>>> partUploads, final List<Path> chunks,
             final DoubleSupplier currentWriteProgress, final BranchingExecMonitor splitter) {
 

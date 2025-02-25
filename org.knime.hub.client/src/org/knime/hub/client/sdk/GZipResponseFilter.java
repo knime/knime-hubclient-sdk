@@ -22,10 +22,10 @@ public class GZipResponseFilter implements ClientResponseFilter {
             throws IOException {
         final var encodingHeaderValue = responseContext.getHeaderString(HttpHeaders.CONTENT_ENCODING);
         if (GZIP_ENCODING.equalsIgnoreCase(encodingHeaderValue)) {
-            final var entityStream = responseContext.getEntityStream();
-            responseContext.setEntityStream(new GZIPInputStream(entityStream));
+            @SuppressWarnings("resource")
+            final var wrapped = new GZIPInputStream(responseContext.getEntityStream());
+            responseContext.setEntityStream(wrapped);
             responseContext.getHeaders().remove(HttpHeaders.CONTENT_ENCODING); // Prevent double decoding
         }
     }
-
 }

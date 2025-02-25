@@ -60,12 +60,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 
 /**
  * POJO representing a upload target.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -73,18 +71,18 @@ public final class UploadTarget {
 
     private static final String JSON_PROPERTY_METHOD = "method";
     private final String m_method;
-    
+
     private static final String JSON_PROPERTY_URL = "url";
     private final URL m_url;
-    
+
     private static final String JSON_PROPERTY_HEADER = "header";
     private final Map<String, List<String>> m_header;
 
     @JsonCreator
     private UploadTarget(
-            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) String method,
-            @JsonProperty(value = JSON_PROPERTY_URL, required = true) URL url,
-            @JsonProperty(value = JSON_PROPERTY_HEADER, required = true) Map<String, List<String>> header) {
+            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) final String method,
+            @JsonProperty(value = JSON_PROPERTY_URL, required = true) final URL url,
+            @JsonProperty(value = JSON_PROPERTY_HEADER, required = true) final Map<String, List<String>> header) {
         this.m_method = method;
         this.m_url = url;
         this.m_header = header;
@@ -92,7 +90,7 @@ public final class UploadTarget {
 
     /**
      * Retrieves the HTTP method of the upload instruction.
-     * 
+     *
      * @return itemContentType
      */
     @JsonProperty(JSON_PROPERTY_METHOD)
@@ -100,10 +98,10 @@ public final class UploadTarget {
     public String getMethod() {
         return m_method;
     }
-    
+
     /**
      * Retrieves the url of the upload instruction.
-     * 
+     *
      * @return itemContentType
      */
     @JsonProperty(JSON_PROPERTY_URL)
@@ -111,10 +109,10 @@ public final class UploadTarget {
     public URL getUrl() {
         return m_url;
     }
-    
+
     /**
      * Retrieves the header of the upload instruction.
-     * 
+     *
      * @return itemContentType
      */
     @JsonProperty(JSON_PROPERTY_HEADER)
@@ -124,7 +122,7 @@ public final class UploadTarget {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -150,5 +148,5 @@ public final class UploadTarget {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
-    
+
 }

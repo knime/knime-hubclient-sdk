@@ -42,6 +42,7 @@ import org.apache.commons.lang3.function.FailableSupplier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
@@ -98,7 +99,7 @@ class AbstractHubTransfer {
      * @param apiClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
-    AbstractHubTransfer(final HubClientAPI apiClient, final Map<String, String> additionalHeaders) {
+    AbstractHubTransfer(final @NotOwning HubClientAPI apiClient, final Map<String, String> additionalHeaders) {
         m_catalogClient = new CatalogServiceClient(apiClient, additionalHeaders);
     }
 
@@ -253,7 +254,7 @@ class AbstractHubTransfer {
      * @throws ResourceAccessException
      * @throws CanceledExecutionException
      */
-    Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker) 
+    Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
             throws ResourceAccessException, CanceledExecutionException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {

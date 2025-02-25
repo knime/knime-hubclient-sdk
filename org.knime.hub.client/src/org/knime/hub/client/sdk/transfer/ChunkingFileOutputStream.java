@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 
 /**
@@ -44,7 +45,7 @@ public abstract class ChunkingFileOutputStream extends OutputStream {
 
     private Path m_currentChunk;
 
-    private OutputStream m_chunkOutputStream;
+    private @Owning OutputStream m_chunkOutputStream;
 
     private long m_currentChunkSize;
 
@@ -99,11 +100,11 @@ public abstract class ChunkingFileOutputStream extends OutputStream {
         }
     }
 
-    private void finishChunk() throws IOException {
+    private void finishChunk(final @Owning OutputStream chunkOutputStream) throws IOException {
         try {
-            m_chunkOutputStream.close();
+            chunkOutputStream.close();
             chunkFinished(m_currentChunkNo, m_currentChunk, m_currentChunkSize,
-                m_chunkOutputStream instanceof DigestOutputStream dos ? dos.getMessageDigest().digest() : null);
+                chunkOutputStream instanceof DigestOutputStream dos ? dos.getMessageDigest().digest() : null);
         } finally {
             m_chunkOutputStream = null;
             m_currentChunk = null;
@@ -118,7 +119,7 @@ public abstract class ChunkingFileOutputStream extends OutputStream {
         m_chunkOutputStream.write(b);
         m_currentChunkSize++;
         if (m_currentChunkSize == m_maxChunkSize) {
-            finishChunk();
+            finishChunk(m_chunkOutputStream);
         }
     }
 
@@ -134,7 +135,7 @@ public abstract class ChunkingFileOutputStream extends OutputStream {
             m_chunkOutputStream.write(array, current, writeLength);
             m_currentChunkSize += writeLength;
             if (m_currentChunkSize == m_maxChunkSize) {
-                finishChunk();
+                finishChunk(m_chunkOutputStream);
             }
             current += writeLength;
         }
@@ -150,7 +151,7 @@ public abstract class ChunkingFileOutputStream extends OutputStream {
     @Override
     public void close() throws IOException {
         if (m_chunkOutputStream != null) {
-            finishChunk();
+            finishChunk(m_chunkOutputStream);
         }
         m_currentChunkNo = -1;
     }
