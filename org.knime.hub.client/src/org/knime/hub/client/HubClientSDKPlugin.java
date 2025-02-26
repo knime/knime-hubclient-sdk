@@ -77,9 +77,8 @@ public class HubClientSDKPlugin extends AbstractUIPlugin {
      *
      * @param relativePath a relative path
      * @return the resolved absolute path
-     * @throws URISyntaxException
      */
-    public static Path resolvePath(final IPath relativePath) throws URISyntaxException {
+    public static Path resolvePath(final IPath relativePath) {
         var myself = FrameworkUtil.getBundle(HubClientSDKPlugin.class);
         try {
             var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));

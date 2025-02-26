@@ -201,10 +201,9 @@ public class HubClientAPI implements AutoCloseable {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH)
                 .append(path);
 
-        final Object localVarPostBody = spaceRequestBody;
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, localVarPostBody, REPOSITORY_ITEM);
+                .invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -347,7 +346,7 @@ public class HubClientAPI implements AutoCloseable {
             final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
             final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -421,7 +420,7 @@ public class HubClientAPI implements AutoCloseable {
             final MediaType responseType, final DownloadContentHandler<R> contentHandler,
             final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(id);
 
@@ -485,7 +484,7 @@ public class HubClientAPI implements AutoCloseable {
             final MediaType responseType, final DownloadContentHandler<R> contentHandler,
             final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(responseType);
         CheckUtils.checkNotNull(path);
 
@@ -829,7 +828,7 @@ public class HubClientAPI implements AutoCloseable {
             final IPath subPath, final MediaType contentType,
             final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(accountId);
         CheckUtils.checkNotNull(subPath);
@@ -938,7 +937,7 @@ public class HubClientAPI implements AutoCloseable {
     public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
             final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(id);
 
@@ -1037,7 +1036,7 @@ public class HubClientAPI implements AutoCloseable {
     public <R> ApiResponse<R> uploadItemByPath(final IPath path,final MediaType contentType,
             final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
                     throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler, null);
+        CheckUtils.checkNotNull(contentHandler);
         CheckUtils.checkNotNull(contentType);
         CheckUtils.checkNotNull(path);
 

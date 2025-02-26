@@ -58,7 +58,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
  */
 public final class ObjectMapperUtil {
 
-    private static final ObjectMapper mapper = new ObjectMapper().registerModule(new Jdk8Module());
+    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new Jdk8Module());
 
     private ObjectMapperUtil() {
         // utility class
@@ -70,7 +70,7 @@ public final class ObjectMapperUtil {
      * @return an object mapper
      */
     public static ObjectMapper getObjectMapper() {
-        return mapper;
+        return MAPPER;
     }
     
 }

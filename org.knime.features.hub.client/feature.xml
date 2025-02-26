@@ -2,7 +2,7 @@
 <feature
       id="org.knime.features.hub.client"
       label="KNIME AP Hubclient SDK"
-      version="4.0.0.qualifier"
+      version="0.0.1.qualifier"
       provider-name="KNIME AG, Zurich, Switzerland">
 
    <description>
@@ -729,9 +729,6 @@ propagated with or for interoperation with KNIME.
 
    <plugin
          id="org.knime.hub.client"
-         download-size="0"
-         install-size="0"
-         version="0.0.0"
-         unpack="false"/>
+         version="0.0.0"/>
 
 </feature>

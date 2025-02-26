@@ -78,7 +78,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
         visible = true, //
         requireTypeIdForSubtypes = OptBoolean.TRUE
 )
-@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE_VALUE) })
+@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE) })
 public sealed class WorkflowGroup extends RepositoryItem permits Space {
 
     /** Type of a workflow group and space */
