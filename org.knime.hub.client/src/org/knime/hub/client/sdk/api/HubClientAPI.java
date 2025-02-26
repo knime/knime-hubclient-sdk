@@ -230,7 +230,7 @@ public class HubClientAPI implements AutoCloseable {
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
+                .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
                 .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
@@ -263,7 +263,7 @@ public class HubClientAPI implements AutoCloseable {
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
-                .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
+                .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
                 .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
@@ -290,7 +290,7 @@ public class HubClientAPI implements AutoCloseable {
                 .append(id);
 
         return m_apiClient.createApiRequest()
-                .withQueryParam(QUERY_PARAM_SOFT_DELETE, Boolean.toString(softDelete))
+                .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
                 .withHeaders(additionalHeaders)
                 .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
@@ -568,8 +568,8 @@ public class HubClientAPI implements AutoCloseable {
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_DETAILS, details)
-                .withQueryParam(QUERY_PARAM_DEEP, Boolean.toString(deep))
-                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, Boolean.toString(spaceDetails))
+                .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
+                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
@@ -639,8 +639,8 @@ public class HubClientAPI implements AutoCloseable {
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_DETAILS, details)
-                .withQueryParam(QUERY_PARAM_DEEP, Boolean.toString(deep))
-                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, Boolean.toString(spaceDetails))
+                .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
+                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
@@ -717,8 +717,8 @@ public class HubClientAPI implements AutoCloseable {
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
                 .withQueryParam(QUERY_PARAM_DETAILS, details)
-                .withQueryParam(QUERY_PARAM_DEEP, Boolean.toString(deep))
-                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, Boolean.toString(spaceDetails))
+                .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
+                .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
                 .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
                 .withQueryParam(QUERY_PARAM_VERSION, version)
                 .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)

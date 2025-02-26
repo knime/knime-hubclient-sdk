@@ -48,19 +48,9 @@
 
 package org.knime.hub.client.sdk;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.MediaType;
-
-import static com.github.tomakehurst.wiremock.client.WireMock.*;
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -83,26 +73,38 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
-import org.mockito.Mockito;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.HubClientSDKPlugin;
 import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
+import org.mockito.Mockito;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.tomakehurst.wiremock.WireMockServer;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
+import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 
 /**
  * Integration tests for {@link HubClientAPI}.
- * 
+ *
  * This only includes enough test cases to test the de-serialization of the response entities.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 class HubClientAPITest {
-    
+
 	public static final String RESOURCE_FOLDER_NAME = "resources";
     public static final String TEST_FILE_FOLDER_NAME = "repositoryMetaDataTestFiles";
-	
+
 	public static final String DEFAULT_USERNAME = "knime";
 	public static final String DEFAULT_PUBLIC_SPACE_NAME = "PublicSpace";
 	public static final String DEFAULT_PRIVATE_SPACE_NAME = "PrivateSpace";
@@ -110,7 +112,7 @@ class HubClientAPITest {
 			formatted(DEFAULT_USERNAME, DEFAULT_PUBLIC_SPACE_NAME);
     public static final String DEFAULT_PRIVATE_SPACE_PATH = "Users/%s/%s".
     		formatted(DEFAULT_USERNAME, DEFAULT_PRIVATE_SPACE_NAME);
-    
+
     public static final String JSON_PATH_PATH = "$['path']";
     public static final String JSON_PATH_ID = "$['id']";
     public static final String JSON_PATH_TYPE = "$['type']";
@@ -119,28 +121,28 @@ class HubClientAPITest {
     public static final String JSON_PATH_DETAILS_SPACE_ID = "$['details']['space']['spaceId']";
     public static final String JSON_PATH_MASON_CONTROLS_HREF = "$['@controls'][*]['href']";
     public static final String JSON_PATH_MASON_CONTROLS_METHOD = "$['@controls'][*]['method']";
-    
+
     public static final String JSON_PATH_CHILD_ITEM_PATH = "$['children'][*]['path']";
     public static final String JSON_PATH_CHILD_ITEM_ID = "$['children'][*]['id']";
     public static final String JSON_PATH_CHILD_ITEM_TYPE = "$['children'][*]['type']";
     public static final String JSON_PATH_CHILD_ITEM_OWNER = "$['children'][*]['owner']";
     public static final String JSON_PATH_CHILD_ITEM_DESCRIPTION = "$['children'][*]['description']";
-    
-    public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF = 
+
+    public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF =
     		"$['children'][*]['@controls'][*]['href']";
-    public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD = 
+    public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD =
     		"$['children'][*]['@controls'][*]['method']";
-    
+
     private static ApiClient apiClient;
     private static ObjectMapper mapper;
-	
+
 	private static WireMockServer serverMock;
 	private static HubClientAPI hubClientAPIMock;
 	private static Configuration jsonPathConfig;
 	private static String authToken;
-	
+
 	@BeforeAll
-	static void startServerMock() throws CouldNotAuthorizeException {	    
+	static void startServerMock() throws CouldNotAuthorizeException {
 	    // Initialize wiremock server.
 	    serverMock = HttpMockServiceFactory.createMockServer();
 	    serverMock.start();
@@ -151,9 +153,9 @@ class HubClientAPITest {
 	    authToken = UUID.randomUUID().toString();
 	    when(authMock.getAuthorization()).thenReturn(authToken);
         apiClient = new ApiClient(serverAdress, authMock, Duration.ofSeconds(0), Duration.ofSeconds(0));
-        mapper = apiClient.getObjectMapper();	    
+        mapper = apiClient.getObjectMapper();
 	    hubClientAPIMock = new HubClientAPI(apiClient);
-	    
+
 	    // Configure JsonPath to use Jackson for JsonNode compatibility
 	    // Returns a null node if a JSON property is missing.
 	    jsonPathConfig = Configuration.builder()
@@ -162,8 +164,8 @@ class HubClientAPITest {
                 .options(Option.DEFAULT_PATH_LEAF_TO_NULL)
                 .build();
 	}
-		
-	private static JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId, 
+
+	private static JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId,
 	        final Map<String, String> queryParams) throws IOException, URISyntaxException {
         // Path to the file inside test file folder.
 	    final var filePath = IPath.forPosix(HubClientAPITest.RESOURCE_FOLDER_NAME)
@@ -171,39 +173,39 @@ class HubClientAPITest {
 
         // Obtain file object from bundle activator class.
         File file = HubClientSDKPlugin.resolvePath(filePath).toFile();
-        
+
         try (InputStream is = new FileInputStream(file);) {
             // Create a json node from the resource.
             JsonNode jsonNode = mapper.readTree(is);
-            
+
             // Create query paramter string.
             String queryParamString = StringUtils.EMPTY;
             if (!queryParams.isEmpty()) {
                 var queryParamPairs = queryParams.keySet().stream()
                         .map(key -> "%s=%s".formatted(key, queryParams.get(key))).toList();
-                queryParamString = "?%s".formatted(String.join("&", queryParamPairs));                
+                queryParamString = "?%s".formatted(String.join("&", queryParamPairs));
             }
-            
+
             // Create a stub for the getRepositoryItemMetaData request.
             serverMock.stubFor(get(urlEqualTo("/repository/%s%s".formatted(repoItemPathOrId, queryParamString)))
                     .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
                         .withBody(jsonNode.toString())));
-            
+
             return jsonNode;
         }
     }
-	
+
 	/**
-	 * Tests that the response entities are deserialized 
+	 * Tests that the response entities are deserialized
 	 * into the expected repository item meta data.
-	 * 
-	 * @param testFileName the provided JSON response 
+	 *
+	 * @param testFileName the provided JSON response
 	 * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException 
-	 * @throws URISyntaxException 
+	 * @throws CouldNotAuthorizeException
+	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -213,7 +215,7 @@ class HubClientAPITest {
         "workflowGroup.json,   WorkflowGroup",
         "space.json,           Space"
     })
-	void testGetRepositoryItemMetaDataWithoutDetails(final String testFileName, final String repoItemName) 
+	void testGetRepositoryItemMetaDataWithoutDetails(final String testFileName, final String repoItemName)
 			throws IOException, CouldNotAuthorizeException, URISyntaxException {
 	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = null;
@@ -223,34 +225,31 @@ class HubClientAPITest {
         String version = null;
         String spaceVersion = null;
 
-        final var queryParams = new HashMap<String, String>();
-        queryParams.put("deep", Boolean.toString(deep));
-        queryParams.put("spaceDetails", Boolean.toString(spaceDetails));
-        
         // Create the stub for the repository item metadata.
-        final var knimeHubJSONResponse = retrieveRepositoryItemMetaData(testFileName, path, queryParams);
-        
+        final var knimeHubJSONResponse =
+                retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
+
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
-	    
+
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE, 
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, 
+                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
                 JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD);
         assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
 	}
-	
+
 	/**
-	 * Tests that the response entities are deserialized into the expected repository 
+	 * Tests that the response entities are deserialized into the expected repository
 	 * item meta data where "full" details are requested.
-	 * 
-	 * @param testFileName the provided JSON response 
+	 *
+	 * @param testFileName the provided JSON response
      * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException 
-	 * @throws URISyntaxException 
+	 * @throws CouldNotAuthorizeException
+	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -260,124 +259,117 @@ class HubClientAPITest {
         "workflowGroupWithDetails.json,   WorkflowGroup",
         // Space does not provide details if requested.
     })
-    void testGetRepositoryItemMetaDataWithDetails(final String testFileName, final String repoItemName) 
+    void testGetRepositoryItemMetaDataWithDetails(final String testFileName, final String repoItemName)
             throws IOException, CouldNotAuthorizeException, URISyntaxException {
-        String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);        
+        String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = "full";
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = null;
         String version = null;
         String spaceVersion = null;
-        
+
         final var queryParams = new HashMap<String, String>();
         queryParams.put("details", details);
-        queryParams.put("deep", Boolean.toString(deep));
-        queryParams.put("spaceDetails", Boolean.toString(spaceDetails));
-        
+
         // Create the stub for the repository item metadata.
         final var knimeHubJSONResponse = retrieveRepositoryItemMetaData(testFileName, path, queryParams);
-        
+
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
-        
+
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE, 
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, 
+                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
                 JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_DETAILS_SPACE_ID);
         assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
     }
-	
+
 	/**
-	 * Tests that the response entities which have the children property 
+	 * Tests that the response entities which have the children property
 	 * are deserialized into the expected repository item meta data.
-	 * 
-	 * @param testFileName the provided JSON response 
+	 *
+	 * @param testFileName the provided JSON response
      * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException 
-	 * @throws URISyntaxException 
+	 * @throws CouldNotAuthorizeException
+	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
         "workflowGroup.json,   WorkflowGroup",
-        "space.json,           Space"    
+        "space.json,           Space"
     })
-	void testGetRepositoryItemMetaDataWithChildren(final String testFileName, final String repoItemName) 
+	void testGetRepositoryItemMetaDataWithChildren(final String testFileName, final String repoItemName)
 	        throws IOException, CouldNotAuthorizeException, URISyntaxException {
-	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);        
+	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = null;
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = null;
         String version = null;
         String spaceVersion = null;
-        
-        final var queryParams = new HashMap<String, String>();
-        queryParams.put("deep", Boolean.toString(deep));
-        queryParams.put("spaceDetails", Boolean.toString(spaceDetails));
-        
+
         // Create the stub for the repository item metadata.
-        final var knimeHubJSONResponse = retrieveRepositoryItemMetaData(testFileName, path, queryParams);
-        
+        final var knimeHubJSONResponse =
+                retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
+
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
-        
+
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE, 
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF, 
-                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID, 
+                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF,
+                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
                 JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION);
         assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
 	}
-	
+
 	/**
-	 * Tests that the response entities of user groups for "children" contributer spaces 
+	 * Tests that the response entities of user groups for "children" contributer spaces
      * are deserialized into the expected repository item meta data.
-	 * 
+	 *
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException 
-	 * @throws URISyntaxException 
+	 * @throws CouldNotAuthorizeException
+	 * @throws URISyntaxException
 	 */
 	@Test
-	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException, CouldNotAuthorizeException, 
+	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException, CouldNotAuthorizeException,
 	URISyntaxException {
-        String path = "Users/%s".formatted(DEFAULT_USERNAME);        
+        String path = "Users/%s".formatted(DEFAULT_USERNAME);
         String details = null;
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = "children";
         String version = null;
         String spaceVersion = null;
-        
+
         final var queryParams = new HashMap<String, String>();
         queryParams.put("contribSpaces", contribSpaces);
-        queryParams.put("deep", Boolean.toString(deep));
-        queryParams.put("spaceDetails", Boolean.toString(spaceDetails));
-        
+
         // Create the stub for the repository item metadata.
-        final var knimeHubJSONResponse = retrieveRepositoryItemMetaData("userGroupWithContribSpaces.json", 
+        final var knimeHubJSONResponse = retrieveRepositoryItemMetaData("userGroupWithContribSpaces.json",
         		path, queryParams);
-        
+
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
-        
+
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE, 
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF, 
-                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID, 
+                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF,
+                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
                 JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION,
                 JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF, JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD);
         assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
     }
-	
-	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse, 
+
+	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse,
 			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) {
 	    // Create the actual JSON node response object.
 	    var responseEntity = actualApiResponse.result().toOptional().get();
@@ -387,15 +379,15 @@ class HubClientAPITest {
         for (var jsonPath : expectedJsonPaths) {
             var actualJSONProperties = JsonPath.using(jsonPathConfig).parse(actualJSONResponse).read(jsonPath);
             var expectedJSONProperties = JsonPath.using(jsonPathConfig).parse(knimeHubJSONResponse).read(jsonPath);
-            assertEquals(expectedJSONProperties, actualJSONProperties, 
+            assertEquals(expectedJSONProperties, actualJSONProperties,
             		"Unexpected properties for JSON path '%s'".formatted(jsonPath));
         }
     }
 
-    @AfterAll 
+    @AfterAll
 	static void stopServerMock() {
 	    serverMock.stop();
 	    hubClientAPIMock.getApiClient().close();
 	}
-	
+
 }
