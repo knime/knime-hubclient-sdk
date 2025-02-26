@@ -101,7 +101,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
         /** Data */
         DATA(Data.TYPE), //
         /** Space */
-        SPACE(Space.TYPE_VALUE);
+        SPACE(Space.TYPE);
 
         private final String m_value;
 

@@ -61,7 +61,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing Data.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -70,23 +70,23 @@ public final class Data extends RepositoryItem implements Sized {
     static final String TYPE = "Data";
 
     private static final String JSON_PROPERTY_SIZE = "size";
-    private final int m_size;
+    private final long m_size;
 
     @JsonCreator
-    private Data(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) Map<String, Control> masonControls,
-            @JsonProperty(value = Data.JSON_PROPERTY_SIZE, required = true) Integer size) {
+    private Data(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+            @JsonProperty(value = Data.JSON_PROPERTY_SIZE, required = true) final long size) {
         super(path, id, owner, description, details, masonControls);
-        this.m_size = size.intValue();
+        m_size = size;
     }
 
     /**
      * Retrieves the data files size in bytes.
-     * 
+     *
      * @return size
      */
     @JsonProperty(JSON_PROPERTY_SIZE)
@@ -102,7 +102,7 @@ public final class Data extends RepositoryItem implements Sized {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

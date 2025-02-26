@@ -1,0 +1,54 @@
+{
+  "id" : "*iMLnw_ejyqC_DiiE",
+  "type" : "Component",
+  "path" : "/Users/jdoe/Space/Component",
+  "canonicalPath" : "",
+  "_class" : "",
+  "ownerAccountId" : "",
+  "owner" : "jdoe",
+  "author" : "",
+  "createdOn" : "",
+  "itemVersionId" : "",
+  "description" : "This is a description",
+  "richDescription" : "",
+  "downloadCount" : 0,
+  "lastEditedOn" : "",
+  "lastUploadedOn" : "",
+  "size" : 5000000000,
+  "kudosCount" : 0,
+  "updateCount" : 0,
+  "updateCheckCount" : 0,
+  "version" : "",
+  "createdBy" : "",
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component",
+      "method" : "GET"
+    },
+    "knime:download" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component:data",
+      "method" : "GET"
+    },
+    "knime:delete" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component",
+      "method" : "DELETE"
+    },
+    "edit" : {
+      "href" : "https://api.hub.com/repository/Users/jdoe/Space/Component:data",
+      "method" : "PUT",
+      "accept" : [ "*/*" ],
+      "encoding" : "Raw",
+      "title" : "Upload new version"
+    },
+    "knime:manifest-download" : {
+      "href" : "https://api.hub.com/repository/*iMLnw_ejyqC_DiiE/manifest",
+      "method" : "GET",
+      "title" : "Download item"
+    }
+  },
+  "@namespaces" : {
+    "knime" : {
+      "name" : ""
+    }
+  }
+}

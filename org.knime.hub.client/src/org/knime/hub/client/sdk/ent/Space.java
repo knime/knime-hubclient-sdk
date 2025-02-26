@@ -62,34 +62,35 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a Space.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Space extends WorkflowGroup {
 
-    static final String TYPE_VALUE = "Space";
+    @SuppressWarnings("hiding")
+    static final String TYPE = "Space";
 
     private static final String JSON_PROPERTY_PRIVATE = "private";
     private final boolean m_private;
 
     @JsonCreator
     private Space(
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) Map<String, Control> masonControls,
-            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) List<RepositoryItem> children,
-            @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) Boolean isPrivate) {
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children,
+            @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
         super(path, id, owner, description, details, masonControls, children);
         this.m_private = isPrivate.booleanValue();
     }
-    
+
     /**
      * Returns {@code true} if the space is private, otherwise {@code false}.
-     * 
+     *
      * @return private
      */
     @JsonProperty(JSON_PROPERTY_PRIVATE)
@@ -104,7 +105,7 @@ public final class Space extends WorkflowGroup {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
