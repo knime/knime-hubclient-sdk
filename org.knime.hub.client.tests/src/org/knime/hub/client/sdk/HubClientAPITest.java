@@ -75,10 +75,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.hub.client.HubClientSDKPlugin;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
+import org.knime.hub.client.sdk.testing.TestUtil;
 import org.mockito.Mockito;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -172,7 +172,7 @@ class HubClientAPITest {
 	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(testFileName);
 
         // Obtain file object from bundle activator class.
-        File file = HubClientSDKPlugin.resolvePath(filePath).toFile();
+        File file = TestUtil.resolvePath(filePath).toFile();
 
         try (InputStream is = new FileInputStream(file);) {
             // Create a json node from the resource.

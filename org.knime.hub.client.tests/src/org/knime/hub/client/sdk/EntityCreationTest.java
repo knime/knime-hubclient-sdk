@@ -64,7 +64,6 @@ import java.util.List;
 
 import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
-import org.knime.hub.client.HubClientSDKPlugin;
 import org.knime.hub.client.sdk.ent.Component;
 import org.knime.hub.client.sdk.ent.Data;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
@@ -74,6 +73,7 @@ import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.Workflow;
 import org.knime.hub.client.sdk.ent.WorkflowGroup;
+import org.knime.hub.client.sdk.testing.TestUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -116,7 +116,7 @@ class EntityCreationTest {
 	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(filename);
 
 		// Obtain path object from bundle activator class.
-		final var path = HubClientSDKPlugin.resolvePath(filePath);
+		final var path = TestUtil.resolvePath(filePath);
 		return MAPPER.readValue(Files.readString(path), clazz);
 	}
 

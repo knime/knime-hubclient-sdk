@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,13 +41,12 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Feb 27, 2025 (magnus): created
  */
-
-package org.knime.hub.client;
+package org.knime.hub.client.sdk.testing;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -54,23 +54,16 @@ import java.nio.file.Path;
 
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
-import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.knime.core.util.FileUtil;
+import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.osgi.framework.FrameworkUtil;
 
 /**
- * The activator class controls the plug-in life cycle.
+ * Test utility class for unit tests.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public class HubClientSDKPlugin extends AbstractUIPlugin {
-
-    /**
-     * The constructor.
-     */
-    public HubClientSDKPlugin() {
-        // activator class
-    }
+public class TestUtil {
 
     /**
      * Resolves a path relative to the plug-in or any fragment's root into an absolute path.
@@ -79,7 +72,7 @@ public class HubClientSDKPlugin extends AbstractUIPlugin {
      * @return the resolved absolute path
      */
     public static Path resolvePath(final IPath relativePath) {
-        var myself = FrameworkUtil.getBundle(HubClientSDKPlugin.class);
+        var myself = FrameworkUtil.getBundle(HubClientAPI.class);
         try {
             var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
             return FileUtil.resolveToPath(fileUrl);
