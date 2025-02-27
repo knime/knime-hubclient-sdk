@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<site>   
+<site>
+   <bundle id="org.knime.hub.client" version="0.0.0">
+        <category name="knime-hubclient-sdk" />
+   </bundle>   
    <category-def name="knime-hubclient-sdk" label="Build artifacts from knime-hubclient-sdk">
        <description>Build artifacts from knime-hubclient-sdk</description>
    </category-def>

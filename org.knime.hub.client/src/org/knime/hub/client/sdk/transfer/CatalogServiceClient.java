@@ -153,7 +153,7 @@ public class CatalogServiceClient {
         }
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.initiateUpload(parentId.id(), manifest, additionalHeaders);
+            final var response = m_hubClient.catalog().initiateUpload(parentId.id(), manifest, additionalHeaders);
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
             } else {
@@ -175,7 +175,7 @@ public class CatalogServiceClient {
     public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
             throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
+            final var response = m_hubClient.catalog().requestPartUpload(uploadId, partNumber, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -191,7 +191,7 @@ public class CatalogServiceClient {
      */
     public UploadStatus pollUploadState(final String uploadId) throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.pollUploadStatus(uploadId, m_additionalHeaders);
+            final var response = m_hubClient.catalog().pollUploadStatus(uploadId, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -213,7 +213,7 @@ public class CatalogServiceClient {
                 LinkedHashMap::new));
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
+            final var response = m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -228,7 +228,7 @@ public class CatalogServiceClient {
      */
     public void cancelUpload(final String uploadId) throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.cancelUpload(uploadId, m_additionalHeaders);
+            final var response = m_hubClient.catalog().cancelUpload(uploadId, m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -277,9 +277,9 @@ public class CatalogServiceClient {
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = itemIDOrPath.startsWith("*") ?
-                    m_hubClient.getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam, spaceDetailsParam,
+                    m_hubClient.catalog().getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam, spaceDetailsParam,
                             contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders) :
-                    m_hubClient.getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
+                    m_hubClient.catalog().getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
                             spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders);
             if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode()) ||
                     (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
@@ -312,7 +312,7 @@ public class CatalogServiceClient {
             } else if (RepositoryItemType.WORKFLOW == itemType || RepositoryItemType.COMPONENT == itemType) {
                 accept = KNIME_WORKFLOW_MEDIA_TYPE;
             }
-            final var response = m_hubClient.downloadItemById(id.id(), null,
+            final var response = m_hubClient.catalog().downloadItemById(id.id(), null,
                     null, accept, contentHandler, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {

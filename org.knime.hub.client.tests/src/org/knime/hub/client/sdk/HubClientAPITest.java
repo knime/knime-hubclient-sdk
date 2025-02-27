@@ -230,7 +230,7 @@ class HubClientAPITest {
                 retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
 
         // Assert required json paths.
@@ -276,7 +276,7 @@ class HubClientAPITest {
         final var knimeHubJSONResponse = retrieveRepositoryItemMetaData(testFileName, path, queryParams);
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
 
         // Assert required json paths.
@@ -317,7 +317,7 @@ class HubClientAPITest {
                 retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
 
         // Assert required json paths.
@@ -356,7 +356,7 @@ class HubClientAPITest {
         		path, queryParams);
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
 
         // Assert required json paths.
