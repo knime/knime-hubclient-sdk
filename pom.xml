@@ -25,7 +25,6 @@
 	<modules>
 		<module>org.knime.hub.client</module>
 		<module>org.knime.hub.client.tests</module>
-		<module>org.knime.features.hub.client</module>
 		<module>org.knime.update.hub.client</module>
 	</modules>
 
