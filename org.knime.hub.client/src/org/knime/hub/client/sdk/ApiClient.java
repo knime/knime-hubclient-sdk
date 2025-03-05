@@ -66,10 +66,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.cxf.jaxrs.client.ClientProperties;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -81,8 +79,6 @@ import org.knime.core.util.KNIMEServerHostnameVerifier;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.proxy.URLConnectionFactory;
-import org.knime.hub.client.sdk.ent.UploadManifest;
-import org.knime.hub.client.sdk.transfer.ItemID;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -96,7 +92,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
@@ -110,8 +106,9 @@ import jakarta.ws.rs.core.Response.Status.Family;
  */
 public class ApiClient implements AutoCloseable {
 
-    /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
-    private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
+    private static final String HTTP_CONNECTION_TIMEOUT_PROP = "http.connection.timeout";
+    private static final String HTTP_RECEIVE_TIMEOUT_PROP = "http.receive.timeout";
+    private static final String HTTP_AUTOREDIRECT_PROP = "http.autoredirect";
 
     /**
      * HTTP request method
@@ -191,16 +188,13 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.register(jsonProvider);
 
         // Enable automatic redirects (e.g. for download)
-        clientBuilder.property(ClientProperties.HTTP_AUTOREDIRECT_PROP, true);
+        clientBuilder.property(HTTP_AUTOREDIRECT_PROP, true);
 
         // Set timeouts for connection
-        clientBuilder.connectTimeout(m_connectionTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        clientBuilder.readTimeout(m_readTimeout.toMillis(), TimeUnit.MILLISECONDS);
-        clientBuilder.property(ClientProperties.HTTP_RECEIVE_TIMEOUT_PROP,
-                Math.max(SLOW_OPERATION_READ_TIMEOUT.toMillis(), m_readTimeout.toMillis()));
+        clientBuilder.property(HTTP_CONNECTION_TIMEOUT_PROP, m_connectionTimeout.toMillis());
+        clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
 
-        final var client = clientBuilder.build();
-        m_httpClient = client;
+        m_httpClient = clientBuilder.build();
 
         m_logger = NodeLogger.getLogger(getClass());
     }
@@ -227,6 +221,8 @@ public class ApiClient implements AutoCloseable {
         private static final MediaType DEFAULT_CONTENT_TYPE = MediaType.APPLICATION_JSON_TYPE;
         private MediaType m_contentType = DEFAULT_CONTENT_TYPE;
         private String m_headerAccept;
+
+        private Duration m_requestReadTimeout;
 
         private static final String REQUEST_LENGTH_MESSAGE = "Request '%s' took %.3fs";
 
@@ -348,6 +344,17 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
+         * Set the read timeout
+         *
+         * @param readTimeout
+         * @return {@link ApiRequest}
+         */
+        public ApiRequest withReadTimeout(final Duration readTimeout) {
+            m_requestReadTimeout = readTimeout;
+            return this;
+        }
+
+        /**
          * Build full URL by concatenating base path, the given sub path and query
          * parameters.
          *
@@ -405,7 +412,6 @@ public class ApiClient implements AutoCloseable {
          */
         private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth)
                 throws CouldNotAuthorizeException {
-            Invocation.Builder builder;
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
 
@@ -419,19 +425,25 @@ public class ApiClient implements AutoCloseable {
                 m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
             }
 
+            WebTarget target = m_httpClient.target(uri);
+            if (m_requestReadTimeout != null) {
+                target.property(HTTP_RECEIVE_TIMEOUT_PROP, m_requestReadTimeout.toMillis());
+            }
+
+            final Invocation.Builder builder;
             if (m_headerAccept == null) {
-                builder = m_httpClient.target(uri).request();
+                builder = target.request();
             } else {
-                builder = m_httpClient.target(uri).request(m_headerAccept);
+                builder = target.request(m_headerAccept);
                 m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
             for (final Entry<String, String> keyValue : m_headerParams.entrySet()) {
-                builder = builder.header(keyValue.getKey(), keyValue.getValue());
+                builder.header(keyValue.getKey(), keyValue.getValue());
             }
 
             for (final Entry<String, String> keyValue : m_cookieParams.entrySet()) {
-                builder = builder.cookie(keyValue.getKey(), keyValue.getValue());
+                builder.cookie(keyValue.getKey(), keyValue.getValue());
             }
 
             return builder;
@@ -499,9 +511,13 @@ public class ApiClient implements AutoCloseable {
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
                     // TODO JSON error handling
+                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
+                    return new ApiResponse<>(responseHeaders, responseStatusCode,
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                } else if (Family.REDIRECTION == responseStatusFamily) {
                     String message;
-                    if (responseStatusFamily == Family.REDIRECTION
-                            && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
                         final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
                         message = "Redirect failed (firewall?): '%s'".formatted(location);
                     } else {
@@ -577,14 +593,18 @@ public class ApiClient implements AutoCloseable {
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
                     // TODO JSON error handling
+                    final var message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                            null, responseStatusInfo::getReasonPhrase);
+                    return new ApiResponse<>(responseHeaders, responseStatusCode,
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                } else if (Family.REDIRECTION == responseStatusFamily) {
                     String message;
-                    if (responseStatusFamily == Family.REDIRECTION
-                            && response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
                         final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
                         message = "Redirect failed (firewall?): '%s'".formatted(location);
                     } else {
                         message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                            null, responseStatusInfo::getReasonPhrase);
+                                null, responseStatusInfo::getReasonPhrase);
                     }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
                             responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));

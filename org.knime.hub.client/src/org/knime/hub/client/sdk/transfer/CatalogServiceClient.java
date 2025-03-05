@@ -23,6 +23,7 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -71,6 +72,9 @@ public class CatalogServiceClient {
 
     static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
             RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
+
+    /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
+    private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
     private static final String KNIME_SERVER_NAMESPACE = "knime";
 
@@ -153,7 +157,8 @@ public class CatalogServiceClient {
         }
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().initiateUpload(parentId.id(), manifest, additionalHeaders);
+            final var response = m_hubClient.catalog()
+                    .initiateUpload(parentId.id(), manifest, SLOW_OPERATION_READ_TIMEOUT, additionalHeaders);
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
             } else {

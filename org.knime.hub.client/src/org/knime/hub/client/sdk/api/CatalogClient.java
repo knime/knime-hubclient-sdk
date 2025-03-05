@@ -49,6 +49,7 @@
 package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IPath;
@@ -145,15 +146,14 @@ public final class CatalogClient {
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
         final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
-        final Object localVarPostBody = spaceRequestBody;
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.PUT,
-            localVarPostBody, REPOSITORY_ITEM);
+            spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -174,7 +174,7 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(path);
+        CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
@@ -196,7 +196,7 @@ public final class CatalogClient {
      */
     public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(path);
+        CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
@@ -219,8 +219,8 @@ public final class CatalogClient {
      */
     public ApiResponse<Void> deleteItemByCanonicalPath(final String accountId, final IPath subPath,
         final boolean softDelete, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
@@ -244,7 +244,7 @@ public final class CatalogClient {
      */
     public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(id);
+        CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
 
@@ -293,10 +293,10 @@ public final class CatalogClient {
         final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(responseType);
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(responseType);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
@@ -348,9 +348,9 @@ public final class CatalogClient {
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(responseType);
-        CheckUtils.checkNotNull(id);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(responseType);
+        CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
@@ -398,9 +398,9 @@ public final class CatalogClient {
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(responseType);
-        CheckUtils.checkNotNull(path);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(responseType);
+        CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
@@ -451,8 +451,8 @@ public final class CatalogClient {
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
         final String version, final String spaceVersion, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
@@ -506,7 +506,7 @@ public final class CatalogClient {
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
         final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(path);
+        CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
@@ -562,7 +562,7 @@ public final class CatalogClient {
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
         final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(id);
+        CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
 
@@ -593,10 +593,10 @@ public final class CatalogClient {
     public ApiResponse<RepositoryItem> serverCopyByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
@@ -625,10 +625,10 @@ public final class CatalogClient {
     public ApiResponse<RepositoryItem> serverMoveByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
@@ -660,10 +660,10 @@ public final class CatalogClient {
         final MediaType contentType, final UploadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(accountId);
-        CheckUtils.checkNotNull(subPath);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(accountId);
+        CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
@@ -689,9 +689,9 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(id);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
@@ -718,9 +718,9 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(id);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
@@ -750,9 +750,9 @@ public final class CatalogClient {
     public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(id);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
@@ -776,9 +776,9 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(path);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(path);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
@@ -804,9 +804,9 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(path);
-        CheckUtils.checkNotNull(fromRepository);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(path);
+        CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
@@ -835,9 +835,9 @@ public final class CatalogClient {
     public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
         throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(contentHandler);
-        CheckUtils.checkNotNull(contentType);
-        CheckUtils.checkNotNull(path);
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(contentType);
+        CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
@@ -856,7 +856,7 @@ public final class CatalogClient {
      */
     public ApiResponse<Void> cancelUpload(final String uploadId, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(uploadId);
+        CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
@@ -871,22 +871,22 @@ public final class CatalogClient {
      *
      * @param parentId The ID of the parent item the artifact will be uploaded into. (required)
      * @param requestBody The request body (optional)
+     * @param readTimeout The read timeout
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
      * @throws CouldNotAuthorizeException
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Duration readTimeout, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         m_logger.debug("Initiating upload of %d items".formatted(requestBody.getItems().size()));
 
-        CheckUtils.checkNotNull(parentId);
+        CheckUtils.checkArgumentNotNull(parentId);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_UPLOAD_MANIFEST);
 
-        final Object localVarPostBody = requestBody;
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.POST,
-            localVarPostBody, UPLOAD_STARTED);
+        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).withReadTimeout(readTimeout)
+                .invokeAPI(requestPath, Method.POST, requestBody, UPLOAD_STARTED);
     }
 
     /**
@@ -900,7 +900,7 @@ public final class CatalogClient {
      */
     public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(uploadId);
+        CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_STATUS);
 
@@ -920,7 +920,7 @@ public final class CatalogClient {
      */
     public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(uploadId);
+        CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
@@ -940,8 +940,8 @@ public final class CatalogClient {
      */
     public ApiResponse<UploadTarget> requestPartUpload(final String uploadId, final Integer partNumber,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        CheckUtils.checkNotNull(uploadId);
-        CheckUtils.checkNotNull(partNumber);
+        CheckUtils.checkArgumentNotNull(uploadId);
+        CheckUtils.checkArgumentNotNull(partNumber);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_PARTS);
 
