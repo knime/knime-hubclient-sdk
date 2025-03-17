@@ -51,24 +51,27 @@ package org.knime.hub.client.sdk.api;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
 import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiClient.UploadContentHandler;
 import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
@@ -81,18 +84,18 @@ import jakarta.ws.rs.core.MediaType;
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
 public final class CatalogClient {
 
-    /** API paths */
+    /* API paths */
     private static final String REPOSITORY_API_PATH = "repository";
     private static final String UPLOAD_API_PATH = "uploads";
 
-    /** Path pieces */
+    /* Path pieces */
     private static final String PATH_PIECE_USERS = "Users";
     private static final String PATH_PIECE_DATA = ":data";
     private static final String PATH_PIECE_UPLOAD_MANIFEST = "manifest";
     private static final String PATH_PIECE_UPLOAD_STATUS = "status";
     private static final String PATH_PIECE_UPLOAD_PARTS = "parts";
 
-    /** Query parameters */
+    /* Query parameters */
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
     private static final String QUERY_PARAM_MOVE = "move";
     private static final String QUERY_PARAM_VERSION = "version";
@@ -104,17 +107,21 @@ public final class CatalogClient {
     private static final String QUERY_PARAM_CONTRIB_SPACES = "contribSpaces";
     private static final String QUERY_PARAM_PART_NUMBER = "partNumber";
 
-    /** Return Types */
+    /* Return Types */
     private static final GenericType<Void> VOID = new GenericType<Void>() {};
     private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<RepositoryItem>() {};
     private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<UploadStatus>() {};
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
 
+    /* Item version query parameter "special" values */
+    private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
+    private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
+
     @SuppressWarnings("resource") // Owned by Hub Client API
     private final @NotOwning ApiClient m_apiClient;
 
-    final NodeLogger m_logger;
+    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogClient.class);
 
     /**
      * Create the {@link CatalogClient} given an {@link ApiClient}
@@ -123,7 +130,6 @@ public final class CatalogClient {
      */
     public CatalogClient(final @NotOwning ApiClient apiClient) {
         m_apiClient = apiClient;
-        m_logger = NodeLogger.getLogger(getClass());
     }
 
     /**
@@ -286,13 +292,13 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final String version,
         final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(accountId);
@@ -341,13 +347,13 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItemById(final String id, final String version, final String spaceVersion,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(id);
@@ -391,13 +397,13 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final String version, final String spaceVersion,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(path);
@@ -653,13 +659,13 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
         final MediaType contentType, final UploadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
@@ -744,12 +750,12 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
@@ -829,12 +835,12 @@ public final class CatalogClient {
      * @return {@link ApiResponse}
      *
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
-        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
@@ -879,7 +885,7 @@ public final class CatalogClient {
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        m_logger.debug("Initiating upload of %d items".formatted(requestBody.getItems().size()));
+        LOGGER.debug("Initiating upload of %d items", requestBody.getItems().size());
 
         CheckUtils.checkArgumentNotNull(parentId);
 
@@ -948,6 +954,21 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
             .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
             .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
+    }
+
+    /**
+     * Returns the string representation of the given item version for the Catalog service, if it is
+     * {@link ItemVersion#isVersioned()}, or {@link Optional#empty()} if the given version refers to the "current
+     * state".
+     *
+     * @param version non-{@code null} version to map to its string representation
+     * @return string representation for item version
+     */
+    public static Optional<String> getQueryParameterValue(final ItemVersion version) {
+        return Optional.ofNullable(version.match(//
+            cs -> null, //
+            mr -> ITEM_VERSION_MOST_RECENT_IDENTIFIER,
+            sv -> sv.getVersionString()));
     }
 
 }

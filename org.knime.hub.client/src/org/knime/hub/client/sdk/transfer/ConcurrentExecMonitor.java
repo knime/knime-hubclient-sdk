@@ -32,7 +32,7 @@ import java.util.function.DoubleConsumer;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.knime.core.node.CanceledExecutionException;
+import org.knime.hub.client.sdk.CancelationException;
 
 import com.google.common.util.concurrent.AtomicDouble;
 
@@ -56,14 +56,14 @@ public sealed interface ConcurrentExecMonitor {
     void done();
 
     /**
-     * Checks whether the user has canceled the operation and throws a {@link CanceledExecutionException}
+     * Checks whether the user has canceled the operation and throws a {@link CancelationException}
      * if they have.
      *
-     * @throws CanceledExecutionException if the user has canceled the operation
+     * @throws CancelationException if the user has canceled the operation
      */
-    default void checkCanceled() throws CanceledExecutionException {
+    default void checkCanceled() throws CancelationException {
         if (cancelChecker().getAsBoolean()) {
-            throw new CanceledExecutionException();
+            throw new CancelationException();
         }
     }
 

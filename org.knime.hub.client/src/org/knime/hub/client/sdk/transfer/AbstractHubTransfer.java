@@ -43,8 +43,8 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.core.node.CanceledExecutionException;
 import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
@@ -74,9 +74,9 @@ class AbstractHubTransfer {
          * @param throwable from the {@link Future}
          * @return result to be returned
          * @throws E custom declared exception
-         * @throws CanceledExecutionException if the user cancelled
+         * @throws CancelationException if the user cancelled
          */
-        T handle(Throwable throwable) throws E, CanceledExecutionException;
+        T handle(Throwable throwable) throws E, CancelationException;
     }
 
     static final int MAX_PATH_LENGTH_IN_MESSAGE = 64;
@@ -200,22 +200,22 @@ class AbstractHubTransfer {
      * @param errorHandler error handler for handling errors/exceptions in the {@link Future}'s execution
      * @return result
      * @throws E
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      */
     static <T, E extends Exception> T waitForCancellable(final Future<T> task, final BooleanSupplier cancelChecker,
-            final ErrorHandler<T, E> errorHandler) throws E, CanceledExecutionException {
+            final ErrorHandler<T, E> errorHandler) throws E, CancelationException {
         try {
             while (true) {
                 try {
                     if (cancelChecker.getAsBoolean()) { // NOSONAR
-                        throw new CanceledExecutionException();
+                        throw new CancelationException();
                     }
                     return task.get(200, TimeUnit.MILLISECONDS);
                 } catch (TimeoutException e) { // NOSONAR
                     // continue waiting until cancelled
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new CanceledExecutionException();
+                    throw new CancelationException();
                 } catch (final ExecutionException e) { // NOSONAR cause is propagated
                     return errorHandler.handle(e.getCause());
                 }
@@ -232,10 +232,10 @@ class AbstractHubTransfer {
      * @param cancelChecker for checking cancellation
      * @return pair containing the deep repository item and its entity tag
      * @throws ResourceAccessException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      */
     Pair<RepositoryItem, EntityTag> deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws ResourceAccessException, CanceledExecutionException {
+            throws ResourceAccessException, CancelationException {
         return runInCommonPool(cancelChecker, () -> {
             final Pair<RepositoryItem, EntityTag> itemAndETag = m_catalogClient //
                 .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
@@ -252,10 +252,10 @@ class AbstractHubTransfer {
      * @param cancelChecker for checking cancellation
      * @return pair containing the deep repository item and its entity tag if successful
      * @throws ResourceAccessException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      */
     Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws ResourceAccessException, CanceledExecutionException {
+            throws ResourceAccessException, CancelationException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
                 final Pair<RepositoryItem, EntityTag> itemAndETag = m_catalogClient //
@@ -273,11 +273,11 @@ class AbstractHubTransfer {
 
     private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,
             final FailableSupplier<T, ResourceAccessException> job)
-            throws ResourceAccessException, CanceledExecutionException {
+            throws ResourceAccessException, CancelationException {
         return waitForCancellable(ForkJoinPool.commonPool().submit(job::get), cancelChecker, throwable -> {
             if (throwable instanceof RuntimeException rte) {
                 throw rte;
-            } else if (throwable instanceof CanceledExecutionException cee) {
+            } else if (throwable instanceof CancelationException cee) {
                 throw cee;
             } else {
                 // the only declared exception

@@ -45,15 +45,16 @@ import org.apache.commons.io.input.RandomAccessFileInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.Owning;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.proxy.URLConnectionFactory;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -87,7 +88,7 @@ public final class FilePartUploader {
         UploadTarget fetch(int partNo) throws ResourceAccessException;
     }
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(FilePartUploader.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartUploader.class);
 
     /** Maximum number of simultaneous upload connections. */
     private static final int PARALLELISM = 4;
@@ -164,7 +165,7 @@ public final class FilePartUploader {
 
     private Pair<Integer, EntityTag> uploadTempFileJob(final String path, final Integer partNum,
             final UploadTargetFetcher targetFetcher, final Path file, final long fileSize, final String md5Hash,
-            final LeafExecMonitor monitor) throws IOException, CanceledExecutionException {
+            final LeafExecMonitor monitor) throws IOException, CancelationException {
         try {
             var retriesRemaining = m_numRetries;
             for (var attempt = 0;; attempt++) {
@@ -177,7 +178,7 @@ public final class FilePartUploader {
                     if (retriesRemaining > 0) {
                         retriesRemaining--;
                         final var remaining = retriesRemaining;
-                        LOGGER.debug(() -> "Retrying to upload part %d of '%s', %d/%d retries left" //
+                        LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
                             .formatted(partNum, path, remaining, m_numRetries), e);
                     } else {
                         throw e;
@@ -202,7 +203,7 @@ public final class FilePartUploader {
 
     private Pair<Integer, EntityTag> uploadDataFilePartJob(final String path, final int partNum,
             final UploadTargetFetcher targetFetcher, final Path dataFile, final long start, final long length,
-            final LeafExecMonitor monitor) throws IOException, CanceledExecutionException {
+            final LeafExecMonitor monitor) throws IOException, CancelationException {
         final String md5Hash = SEND_CONTENT_MD5 ? calculateHash(dataFile, start, length) : null;
         var retriesRemaining = m_numRetries;
         for (var attempt = 0;; attempt++) {
@@ -213,7 +214,7 @@ public final class FilePartUploader {
                 if (retriesRemaining > 0) {
                     retriesRemaining--;
                     final var remaining = retriesRemaining;
-                    LOGGER.debug(() -> "Retrying to upload part %d of '%s', %d/%d retries left" //
+                    LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
                         .formatted(partNum, path, remaining, m_numRetries), e);
                 } else {
                     throw e;
@@ -246,9 +247,9 @@ public final class FilePartUploader {
 
     private EntityTag uploadArtifactPart(final String path, final int partNumber, final int attempt, // NOSONAR
             final UploadTargetFetcher targetFetcher, final InputStream artifactStream, final long numBytes,
-            final String md5Hash, final LeafExecMonitor monitor) throws IOException, CanceledExecutionException {
-        LOGGER.debug(() -> "Starting attempt %d of the upload of part %d of '%s' (%d bytes)" //
-            .formatted(attempt + 1, partNumber, path, numBytes));
+            final String md5Hash, final LeafExecMonitor monitor) throws IOException, CancelationException {
+        LOGGER.debug("Starting attempt %d of the upload of part %d of '%s' (%d bytes)", //
+            attempt + 1, partNumber, path, numBytes);
 
         // set a very small non-zero value to signal that the part upload job has started
         monitor.setProgress(Double.MIN_VALUE);
@@ -269,10 +270,10 @@ public final class FilePartUploader {
                     monitor.setProgress(0.95 * written / numBytes);
                 }
             } catch (final IOException e) {
-                LOGGER.debug(() -> "Failed to upload part %d of '%s'".formatted(partNumber, path), e);
+                LOGGER.debug("Failed to upload part %d of '%s'".formatted(partNumber, path), e);
                 throw e;
-            } catch (final CanceledExecutionException e) {
-                LOGGER.debug(() -> "Cancelled upload of part %d of '%s'".formatted(partNumber, path));
+            } catch (final CancelationException e) {
+                LOGGER.debug("Cancelled upload of part %d of '%s'", partNumber, path);
                 throw e;
             }
 
@@ -292,7 +293,7 @@ public final class FilePartUploader {
                 monitor.setProgress(0.99);
             }
         } finally {
-            LOGGER.debug(() -> "Ending upload of part %d of '%s'".formatted(partNumber, path));
+            LOGGER.debug("Ending upload of part %d of '%s'", partNumber, path);
             monitor.done();
             conn.disconnect();
         }

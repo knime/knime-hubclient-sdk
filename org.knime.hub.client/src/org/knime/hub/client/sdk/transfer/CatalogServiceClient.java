@@ -34,17 +34,19 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.Path;
-import org.knime.core.node.CanceledExecutionException;
+import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
-import org.knime.core.util.hub.HubItemVersion;
+import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
 import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Success;
+import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
@@ -126,11 +128,14 @@ public class CatalogServiceClient {
     public record DownloadTarget(String name, RepositoryItem.RepositoryItemType type, URL url) {
     }
 
+    @NotOwning
     private final HubClientAPI m_hubClient;
 
     private final Map<String, String> m_additionalHeaders;
 
     /**
+     * Creates a new catalog service client using the given Hub client.
+     *
      * @param hubClient {@link HubClientAPI}
      * @param additionalHeaders additional header parameters for up and download
      */
@@ -218,7 +223,8 @@ public class CatalogServiceClient {
                 LinkedHashMap::new));
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
+            final var response = m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap,
+                m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -254,7 +260,7 @@ public class CatalogServiceClient {
      * @throws ResourceAccessException
      */
     public Optional<Pair<RepositoryItem, EntityTag>> fetchRepositoryItem(final String itemIDOrPath,
-            final Map<String, String> queryParams, final HubItemVersion version, final EntityTag ifNoneMatch,
+            final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
             final EntityTag ifMatch) throws ResourceAccessException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         additionalHeaders.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
@@ -276,14 +282,14 @@ public class CatalogServiceClient {
         final var contribSpacesParam = nonNullQueryParams.get("contribSpaces");
         String versionParam = null;
         if (version != null) {
-            versionParam = version.getQueryParameterValue().orElse(null);
+            versionParam = CatalogClient.getQueryParameterValue(version).orElse(null);
         }
         final var spaceVersionParam = nonNullQueryParams.get("spaceVersion");
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = itemIDOrPath.startsWith("*") ?
-                    m_hubClient.catalog().getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam, spaceDetailsParam,
-                            contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders) :
+                    m_hubClient.catalog().getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam,
+                        spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders) :
                     m_hubClient.catalog().getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
                             spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders);
             if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode()) ||
@@ -306,10 +312,10 @@ public class CatalogServiceClient {
      * @param contentHandler callback consuming the response data
      * @return value returned by the callback
      * @throws IOException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      */
     public <R> R downloadItem(final ItemID id, final RepositoryItemType itemType,
-            final DownloadContentHandler<R> contentHandler) throws IOException, CanceledExecutionException {
+            final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             MediaType accept = MediaType.WILDCARD_TYPE;
             if (RepositoryItemType.WORKFLOW_GROUP == itemType) {

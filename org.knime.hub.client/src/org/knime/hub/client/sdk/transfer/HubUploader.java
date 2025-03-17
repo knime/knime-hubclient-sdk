@@ -46,11 +46,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.Owning;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.FileUtil;
+import org.knime.core.node.workflow.WorkflowExporter;
+import org.knime.core.node.workflow.WorkflowExporter.ItemType;
+import org.knime.core.node.workflow.WorkflowExporter.ResourcesToCopy;
 import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.api.HubClientAPI;
@@ -66,8 +67,8 @@ import org.knime.hub.client.sdk.ent.WorkflowGroup;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.UploadTargetFetcher;
-import org.knime.hub.client.sdk.transfer.WorkflowExporter.ItemType;
-import org.knime.hub.client.sdk.transfer.WorkflowExporter.ResourcesToCopy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.util.concurrent.AtomicDouble;
 
@@ -86,7 +87,7 @@ public final class HubUploader extends AbstractHubTransfer {
     private static final String MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP =
             StringUtils.removeEnd(CatalogServiceClient.KNIME_WORKFLOW_GROUP_MEDIA_TYPE.toString(), "+zip");
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(HubUploader.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(HubUploader.class);
 
     /**
      * Result of a check for collisions of a potential upload.
@@ -142,10 +143,10 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param progMon to enable cancellation
      * @return collisions found if the Hub supports multi-part uploads, a {@link Failure} otherwise
      * @throws ResourceAccessException
-     * @throws CanceledExecutionException
+     * @throws CancelationException
      */
     public Result<CollisionReport> checkCollisions(final ItemID parentId, final Map<IPath, ItemType> itemToType,
-            final IProgressMonitor progMon) throws ResourceAccessException, CanceledExecutionException {
+            final IProgressMonitor progMon) throws ResourceAccessException, CancelationException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
 
@@ -307,23 +308,25 @@ public final class HubUploader extends AbstractHubTransfer {
      * Performs the uploads.
      *
      * @param itemsToUpload items to be uploaded
-     * @param excludeData whether or not to exclude data when exporting workflows
+     * @param exporter exporter to use for workflow exports
+     * @param tempFileSupplier provider for temp files
      * @param progMon progress monitor
      * @return map from item path to upload result, or {@link Optional#empty()} if the upload was aborted
      * @throws IOException if the upload as a whole failed
-     * @throws CanceledExecutionException if the upload was canceled
+     * @throws CancelationException if the upload was canceled
      */
     public Map<IPath, Result<String>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
-            final boolean excludeData, final IProgressMonitor progMon)
-            throws IOException, CanceledExecutionException {
-        final var resources =
-                collectFileResources(itemsToUpload, new WorkflowExporter(excludeData), progMon);
-        final var uploadJobs = submitUploadJobs(itemsToUpload, resources, progMon);
+            final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
+            final IProgressMonitor progMon)
+            throws IOException, CancelationException {
+        final var resources = collectFileResources(itemsToUpload, exporter, progMon);
+        final var uploadJobs = submitUploadJobs(exporter, tempFileSupplier, itemsToUpload, resources, progMon);
         return awaitUploads(uploadJobs, progMon::isCanceled);
     }
 
-    private Map<IPath, Future<Result<String>>> submitUploadJobs(final Map<IPath, ItemToUpload> itemsToUpload,
-            final FileResources resources, final IProgressMonitor progMon) {
+    private Map<IPath, Future<Result<String>>> submitUploadJobs(final WorkflowExporter<CancelationException> exporter,
+        final TempFileSupplier tempFileSupplier,
+        final Map<IPath, ItemToUpload> itemsToUpload, final FileResources resources, final IProgressMonitor progMon) {
         final Map<IPath, Future<Result<String>>> uploadJobs = new LinkedHashMap<>();
         if (itemsToUpload.size() == 1) {
             // only one item is being uploaded, show part uploads as details
@@ -343,7 +346,7 @@ public final class HubUploader extends AbstractHubTransfer {
                     .map(e -> " \u2022 %s of file part %s".formatted(percentage(e.getValue()), e.getKey())) //
                     .collect(Collectors.joining("\n")));
             });
-            submitUploadJob(uploadJobs, pathInTarget, resources, splitter, itemToUpload);
+            submitUploadJob(exporter, tempFileSupplier, uploadJobs, pathInTarget, resources, splitter, itemToUpload);
         } else {
             // multiple items to upload, each one is one line of detail
             final var splitter = beginMultiProgress(progMon, "Uploading items...", status -> {
@@ -364,21 +367,25 @@ public final class HubUploader extends AbstractHubTransfer {
                 final var totalSize = resources.totalSize();
                 final double contribution = totalSize == 0 ? 0 : (1.0 * size / totalSize);
                 final var subSplitter = splitter.createBranchingChild(pathStr, contribution);
-                submitUploadJob(uploadJobs, pathInTarget, resources, subSplitter, itemToUpload);
+                submitUploadJob(exporter, tempFileSupplier, uploadJobs, pathInTarget, resources, subSplitter,
+                    itemToUpload);
             }
         }
         return uploadJobs;
     }
 
-    private void submitUploadJob(final Map<IPath, Future<Result<String>>> uploadJobs, final IPath pathInTarget,
-        final FileResources resources, final BranchingExecMonitor subSplitter, final ItemToUpload itemToUpload) {
+    private void submitUploadJob(final WorkflowExporter<CancelationException> exporter,
+        final TempFileSupplier tempFileSupplier, final Map<IPath, Future<Result<String>>> uploadJobs,
+        final IPath pathInTarget, final FileResources resources, final BranchingExecMonitor subSplitter,
+        final ItemToUpload itemToUpload) {
         uploadJobs.put(pathInTarget, HUB_ITEM_TRANSFER_POOL.submit( //
             () -> uploadItem(itemToUpload.path(), itemToUpload.localItem().fsPath(), itemToUpload.localItem().type(),
-                resources.workflowResources(), subSplitter, itemToUpload.uploadInstructions())));
+                exporter, tempFileSupplier, resources.workflowResources(), subSplitter,
+                itemToUpload.uploadInstructions())));
     }
 
     private static Map<IPath, Result<String>> awaitUploads(final Map<IPath, Future<Result<String>>> uploadJobs,
-            final BooleanSupplier cancelChecker) throws CanceledExecutionException {
+            final BooleanSupplier cancelChecker) throws CancelationException {
         Map<IPath, Result<String>> uploaded = new LinkedHashMap<>();
         var canceled = false;
         for (final var unfinishedJob : uploadJobs.entrySet()) {
@@ -387,28 +394,28 @@ public final class HubUploader extends AbstractHubTransfer {
 
             try {
                 final var uploadResult = waitForCancellable(future, cancelChecker, throwable -> {
-                    if (throwable instanceof CanceledExecutionException cee) { // NOSONAR
+                    if (throwable instanceof CancelationException cee) { // NOSONAR
                         throw cee;
                     } else {
-                        LOGGER.debug(() -> "Unexpected exception during upload job", throwable);
+                        LOGGER.debug("Unexpected exception during upload job", throwable);
                         return Result.failure(throwable.getMessage(), throwable);
                     }
                 });
                 uploaded.put(path, uploadResult);
-            } catch (CanceledExecutionException cee) { // NOSONAR
+            } catch (CancelationException cee) { // NOSONAR
                 // we continue to collect results to we can clean up already finished downloads
                 canceled = true;
             }
         }
         if (canceled) {
-            throw new CanceledExecutionException();
+            throw new CancelationException();
         }
         return uploaded;
     }
 
     private static FileResources collectFileResources(final Map<IPath, ItemToUpload> itemsToUpload,
-            final WorkflowExporter exporter, final IProgressMonitor progMon)
-            throws IOException, CanceledExecutionException {
+            final WorkflowExporter<CancelationException> exporter, final IProgressMonitor progMon)
+            throws IOException, CancelationException {
 
         progMon.setTaskName("Preparing items for upload");
         final Map<String, ResourcesToCopy> workflowResources = new LinkedHashMap<>();
@@ -417,7 +424,7 @@ public final class HubUploader extends AbstractHubTransfer {
         var totalSize = 0L;
         for (final var item : itemsToUpload.entrySet()) {
             if (progMon.isCanceled()) {
-                throw new CanceledExecutionException();
+                throw new CancelationException();
             }
             final var itemToUpload = item.getValue();
             final var pathStr = itemToUpload.path();
@@ -444,19 +451,22 @@ public final class HubUploader extends AbstractHubTransfer {
     }
 
     private Result<String> uploadItem(final String path, final Path osPath, final ItemType type,
-            final Map<String, ResourcesToCopy> workflowResources, final BranchingExecMonitor splitter,
-            final ItemUploadInstructions instructions) throws IOException, CanceledExecutionException {
+            final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
+            final Map<String, ResourcesToCopy> workflowResources,
+            final BranchingExecMonitor splitter, final ItemUploadInstructions instructions)
+                    throws IOException, CancelationException {
         try {
             if (type == ItemType.DATA_FILE) {
                 uploadDataFile(path, osPath, instructions, splitter);
             } else {
-                uploadWorkflowLike(path, workflowResources.get(path), instructions, splitter);
+                uploadWorkflowLike(path, exporter, tempFileSupplier, workflowResources.get(path), instructions,
+                    splitter);
             }
 
             while (true) {
                 final var state = m_catalogClient.pollUploadState(instructions.getUploadId());
-                LOGGER.debug(() -> "Polling state of uploaded item '%s': %s, '%s'" //
-                    .formatted(path, state.getStatus(), state.getStatusMessage()));
+                LOGGER.debug("Polling state of uploaded item '%s': %s, '%s'",  //
+                    path, state.getStatus(), state.getStatusMessage());
                 switch (state.getStatus()) {
                     case ABORTED:
                         return Result.failure(state.getStatusMessage(), null);
@@ -475,9 +485,10 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
-    private void uploadWorkflowLike(final String path, final ResourcesToCopy export,
+    private void uploadWorkflowLike(final String path, final WorkflowExporter<CancelationException> exporter,
+            final TempFileSupplier tempFileSupplier, final ResourcesToCopy resources,
             final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
-            throws CanceledExecutionException, IOException {
+            throws CancelationException, IOException {
 
         // remember all temp files so they can be deleted cleaned up `finally` if something went wrong
         final List<Path> tempFiles = new ArrayList<>();
@@ -487,14 +498,14 @@ public final class HubUploader extends AbstractHubTransfer {
         try {
             final var partSupplier = new UploadPartSupplier(instructions);
             final var currentWriteProgress = new AtomicDouble();
-            final FailableConsumer<Double, CanceledExecutionException> updater = progress -> {
+            final FailableConsumer<Double, CancelationException> updater = progress -> {
                 splitter.checkCanceled();
                 currentWriteProgress.set(progress);
             };
 
-            try (final var outStream = uploadingOutputStream(path, partSupplier, pendingUploads::addLast, tempFiles,
-                    currentWriteProgress::get, splitter)) {
-                export.exportInto(outStream, updater);
+            try (final var outStream = uploadingOutputStream(path, partSupplier, tempFileSupplier,
+                pendingUploads::addLast, tempFiles, currentWriteProgress::get, splitter)) {
+                exporter.exportInto(resources, outStream, updater);
             }
 
             // removes finished jobs from `pendingUploads`
@@ -504,8 +515,7 @@ public final class HubUploader extends AbstractHubTransfer {
             m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
-                LOGGER.debug(() -> "Upload of '%s' has failed, cancelling parts and notifying Catalog Service" //
-                    .formatted(path));
+                LOGGER.debug("Upload of '%s' has failed, cancelling parts and notifying Catalog Service", path);
                 // the upload didn't finish successfully, cancel pending part uploads and delete all temp files
                 pendingUploads.forEach(pending -> pending.cancel(true));
                 m_catalogClient.cancelUpload(instructions.getUploadId());
@@ -518,14 +528,14 @@ public final class HubUploader extends AbstractHubTransfer {
 
     private static Map<Integer, EntityTag> awaitPartsFinished(
             final Deque<Future<Pair<Integer, EntityTag>>> pendingUploads, final BooleanSupplier cancelChecker)
-            throws IOException, CanceledExecutionException {
+            throws IOException, CancelationException {
         final Map<Integer, EntityTag> finished = new LinkedHashMap<>();
         while (!pendingUploads.isEmpty()) {
             final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker, throwable -> {
                 if (throwable instanceof IOException ioe) {
                     throw ioe;
                 } else {
-                    LOGGER.debug(() -> "Unexpected exception while uploading file part", throwable);
+                    LOGGER.debug("Unexpected exception while uploading file part", throwable);
                     throw ExceptionUtils.asRuntimeException(throwable);
                 }
             });
@@ -536,8 +546,8 @@ public final class HubUploader extends AbstractHubTransfer {
     }
 
     private @Owning OutputStream uploadingOutputStream(final String path, final UploadPartSupplier partSupplier,
-            final Consumer<Future<Pair<Integer, EntityTag>>> partUploads, final List<Path> chunks,
-            final DoubleSupplier currentWriteProgress, final BranchingExecMonitor splitter) {
+            final TempFileSupplier tempFileSupplier, final Consumer<Future<Pair<Integer, EntityTag>>> partUploads,
+            final List<Path> chunks, final DoubleSupplier currentWriteProgress, final BranchingExecMonitor splitter) {
 
         return new ChunkingFileOutputStream(m_chunkSize, DigestUtils.getMd5Digest()) { // NOSONAR
 
@@ -547,7 +557,7 @@ public final class HubUploader extends AbstractHubTransfer {
 
             @Override
             public Path newOutputFile() throws IOException {
-                return FileUtil.createTempFile("KNIMEWorkflowUpload", ".knwf.part").toPath();
+                return tempFileSupplier.createTempFile("KNIMEWorkflowUpload", ".knwf.part", true);
             }
 
             @Override
@@ -568,7 +578,7 @@ public final class HubUploader extends AbstractHubTransfer {
     }
 
     private void uploadDataFile(final String path, final Path dataFile, final ItemUploadInstructions instructions,
-            final BranchingExecMonitor splitter) throws IOException, CanceledExecutionException {
+            final BranchingExecMonitor splitter) throws IOException, CancelationException {
 
         final var numBytes = Files.size(dataFile);
         final var partSupplier = new UploadPartSupplier(instructions);
@@ -598,7 +608,7 @@ public final class HubUploader extends AbstractHubTransfer {
             m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
-                LOGGER.debug(() -> "Upload of '%s' has failed, cancelling parts and notifying Hub".formatted(path));
+                LOGGER.debug("Upload of '%s' has failed, cancelling parts and notifying Hub", path);
                 partUploads.forEach(pending -> pending.cancel(true));
                 m_catalogClient.cancelUpload(instructions.getUploadId());
             }

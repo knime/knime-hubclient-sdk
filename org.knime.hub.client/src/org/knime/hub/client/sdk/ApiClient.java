@@ -72,13 +72,13 @@ import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.KNIMEServerHostnameVerifier;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.proxy.URLConnectionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -142,7 +142,7 @@ public class ApiClient implements AutoCloseable {
 
     private final Authenticator m_auth;
 
-    final NodeLogger m_logger;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiClient.class);
 
     /**
      * Builds the {@link ApiClient} with the given base URL of the server
@@ -195,8 +195,6 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
 
         m_httpClient = clientBuilder.build();
-
-        m_logger = NodeLogger.getLogger(getClass());
     }
 
     /**
@@ -531,7 +529,7 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                m_logger.debug(() -> REQUEST_LENGTH_MESSAGE.formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
+                LOGGER.debug(REQUEST_LENGTH_MESSAGE, uri, (System.currentTimeMillis() - t0) / 1000.0);
             }
 
         }
@@ -550,12 +548,12 @@ public class ApiClient implements AutoCloseable {
          *
          * @return {@link ApiResponse}
          * @throws IOException
-         * @throws CanceledExecutionException
+         * @throws CancelationException
          * @throws CouldNotAuthorizeException
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final DownloadContentHandler<R> contentHandler)
-                        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+                        throws IOException, CancelationException, CouldNotAuthorizeException {
 
             // Retrieve the API response
             final var t0 = System.currentTimeMillis();
@@ -613,7 +611,7 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                m_logger.debug(() -> REQUEST_LENGTH_MESSAGE.formatted(uri, (System.currentTimeMillis() - t0) / 1000.0));
+                LOGGER.debug(REQUEST_LENGTH_MESSAGE, uri, (System.currentTimeMillis() - t0) / 1000.0);
             }
 
         }
@@ -631,13 +629,13 @@ public class ApiClient implements AutoCloseable {
          *
          * @return {@link ApiResponse}
          * @throws IOException
-         * @throws CanceledExecutionException if the invocation was canceled through the
+         * @throws CancelationException if the invocation was canceled through the
          *                                    content handler
          * @throws CouldNotAuthorizeException
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method,
                 final UploadContentHandler<R> contentHandler)
-                        throws IOException, CanceledExecutionException, CouldNotAuthorizeException {
+                        throws IOException, CancelationException, CouldNotAuthorizeException {
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
             m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
@@ -654,7 +652,7 @@ public class ApiClient implements AutoCloseable {
             R responseEntity = null;
             try (final var out = conn.getOutputStream()) {
                 responseEntity = contentHandler.handleUpload(out);
-            } catch (final CanceledExecutionException e) {
+            } catch (final CancelationException e) {
                 conn.disconnect();
                 throw e;
             }
@@ -784,10 +782,10 @@ public class ApiClient implements AutoCloseable {
          * @param contentLength content length if available
          * @return result value
          * @throws IOException
-         * @throws CanceledExecutionException in case the download was canceled
+         * @throws CancelationException in case the download was canceled
          */
         R handleDownload(@Owning InputStream data, OptionalLong contentLength) // NOSONAR `OptionalLong` is fine
-                throws IOException, CanceledExecutionException;
+                throws IOException, CancelationException;
     }
 
     /**
@@ -805,9 +803,9 @@ public class ApiClient implements AutoCloseable {
          * @param out output data stream
          * @return result of upload
          * @throws IOException                if an I/O error occurred
-         * @throws CanceledExecutionException if the upload was canceled
+         * @throws CancelationException if the upload was canceled
          */
-        R handleUpload(@Owning OutputStream out) throws IOException, CanceledExecutionException;
+        R handleUpload(@Owning OutputStream out) throws IOException, CancelationException;
     }
 
     @Override

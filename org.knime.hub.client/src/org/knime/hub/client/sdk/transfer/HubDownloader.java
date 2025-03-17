@@ -42,12 +42,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.core.node.CanceledExecutionException;
-import org.knime.core.node.NodeLogger;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
-import org.knime.core.util.FileUtil;
 import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.Result.Success;
@@ -61,6 +59,8 @@ import org.knime.hub.client.sdk.ent.Workflow;
 import org.knime.hub.client.sdk.ent.WorkflowGroup;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Downloader for sets of items from a Hub.
@@ -98,7 +98,7 @@ public final class HubDownloader extends AbstractHubTransfer {
      */
     public record DownloadResources(List<DownloadInfo> itemsToDownload, long numDownloads, OptionalLong totalSize) {}
 
-    private static final NodeLogger LOGGER = NodeLogger.getLogger(HubDownloader.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(HubDownloader.class);
 
     /**
      * @param hubClient Hub API client
@@ -115,10 +115,10 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @param progMon progress monitor
      * @return description of all items that have to be downloaded
      * @throws ResourceAccessException if a request to Hub failed
-     * @throws CanceledExecutionException if the operation was canceled
+     * @throws CancelationException if the operation was canceled
      */
     public Pair<DownloadResources, Map<IPath, Failure<Void>>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
-            final IProgressMonitor progMon) throws ResourceAccessException, CanceledExecutionException {
+            final IProgressMonitor progMon) throws ResourceAccessException, CancelationException {
         progMon.beginTask("Collecting items to download...", itemIds.size());
         final Map<IPath, Pair<HubItem, Result<DownloadInfo>>> results = new LinkedHashMap<>();
         var optTotalSize = 0L;
@@ -182,12 +182,13 @@ public final class HubDownloader extends AbstractHubTransfer {
      * Performs the download.
      *
      * @param resources resources to download
+     * @param tempFileSupplier supplier for temp files
      * @param progMon progress monitor
      * @return mapping from item ID to the type and result (success or failure) of the download
-     * @throws CanceledExecutionException if the download was canceled
+     * @throws CancelationException if the download was canceled
      */
     public Map<IPath, Pair<HubItem, Result<Optional<Path>>>> download(final DownloadResources resources,
-            final IProgressMonitor progMon) throws CanceledExecutionException {
+            final TempFileSupplier tempFileSupplier, final IProgressMonitor progMon) throws CancelationException {
         final var splitter = beginMultiProgress(progMon, "Downloading items...", status -> {
             final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
                 .formatted(status.numDone(), resources.itemsToDownload().size(), 100.0 * status.totalProgress(),
@@ -200,7 +201,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         });
         final var totalSize = resources.totalSize();
         final var downloadJobs = submitDownloadJobs(resources.itemsToDownload(), totalSize.isPresent(),
-            totalSize.orElse(resources.numDownloads()), splitter);
+            tempFileSupplier, totalSize.orElse(resources.numDownloads()), splitter);
 
         final Map<IPath, Result<Optional<Path>>> downloaded = awaitDownloads(downloadJobs, progMon::isCanceled);
 
@@ -216,7 +217,8 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private Map<IPath, Future<Result<Path>>> submitDownloadJobs(final List<DownloadInfo> downloadInfos,
-            final boolean allSizesKnown, final double maxProgress, final BranchingExecMonitor splitter) {
+            final boolean allSizesKnown, final TempFileSupplier tempFileSupplier, final double maxProgress,
+            final BranchingExecMonitor splitter) {
         final var downloadJobs = new LinkedHashMap<IPath, Future<Result<Path>>>();
         for (final var download : downloadInfos) {
             final var hubItem = download.item();
@@ -224,7 +226,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                 final var itemSize = allSizesKnown ? download.size().getAsLong() : 1;
                 final var contribution = itemSize / maxProgress;
                 downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
-                    () -> downloadItemTask(download,
+                    () -> downloadItemTask(download, tempFileSupplier,
                         splitter.createLeafChild(hubItem.path().toString(), contribution))));
             }
         }
@@ -233,7 +235,7 @@ public final class HubDownloader extends AbstractHubTransfer {
 
     private static Map<IPath, Result<Optional<Path>>> awaitDownloads(
             final Map<IPath, Future<Result<Path>>> downloadJobs, final BooleanSupplier cancelChecker)
-            throws CanceledExecutionException {
+            throws CancelationException {
 
         Map<IPath, Result<Optional<Path>>> downloaded = new LinkedHashMap<>();
         try {
@@ -244,7 +246,7 @@ public final class HubDownloader extends AbstractHubTransfer {
 
                 try {
                     final var downloadResult = waitForCancellable(future, cancelChecker, throwable -> {
-                        if (throwable instanceof CanceledExecutionException cee) { // NOSONAR
+                        if (throwable instanceof CancelationException cee) { // NOSONAR
                             throw cee;
                         } else {
                             return Result.failure(throwable.getMessage(), throwable);
@@ -253,13 +255,13 @@ public final class HubDownloader extends AbstractHubTransfer {
 
                     // wrap the path into an `Optional`
                     downloaded.put(pathInTarget, downloadResult.map(Optional::of));
-                } catch (CanceledExecutionException cee) { // NOSONAR
+                } catch (CancelationException cee) { // NOSONAR
                     // we continue to collect results to we can clean up already finished downloads
                     canceled = true;
                 }
             }
             if (canceled) {
-                throw new CanceledExecutionException();
+                throw new CancelationException();
             }
 
             final Map<IPath, Result<Optional<Path>>> out = downloaded;
@@ -269,22 +271,27 @@ public final class HubDownloader extends AbstractHubTransfer {
             if (downloaded != null) {
                 for (final var res : downloaded.values()) {
                     if (res instanceof Success<Optional<Path>> success) {
-                        LOGGER.debug(() -> "Cleaning up downloaded item from temp location '%s'" //
-                            .formatted(success.value()));
-                        FileUtil.deleteRecursively(success.value().orElseThrow().toFile());
+                        final var path = success.value();
+                        LOGGER.debug("Cleaning up downloaded item from temp location \"%s\"", path);
+                        final var file = path.orElseThrow();
+                        try {
+                            Files.deleteIfExists(file);
+                        } catch (final IOException e) {
+                            LOGGER.debug("Failed to delete item at temp location \"%s\"".formatted(file), e);
+                        }
                     }
                 }
             }
         }
     }
 
-    private Result<Path> downloadItemTask(final DownloadInfo download, final LeafExecMonitor monitor)
-            throws IOException, CanceledExecutionException {
+    private Result<Path> downloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
+            final LeafExecMonitor monitor) throws IOException, CancelationException {
         // set a very small non-zero value to signal that the download job has started
         monitor.setProgress(Double.MIN_VALUE);
-        var tempFile = new AtomicReference<>(FileUtil.createTempFile("KNIMEHubItem", ".download", false).toPath());
+        var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
         try {
-            LOGGER.debug(() -> "Downloading '%s' into file '%s'".formatted(download.item().path(), tempFile.get()));
+            LOGGER.debug("Downloading '%s' into file '%s'", download.item().path(), tempFile.get());
             final var file = m_catalogClient.downloadItem(download.id(), download.item().type(), (in, contentLength) -> { // NOSONAR
                 // prefer size from the HTTP request if available, fall back to Catalog information otherwise
                 final var numBytes = contentLength.orElse(download.size().orElse(-1));
@@ -307,7 +314,7 @@ public final class HubDownloader extends AbstractHubTransfer {
             });
             return Result.success(file);
         } finally {
-            LOGGER.debug(() -> "Ended downloading '%s'".formatted(download.item().path()));
+            LOGGER.debug("Ended downloading '%s'", download.item().path());
             monitor.done();
             final var remainingAfterFailure = tempFile.get();
             if (remainingAfterFailure != null) {
