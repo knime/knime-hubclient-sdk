@@ -53,6 +53,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -88,10 +89,12 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
 
+import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.ResponseProcessingException;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -402,9 +405,10 @@ public class ApiClient implements AutoCloseable {
          * @throws UnsupportedEncodingException
          * @throws URISyntaxException
          * @throws CouldNotAuthorizeException
+         * @throws IOException
          */
         private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody,
-            final Authenticator auth) throws CouldNotAuthorizeException {
+            final Authenticator auth) throws CouldNotAuthorizeException, IOException {
             // Build the invocation builder which makes the request
             var builder = createInvocationBuilder(uri, auth);
 
@@ -465,14 +469,28 @@ public class ApiClient implements AutoCloseable {
          * @param method      the request method
          * @param requestBody the request body
          * @return the {@link Response}
+         * @throws IOException
          */
         private static Response executeHttpRequest(final Invocation.Builder builder, final Method method,
-                final Object requestBody) {
-            return switch (method) {
-                case POST, PUT, PATCH -> builder.build(method.name(),
-                    requestBody != null ? Entity.entity(requestBody, DEFAULT_CONTENT_TYPE) : null).invoke();
-                case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
-            };
+                final Object requestBody) throws IOException {
+            try {
+                return switch (method) {
+                    case POST, PUT, PATCH -> builder.build(method.name(),
+                        requestBody != null ? Entity.entity(requestBody, DEFAULT_CONTENT_TYPE) : null).invoke();
+                    case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
+                };
+            } catch (ResponseProcessingException e) {
+                throw new IOException("Response processing failed", e.getCause());
+            } catch (ProcessingException e) {
+                final var cause = e.getCause();
+                if (cause != null) {
+                    if (cause instanceof SocketTimeoutException socketTimeoutException) {
+                        throw socketTimeoutException;
+                    }
+                    // Handle additional kinds of processing exceptions here
+                }
+                throw new IOException("Processing failed", cause);
+            }
         }
 
         /**
@@ -486,9 +504,10 @@ public class ApiClient implements AutoCloseable {
          *
          * @return {@link ApiResponse}
          * @throws CouldNotAuthorizeException
+         * @throws IOException
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
-                final GenericType<R> returnType) throws CouldNotAuthorizeException {
+                final GenericType<R> returnType) throws CouldNotAuthorizeException, IOException {
             CheckUtils.checkNotNull(returnType, "Missing return type for '%s' '%s'".formatted(method, path));
 
             // Retrieve the API response

@@ -151,7 +151,7 @@ public class CatalogServiceClient {
     private final Map<String, String> m_additionalHeaders;
 
     /**
-     * Creates a new catalog service client using the given Hub client.
+     * Catalog service client which is used to handle request for async up and download.
      *
      * @param hubClient {@link HubClientAPI}
      * @param additionalHeaders additional header parameters for up and download
@@ -188,6 +188,8 @@ public class CatalogServiceClient {
             }
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -206,6 +208,8 @@ public class CatalogServiceClient {
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -222,6 +226,8 @@ public class CatalogServiceClient {
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -240,11 +246,13 @@ public class CatalogServiceClient {
                 LinkedHashMap::new));
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap,
-                m_additionalHeaders);
+            final var response =
+                    m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -260,6 +268,8 @@ public class CatalogServiceClient {
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -313,6 +323,8 @@ public class CatalogServiceClient {
             return Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null)));
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
+        } catch (IOException e) {
+            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 

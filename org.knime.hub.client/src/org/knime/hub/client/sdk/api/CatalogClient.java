@@ -148,11 +148,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
         final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
@@ -177,10 +178,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
@@ -199,10 +201,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
@@ -222,10 +225,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteItemByCanonicalPath(final String accountId, final IPath subPath,
-        final boolean softDelete, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final boolean softDelete, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
@@ -247,10 +252,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
@@ -347,9 +353,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException if the operation had an I/O error
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
@@ -386,12 +392,13 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
         final ItemVersion version, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
@@ -424,11 +431,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
@@ -462,11 +470,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
@@ -493,11 +502,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -525,11 +535,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -557,9 +568,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException if the operation had an I/O error
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
         final MediaType contentType, final UploadContentHandler<R> contentHandler,
@@ -590,10 +601,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
-        final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final MediaType contentType, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -619,10 +632,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
-        final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final MediaType contentType, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -648,9 +663,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException if the operation had an I/O error
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
@@ -677,10 +692,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
-        final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final MediaType contentType, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -705,10 +722,12 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
-        final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final MediaType contentType, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -733,9 +752,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException if the operation had an I/O error
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
@@ -757,10 +776,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<Void> cancelUpload(final String uploadId, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
@@ -780,13 +800,13 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
-        final Duration readTimeout, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        LOGGER.atDebug() //
-            .addArgument(() -> requestBody.getItems().size()) //
-            .log("Initiating upload of {} items");
+        final Duration readTimeout, final Map<String, String> additionalHeaders)
+                throws CouldNotAuthorizeException, IOException {
+        LOGGER.debug("Initiating upload of %d items".formatted(requestBody.getItems().size()));
 
         CheckUtils.checkArgumentNotNull(parentId);
 
@@ -803,10 +823,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_STATUS);
@@ -823,10 +844,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
@@ -843,10 +865,11 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional parameters
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws CouldNotAuthorizeException if the authorization fails
+     * @throws IOException if an I/O error occurred
      */
     public ApiResponse<UploadTarget> requestPartUpload(final String uploadId, final Integer partNumber,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(uploadId);
         CheckUtils.checkArgumentNotNull(partNumber);
 
