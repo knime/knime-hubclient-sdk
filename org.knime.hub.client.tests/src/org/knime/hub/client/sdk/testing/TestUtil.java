@@ -51,10 +51,10 @@ package org.knime.hub.client.sdk.testing;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
-import org.knime.core.util.FileUtil;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.osgi.framework.FrameworkUtil;
 
@@ -74,8 +74,11 @@ public class TestUtil {
     public static Path resolvePath(final IPath relativePath) {
         var myself = FrameworkUtil.getBundle(HubClientAPI.class);
         try {
-            var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
-            return FileUtil.resolveToPath(fileUrl);
+            final var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
+            // for the tests we assume that we don't have to deal with
+            // - non-encoded characters (literal space) in the path
+            // - UNC paths
+            return Paths.get(fileUrl.toURI());
         } catch (IOException | URISyntaxException e) {
             throw new IllegalStateException("Could not resolve resource: %s".formatted(relativePath), e);
         }
