@@ -1,7 +1,9 @@
 */bin/
 **/target/
 */build/
+*.jar
+**/.polyglot.build.properties
+**/.polyglot.feature.xml
+**/.polyglot.META-INF
 **/.flattened-pom.xml
 **/CHANGELOG.md
-.polyglot.META-INF
-
