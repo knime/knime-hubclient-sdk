@@ -39,7 +39,6 @@ import java.util.function.DoubleConsumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.function.FailableSupplier;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -47,6 +46,7 @@ import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.transfer.CatalogServiceClient.TaggedRepositoryItem;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 
@@ -234,12 +234,12 @@ class AbstractHubTransfer {
      * @throws ResourceAccessException
      * @throws CancelationException
      */
-    Pair<RepositoryItem, EntityTag> deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
+    TaggedRepositoryItem deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
             throws ResourceAccessException, CancelationException {
         return runInCommonPool(cancelChecker, () -> {
-            final Pair<RepositoryItem, EntityTag> itemAndETag = m_catalogClient //
+            final var itemAndETag = m_catalogClient //
                 .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
-            final var parentPath = IPath.forPosix(itemAndETag.getKey().getPath()).removeLastSegments(1);
+            final var parentPath = IPath.forPosix(itemAndETag.item().getPath()).removeLastSegments(1);
             return m_catalogClient //
                 .fetchRepositoryItem(parentPath.toString(), Map.of("deep", "true"), null, null, null).orElseThrow();
         });
@@ -254,15 +254,15 @@ class AbstractHubTransfer {
      * @throws ResourceAccessException
      * @throws CancelationException
      */
-    Optional<Pair<RepositoryItem, EntityTag>> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
+    Optional<TaggedRepositoryItem> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
             throws ResourceAccessException, CancelationException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
-                final Pair<RepositoryItem, EntityTag> itemAndETag = m_catalogClient //
+                final var itemAndETag = m_catalogClient //
                     .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
-                final RepositoryItem repoItem = itemAndETag.getLeft();
-                final EntityTag eTag = itemAndETag.getRight();
-                final Optional<Pair<RepositoryItem, EntityTag>> deep = m_catalogClient //
+                final RepositoryItem repoItem = itemAndETag.item();
+                final EntityTag eTag = itemAndETag.etag();
+                final Optional<TaggedRepositoryItem> deep = m_catalogClient //
                     .fetchRepositoryItem(repoItem.getPath(), Map.of("deep", "true"), null, null, eTag);
                 if (deep.isPresent()) {
                     return deep;

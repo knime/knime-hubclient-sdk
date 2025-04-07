@@ -151,8 +151,8 @@ public final class HubUploader extends AbstractHubTransfer {
         progMon.subTask("Fetching folder contents from Hub...");
 
         final var optDeep = deepListItem(parentId, progMon::isCanceled);
-        final Pair<RepositoryItem, EntityTag> parentGroupAndETag = optDeep.get();
-        final var groupItem = parentGroupAndETag.getLeft();
+        final var parentGroupAndETag = optDeep.get();
+        final var groupItem = parentGroupAndETag.item();
         final var groupItemControls = groupItem.getMasonControls();
         if (!supportsAsyncUpload(groupItemControls)) {
             return Result.failure("This Hub does not support multi-part uploads", null);
@@ -183,7 +183,7 @@ public final class HubUploader extends AbstractHubTransfer {
                 }
             }
         }
-        return Result.success(new CollisionReport(parentGroup, parentGroupAndETag.getRight(), collisions, affected));
+        return Result.success(new CollisionReport(parentGroup, parentGroupAndETag.etag(), collisions, affected));
     }
 
     private boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls) {

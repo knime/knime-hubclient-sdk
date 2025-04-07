@@ -267,6 +267,19 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
+         * Adds a query parameter to the request, can be {@code null}.
+         *
+         * @param param the {@link HTTPQueryParameter} to add to the request
+         * @return {@link ApiRequest} builder instance
+         */
+        public ApiRequest withQueryParam(final HTTPQueryParameter param) {
+            if (param != null) {
+                m_queryParams.put(param.name(), param.value());
+            }
+            return this;
+        }
+
+        /**
          * Adds query parameters to the request.
          *
          * @param queryParamMap the map of query parameters

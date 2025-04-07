@@ -75,6 +75,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
@@ -222,8 +223,7 @@ class HubClientAPITest {
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = null;
-        String version = null;
-        String spaceVersion = null;
+        ItemVersion version = null;
 
         // Create the stub for the repository item metadata.
         final var knimeHubJSONResponse =
@@ -231,7 +231,7 @@ class HubClientAPITest {
 
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
-        		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
+        		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
@@ -266,8 +266,7 @@ class HubClientAPITest {
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = null;
-        String version = null;
-        String spaceVersion = null;
+        ItemVersion version = null;
 
         final var queryParams = new HashMap<String, String>();
         queryParams.put("details", details);
@@ -277,7 +276,7 @@ class HubClientAPITest {
 
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
-        		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
+        		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
@@ -309,8 +308,7 @@ class HubClientAPITest {
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = null;
-        String version = null;
-        String spaceVersion = null;
+        ItemVersion version = null;
 
         // Create the stub for the repository item metadata.
         final var knimeHubJSONResponse =
@@ -318,7 +316,7 @@ class HubClientAPITest {
 
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
-        		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
+        		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
@@ -345,8 +343,7 @@ class HubClientAPITest {
         boolean deep = false;
         boolean spaceDetails = false;
         String contribSpaces = "children";
-        String version = null;
-        String spaceVersion = null;
+        ItemVersion version = null;
 
         final var queryParams = new HashMap<String, String>();
         queryParams.put("contribSpaces", contribSpaces);
@@ -357,7 +354,7 @@ class HubClientAPITest {
 
         // Perform actual API call.
         ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
-        		new Path(path), details, deep, spaceDetails, contribSpaces, version, spaceVersion, null);
+        		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(

@@ -64,6 +64,7 @@ import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiClient.UploadContentHandler;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
@@ -295,7 +296,7 @@ public final class CatalogClient {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final String version,
+    public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final ItemVersion version,
         final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -307,8 +308,11 @@ public final class CatalogClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withAcceptHeaders(responseType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_VERSION, version).withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(responseType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -350,7 +354,7 @@ public final class CatalogClient {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> downloadItemById(final String id, final String version, final String spaceVersion,
+    public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version, final String spaceVersion,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -360,8 +364,11 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withAcceptHeaders(responseType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_VERSION, version).withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(responseType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -400,7 +407,7 @@ public final class CatalogClient {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> downloadItemByPath(final IPath path, final String version, final String spaceVersion,
+    public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version, final String spaceVersion,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -410,8 +417,11 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withAcceptHeaders(responseType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_VERSION, version).withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(responseType) //
+            .withHeaders(additionalHeaders)
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -455,7 +465,7 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
-        final String version, final String spaceVersion, final Map<String, String> additionalHeaders)
+        final ItemVersion version, final String spaceVersion, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -467,7 +477,8 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DETAILS, details)
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces).withQueryParam(QUERY_PARAM_VERSION, version)
+            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
+            .withQueryParam(getQueryParameter(version).orElse(null))
             .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -510,7 +521,7 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
-        final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
+        final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
         final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(path);
 
@@ -520,7 +531,8 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DETAILS, details)
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces).withQueryParam(QUERY_PARAM_VERSION, version)
+            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
+            .withQueryParam(getQueryParameter(version).orElse(null))
             .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -566,7 +578,7 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException
      */
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
-        final boolean deep, final boolean spaceDetails, final String contribSpaces, final String version,
+        final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
         final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(id);
 
@@ -576,7 +588,8 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DETAILS, details)
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces).withQueryParam(QUERY_PARAM_VERSION, version)
+            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
+            .withQueryParam(getQueryParameter(version).orElse(null))
             .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -959,18 +972,20 @@ public final class CatalogClient {
     }
 
     /**
-     * Returns the string representation of the given item version for the Catalog service, if it is
+     * Returns the given item version for the Catalog service as a query parameter key-value pair, if it is
      * {@link ItemVersion#isVersioned()}, or {@link Optional#empty()} if the given version refers to the "current
      * state".
      *
      * @param version non-{@code null} version to map to its string representation
-     * @return string representation for item version
+     * @return query parameter key-value pair representing the given item version or {@link Optional#empty()} if it
+     *         refers to the "current state"
      */
-    public static Optional<String> getQueryParameterValue(final ItemVersion version) {
+    public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
+        CheckUtils.checkArgumentNotNull(version);
         return Optional.ofNullable(version.match(//
             cs -> null, //
-            mr -> ITEM_VERSION_MOST_RECENT_IDENTIFIER,
-            sv -> sv.getVersionString()));
+            mr -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER),
+            sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, sv.getVersionString())));
     }
 
 }

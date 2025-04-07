@@ -126,13 +126,13 @@ public final class HubDownloader extends AbstractHubTransfer {
         final Map<IPath, Failure<Void>> notDownloadable = new LinkedHashMap<>();
         if (!itemIds.isEmpty()) {
             // get the common parent (we expect all items to stem from the same group)
-            final RepositoryItem firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).getLeft();
+            final var firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).item();
 
             final Map<String, RepositoryItem> deepListedItems;
             if (itemIds.size() == 1) {
                 final var itemId = itemIds.get(0);
                 deepListedItems = Map.of(itemId.id(),
-                    deepListItem(itemId, progMon::isCanceled).orElseThrow().getLeft());
+                    deepListItem(itemId, progMon::isCanceled).orElseThrow().item());
             } else {
                 // we cache the first item's siblings, since all items are expected to stem from the same group
                 deepListedItems = ClassUtils.castStream(WorkflowGroup.class, firstParent) //

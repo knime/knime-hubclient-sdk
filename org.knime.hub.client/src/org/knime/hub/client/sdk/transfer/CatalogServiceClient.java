@@ -32,9 +32,9 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.HttpExceptionUtils;
@@ -46,7 +46,6 @@ import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Success;
-import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
@@ -126,6 +125,24 @@ public class CatalogServiceClient {
     @JsonSerialize
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record DownloadTarget(String name, RepositoryItem.RepositoryItemType type, URL url) {
+    }
+
+    /**
+     * Repository item with associated {@code null}-able etag.
+     *
+     * @param item non-{@code null} repository item
+     * @param etag entity tag
+     */
+    public record TaggedRepositoryItem(RepositoryItem item, EntityTag etag) {
+        /**
+         * Constructor.
+         *
+         * @param item non-{@code null} item
+         * @param etag {@code null}-able etag
+         */
+        public TaggedRepositoryItem {
+            CheckUtils.checkNotNull(item);
+        }
     }
 
     @NotOwning
@@ -259,7 +276,7 @@ public class CatalogServiceClient {
      *     {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
      * @throws ResourceAccessException
      */
-    public Optional<Pair<RepositoryItem, EntityTag>> fetchRepositoryItem(final String itemIDOrPath,
+    public Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
             final EntityTag ifMatch) throws ResourceAccessException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
@@ -280,24 +297,19 @@ public class CatalogServiceClient {
         final var deepParam = Boolean.valueOf(nonNullQueryParams.get("deep"));
         final var spaceDetailsParam = Boolean.valueOf(nonNullQueryParams.get("spaceDetails"));
         final var contribSpacesParam = nonNullQueryParams.get("contribSpaces");
-        String versionParam = null;
-        if (version != null) {
-            versionParam = CatalogClient.getQueryParameterValue(version).orElse(null);
-        }
-        final var spaceVersionParam = nonNullQueryParams.get("spaceVersion");
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = itemIDOrPath.startsWith("*") ?
                     m_hubClient.catalog().getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam,
-                        spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders) :
+                        spaceDetailsParam, contribSpacesParam, version, additionalHeaders) :
                     m_hubClient.catalog().getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
-                            spaceDetailsParam, contribSpacesParam, versionParam, spaceVersionParam, additionalHeaders);
+                            spaceDetailsParam, contribSpacesParam, version, additionalHeaders);
             if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode()) ||
                     (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
                 return Optional.empty();
             }
             final var item = checkSuccessful(response).value();
-            return Optional.of(Pair.of(item, response.etag().orElse(null)));
+            return Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null)));
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
@@ -323,8 +335,8 @@ public class CatalogServiceClient {
             } else if (RepositoryItemType.WORKFLOW == itemType || RepositoryItemType.COMPONENT == itemType) {
                 accept = KNIME_WORKFLOW_MEDIA_TYPE;
             }
-            final var response = m_hubClient.catalog().downloadItemById(id.id(), null,
-                    null, accept, contentHandler, m_additionalHeaders);
+            final var response =
+                m_hubClient.catalog().downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
