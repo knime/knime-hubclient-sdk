@@ -52,12 +52,22 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 /**
+ * Supplier for a temporary file.
  *
  * @author Manuel Hotz, KNIME GmbH, Konstanz, Germany
  */
 @FunctionalInterface
 public interface TempFileSupplier {
 
+    /**
+     * Creates a temporary file to be used by the caller.
+     *
+     * @param prefix file prefix
+     * @param suffix file suffix
+     * @param deleteOnExit whether the file should be deleted on exit of the JVM
+     * @return the path to the temporary file
+     * @throws IOException if there was a problem creating the file
+     */
     Path createTempFile(final String prefix, final String suffix, final boolean deleteOnExit) throws IOException;
 
 }

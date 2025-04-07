@@ -178,8 +178,10 @@ public final class FilePartUploader {
                     if (retriesRemaining > 0) {
                         retriesRemaining--;
                         final var remaining = retriesRemaining;
-                        LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
-                            .formatted(partNum, path, remaining, m_numRetries), e);
+                        LOGGER.atDebug()
+                            .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
+                            .setCause(e)
+                            .log("Retrying to upload part {} retries left");
                     } else {
                         throw e;
                     }
@@ -214,8 +216,10 @@ public final class FilePartUploader {
                 if (retriesRemaining > 0) {
                     retriesRemaining--;
                     final var remaining = retriesRemaining;
-                    LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
-                        .formatted(partNum, path, remaining, m_numRetries), e);
+                    LOGGER.atDebug()
+                        .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
+                        .setCause(e)
+                        .log("Retrying to upload part {} retries left");
                 } else {
                     throw e;
                 }
@@ -248,7 +252,7 @@ public final class FilePartUploader {
     private EntityTag uploadArtifactPart(final String path, final int partNumber, final int attempt, // NOSONAR
             final UploadTargetFetcher targetFetcher, final InputStream artifactStream, final long numBytes,
             final String md5Hash, final LeafExecMonitor monitor) throws IOException, CancelationException {
-        LOGGER.debug("Starting attempt %d of the upload of part %d of '%s' (%d bytes)", //
+        LOGGER.atDebug().log("Starting attempt {} of the upload of part {} of '{}' ({} bytes)", //
             attempt + 1, partNumber, path, numBytes);
 
         // set a very small non-zero value to signal that the part upload job has started
@@ -270,10 +274,16 @@ public final class FilePartUploader {
                     monitor.setProgress(0.95 * written / numBytes);
                 }
             } catch (final IOException e) {
-                LOGGER.debug("Failed to upload part %d of '%s'".formatted(partNumber, path), e);
+                LOGGER.atDebug().setCause(e) //
+                    .addArgument(partNumber) //
+                    .addArgument(path) //
+                    .log("Failed to upload part {} of '{}'");
                 throw e;
             } catch (final CancelationException e) {
-                LOGGER.debug("Cancelled upload of part %d of '%s'", partNumber, path);
+                LOGGER.atDebug().setCause(e) //
+                    .addArgument(partNumber)
+                    .addArgument(path)
+                    .log("Cancelled upload of part {} of '{}'");
                 throw e;
             }
 
@@ -293,7 +303,10 @@ public final class FilePartUploader {
                 monitor.setProgress(0.99);
             }
         } finally {
-            LOGGER.debug("Ending upload of part %d of '%s'", partNumber, path);
+            LOGGER.atDebug() //
+                .addArgument(partNumber) //
+                .addArgument(path) //
+                .log("Ending upload of part {} of '{}'");
             monitor.done();
             conn.disconnect();
         }

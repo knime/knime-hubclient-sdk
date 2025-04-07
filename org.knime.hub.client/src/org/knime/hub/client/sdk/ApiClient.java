@@ -222,8 +222,6 @@ public class ApiClient implements AutoCloseable {
 
         private Duration m_requestReadTimeout;
 
-        private static final String REQUEST_LENGTH_MESSAGE = "Request '%s' took %.3fs";
-
         private ApiRequest() {
         }
 
@@ -529,7 +527,7 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                LOGGER.debug(REQUEST_LENGTH_MESSAGE, uri, (System.currentTimeMillis() - t0) / 1000.0);
+                logDuration(uri, t0, System.currentTimeMillis());
             }
 
         }
@@ -611,7 +609,7 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
-                LOGGER.debug(REQUEST_LENGTH_MESSAGE, uri, (System.currentTimeMillis() - t0) / 1000.0);
+                logDuration(uri, t0, System.currentTimeMillis());
             }
 
         }
@@ -716,6 +714,17 @@ public class ApiClient implements AutoCloseable {
             conn.setReadTimeout(Math.toIntExact(m_readTimeout.toMillis()));
             m_headerParams.forEach(conn::addRequestProperty);
             return conn;
+        }
+
+        private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {
+            if (!LOGGER.isDebugEnabled()) {
+                return;
+            }
+            LOGGER.atDebug() //
+                .addArgument(uri) //
+                .addArgument(() -> "%.3f".formatted((toMillis - fromMillis) / 1000.0)) //
+                .setMessage("Request '{}' took {}s") //
+                .log();
         }
 
     }

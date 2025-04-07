@@ -885,7 +885,9 @@ public final class CatalogClient {
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
-        LOGGER.debug("Initiating upload of %d items", requestBody.getItems().size());
+        LOGGER.atDebug() //
+            .addArgument(() -> requestBody.getItems().size()) //
+            .log("Initiating upload of {} items");
 
         CheckUtils.checkArgumentNotNull(parentId);
 

@@ -272,12 +272,17 @@ public final class HubDownloader extends AbstractHubTransfer {
                 for (final var res : downloaded.values()) {
                     if (res instanceof Success<Optional<Path>> success) {
                         final var path = success.value();
-                        LOGGER.debug("Cleaning up downloaded item from temp location \"%s\"", path);
                         final var file = path.orElseThrow();
+                        LOGGER.atDebug() //
+                            .addArgument(file) //
+                            .log("Cleaning up downloaded item from temp location \"{}\"");
                         try {
                             Files.deleteIfExists(file);
                         } catch (final IOException e) {
-                            LOGGER.debug("Failed to delete item at temp location \"%s\"".formatted(file), e);
+                            LOGGER.atDebug() //
+                                .addArgument(file) //
+                                .setCause(e) //
+                                .log("Failed to delete item at temp location \"{}\"");
                         }
                     }
                 }
@@ -285,36 +290,43 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
+    @SuppressWarnings("java:S5612") // lambda with many lines
     private Result<Path> downloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
             final LeafExecMonitor monitor) throws IOException, CancelationException {
         // set a very small non-zero value to signal that the download job has started
         monitor.setProgress(Double.MIN_VALUE);
         var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
         try {
-            LOGGER.debug("Downloading '%s' into file '%s'", download.item().path(), tempFile.get());
-            final var file = m_catalogClient.downloadItem(download.id(), download.item().type(), (in, contentLength) -> { // NOSONAR
-                // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                final var numBytes = contentLength.orElse(download.size().orElse(-1));
-                final var bufferSize = (int)(FileUtils.ONE_MB / 2);
-                try (final var bufferedInStream = new BufferedInputStream(in, bufferSize);
-                        final var outStream = Files.newOutputStream(tempFile.get())) {
-                    final var buffer = new byte[bufferSize];
-                    long written = 0;
-                    for (int read; (read = bufferedInStream.read(buffer)) >= 0;) {
-                        monitor.checkCanceled();
-                        outStream.write(buffer, 0, read);
-                        written += read;
-                        monitor.addTransferredBytes(read);
-                        if (numBytes >= 0) { // NOSONAR
-                            monitor.setProgress(Math.min(1.0 * written / numBytes, 1.0));
+            LOGGER.atDebug() //
+                .addArgument(download.item().path()) //
+                .addArgument(tempFile.get()) //
+                .log("Downloading '{}' into file '{}'");
+            final var file =
+                m_catalogClient.downloadItem(download.id(), download.item().type(), (in, contentLength) -> {
+                    // prefer size from the HTTP request if available, fall back to Catalog information otherwise
+                    final var numBytes = contentLength.orElse(download.size().orElse(-1));
+                    final var bufferSize = (int)(FileUtils.ONE_MB / 2);
+                    try (final var bufferedInStream = new BufferedInputStream(in, bufferSize);
+                            final var outStream = Files.newOutputStream(tempFile.get())) {
+                        final var buffer = new byte[bufferSize];
+                        long written = 0;
+                        for (int read; (read = bufferedInStream.read(buffer)) >= 0;) {
+                            monitor.checkCanceled();
+                            outStream.write(buffer, 0, read);
+                            written += read;
+                            monitor.addTransferredBytes(read);
+                            if (numBytes >= 0) { // NOSONAR
+                                monitor.setProgress(Math.min(1.0 * written / numBytes, 1.0));
+                            }
                         }
                     }
-                }
-                return tempFile.getAndSet(null);
-            });
+                    return tempFile.getAndSet(null);
+                });
             return Result.success(file);
         } finally {
-            LOGGER.debug("Ended downloading '%s'", download.item().path());
+            LOGGER.atDebug() //
+                .addArgument(download.item().path()) //
+                .log("Ended downloading '{}'");
             monitor.done();
             final var remainingAfterFailure = tempFile.get();
             if (remainingAfterFailure != null) {

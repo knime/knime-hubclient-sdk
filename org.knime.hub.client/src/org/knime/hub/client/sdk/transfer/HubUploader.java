@@ -397,7 +397,9 @@ public final class HubUploader extends AbstractHubTransfer {
                     if (throwable instanceof CancelationException cee) { // NOSONAR
                         throw cee;
                     } else {
-                        LOGGER.debug("Unexpected exception during upload job", throwable);
+                        LOGGER.atDebug().setCause(throwable) //
+                            .addArgument(path) //
+                            .log("Unexpected exception during upload job for \"{}\"");
                         return Result.failure(throwable.getMessage(), throwable);
                     }
                 });
@@ -465,8 +467,11 @@ public final class HubUploader extends AbstractHubTransfer {
 
             while (true) {
                 final var state = m_catalogClient.pollUploadState(instructions.getUploadId());
-                LOGGER.debug("Polling state of uploaded item '%s': %s, '%s'",  //
-                    path, state.getStatus(), state.getStatusMessage());
+                LOGGER.atDebug() //
+                    .addArgument(path)
+                    .addArgument(state.getStatus())
+                    .addArgument(state.getStatusMessage())
+                    .log("Polling state of uploaded item '{}': {}, '{}'");
                 switch (state.getStatus()) {
                     case ABORTED:
                         return Result.failure(state.getStatusMessage(), null);
@@ -515,7 +520,9 @@ public final class HubUploader extends AbstractHubTransfer {
             m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
-                LOGGER.debug("Upload of '%s' has failed, cancelling parts and notifying Catalog Service", path);
+                LOGGER.atDebug() //
+                    .addArgument(path) //
+                    .log("Upload of '{}' has failed, cancelling parts and notifying Catalog Service");
                 // the upload didn't finish successfully, cancel pending part uploads and delete all temp files
                 pendingUploads.forEach(pending -> pending.cancel(true));
                 m_catalogClient.cancelUpload(instructions.getUploadId());
@@ -535,7 +542,8 @@ public final class HubUploader extends AbstractHubTransfer {
                 if (throwable instanceof IOException ioe) {
                     throw ioe;
                 } else {
-                    LOGGER.debug("Unexpected exception while uploading file part", throwable);
+                    LOGGER.atDebug().setCause(throwable) //
+                        .log("Unexpected exception while uploading file part (to be caught elsewhere)");
                     throw ExceptionUtils.asRuntimeException(throwable);
                 }
             });
@@ -608,7 +616,9 @@ public final class HubUploader extends AbstractHubTransfer {
             m_catalogClient.reportUploadFinished(instructions.getUploadId(), finishedParts);
         } finally {
             if (!success) {
-                LOGGER.debug("Upload of '%s' has failed, cancelling parts and notifying Hub", path);
+                LOGGER.atDebug() //
+                    .addArgument(path) //
+                    .log("Upload of '{}' has failed, cancelling parts and notifying Hub");
                 partUploads.forEach(pending -> pending.cancel(true));
                 m_catalogClient.cancelUpload(instructions.getUploadId());
             }
