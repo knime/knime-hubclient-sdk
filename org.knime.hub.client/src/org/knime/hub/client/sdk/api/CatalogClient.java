@@ -57,6 +57,7 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.hub.CurrentState;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
@@ -100,7 +101,6 @@ public final class CatalogClient {
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
     private static final String QUERY_PARAM_MOVE = "move";
     private static final String QUERY_PARAM_VERSION = "version";
-    private static final String QUERY_PARAM_SPACE_VERSION = "spaceVersion";
     private static final String QUERY_PARAM_SOFT_DELETE = "softDelete";
     private static final String QUERY_PARAM_DETAILS = "details";
     private static final String QUERY_PARAM_DEEP = "deep";
@@ -276,17 +276,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
@@ -297,7 +286,7 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException
      */
     public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final ItemVersion version,
-        final String spaceVersion, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
+        final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
@@ -311,8 +300,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion) //
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -334,17 +322,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
@@ -354,7 +331,7 @@ public final class CatalogClient {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version, final String spaceVersion,
+    public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -367,8 +344,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion) //
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -387,17 +363,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
@@ -407,7 +372,7 @@ public final class CatalogClient {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version, final String spaceVersion,
+    public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -420,8 +385,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders)
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -447,17 +411,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
@@ -465,7 +418,7 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
-        final ItemVersion version, final String spaceVersion, final Map<String, String> additionalHeaders)
+        final ItemVersion version, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -478,8 +431,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -504,17 +456,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
@@ -522,7 +463,7 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
@@ -532,8 +473,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -561,17 +501,6 @@ public final class CatalogClient {
      *            </ul>
      *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
      *            version. (optional, default to current-state)
-     * @param spaceVersion Legacy: Optional query parameter which indicates the version of the space where the item is
-     *            stored. It can be either:
-     *            <ul>
-     *            <li>The version number of an existing space version (e.g. "1")</li>
-     *            <li>"latest" to target the latest space version (corresponds to value "most-recent" of query parameter
-     *            "version")</li>
-     *            <li>"-1" to target the current state, i.e. including unversioned changes (corresponds to value
-     *            "current-state" of query parameter "version".)</li>
-     *            </ul>
-     *            If used together with query parameter "version" the two parameters need to refer to the same version.
-     *            Clients are encouraged to only use the "version" parameter instead. (optional, default to -1)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
@@ -579,7 +508,7 @@ public final class CatalogClient {
      */
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final String spaceVersion, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
@@ -589,8 +518,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParam(QUERY_PARAM_SPACE_VERSION, spaceVersion)
+            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
