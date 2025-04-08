@@ -44,47 +44,45 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Feb 27, 2025 (magnus): created
+ *   8 Apr 2025 (Manuel Hotz, KNIME GmbH, Konstanz, Germany): created
  */
-package org.knime.hub.client.sdk.testing;
+package org.knime.hub.client.sdk.api;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import org.eclipse.core.runtime.FileLocator;
-import org.eclipse.core.runtime.IPath;
-import org.knime.hub.client.sdk.api.HubClientAPI;
-import org.osgi.framework.FrameworkUtil;
+import org.junit.jupiter.api.Test;
+import org.knime.core.util.hub.CurrentState;
+import org.knime.core.util.hub.MostRecent;
+import org.knime.core.util.hub.SpecificVersion;
+import org.knime.hub.client.sdk.HTTPQueryParameter;
 
 /**
- * Test utility class for unit tests.
+ * Tests for the {@link CatalogClient}.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @author Manuel Hotz, KNIME GmbH, Konstanz, Germany
  */
-public class TestUtil {
+class CatalogClientTest {
 
-    public static final String RESOURCE_FOLDER_NAME = "resources";
-    public static final String TEST_FILE_FOLDER_NAME = "repositoryMetaDataTestFiles";
+    @Test
+    void testItemVersionQueryParam() {
+        var expected = new HTTPQueryParameter("version", "42");
+        final var specific = new SpecificVersion(42);
+        var actual = CatalogClient.getQueryParameter(specific).orElseThrow();
+        assertEquals(expected, actual, "Unexpected specific version query parameter");
 
-    /**
-     * Resolves a path relative to the plug-in or any fragment's root into an absolute path.
-     *
-     * @param relativePath a relative path
-     * @return the resolved absolute path
-     */
-    public static Path resolvePath(final IPath relativePath) {
-        var myself = FrameworkUtil.getBundle(HubClientAPI.class);
-        try {
-            final var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
-            // for the tests we assume that we don't have to deal with
-            // - non-encoded characters (literal space) in the path
-            // - UNC paths
-            return Paths.get(fileUrl.toURI());
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException("Could not resolve resource: %s".formatted(relativePath), e);
-        }
+        expected = new HTTPQueryParameter("version", "most-recent");
+        final var mostRecent = MostRecent.getInstance();
+        actual = CatalogClient.getQueryParameter(mostRecent).orElseThrow();
+        assertEquals(expected, actual, "Unexpected most-recent version query parameter");
+
+        expected = new HTTPQueryParameter("version", "current-state");
+        final var currentState = CurrentState.getInstance();
+        actual = CatalogClient.getQueryParameter(currentState).orElseThrow();
+        assertEquals(expected, actual, "Unexpected current-state version query parameter");
+
+        CatalogClient.getQueryParameter(null).ifPresent(p -> {
+            fail("Unexpected query parameter for null version: " + p);
+        });
     }
-
 }

@@ -46,7 +46,7 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk;
+package org.knime.hub.client.sdk.api;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -76,7 +76,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.ItemVersion;
-import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
 import org.knime.hub.client.sdk.testing.TestUtil;
@@ -102,9 +103,6 @@ import jakarta.ws.rs.core.MediaType;
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 class HubClientAPITest {
-
-	public static final String RESOURCE_FOLDER_NAME = "resources";
-    public static final String TEST_FILE_FOLDER_NAME = "repositoryMetaDataTestFiles";
 
 	public static final String DEFAULT_USERNAME = "knime";
 	public static final String DEFAULT_PUBLIC_SPACE_NAME = "PublicSpace";
@@ -169,8 +167,8 @@ class HubClientAPITest {
 	private static JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId,
 	        final Map<String, String> queryParams) throws IOException, URISyntaxException {
         // Path to the file inside test file folder.
-	    final var filePath = IPath.forPosix(HubClientAPITest.RESOURCE_FOLDER_NAME)
-	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(testFileName);
+	    final var filePath = IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME)
+	            .append(TestUtil.TEST_FILE_FOLDER_NAME).append(testFileName);
 
         // Obtain file object from bundle activator class.
         File file = TestUtil.resolvePath(filePath).toFile();

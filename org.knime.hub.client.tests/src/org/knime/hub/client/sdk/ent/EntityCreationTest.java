@@ -46,7 +46,7 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk;
+package org.knime.hub.client.sdk.ent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,15 +64,7 @@ import java.util.List;
 
 import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
-import org.knime.hub.client.sdk.ent.Component;
-import org.knime.hub.client.sdk.ent.Data;
-import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.ent.Space;
-import org.knime.hub.client.sdk.ent.UploadManifest;
-import org.knime.hub.client.sdk.ent.UploadStarted;
-import org.knime.hub.client.sdk.ent.UploadStatus;
-import org.knime.hub.client.sdk.ent.Workflow;
-import org.knime.hub.client.sdk.ent.WorkflowGroup;
+import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -112,8 +104,8 @@ class EntityCreationTest {
 
 	private static <T> T load(final String filename, final Class<T> clazz) throws IOException, URISyntaxException {
 		// Path to the file inside test file folder.
-	    final var filePath = IPath.forPosix(HubClientAPITest.RESOURCE_FOLDER_NAME)
-	            .append(HubClientAPITest.TEST_FILE_FOLDER_NAME).append(filename);
+	    final var filePath = IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME)
+	            .append(TestUtil.TEST_FILE_FOLDER_NAME).append(filename);
 
 		// Obtain path object from bundle activator class.
 		final var path = TestUtil.resolvePath(filePath);
