@@ -148,7 +148,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
         final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
@@ -177,7 +177,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -199,7 +199,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -222,7 +222,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<Void> deleteItemByCanonicalPath(final String accountId, final IPath subPath,
         final boolean softDelete, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -247,7 +247,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -267,23 +267,16 @@ public final class CatalogClient {
      *
      * @param accountId The ID of the account the repository item is associated with (required)
      * @param subPath The "/" delimited path to the resource below the account root level (required)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
@@ -313,23 +306,16 @@ public final class CatalogClient {
      *            item is renamed or moved. May also be a concatenation of path followed by the "~" character and the ID
      *            without the leading "*" character. This occurs when the request originates from an older AP that
      *            cannot handle the new URI format which adds the ID to the end of the path. (required)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
@@ -354,23 +340,16 @@ public final class CatalogClient {
      * (based on the file extension).
      *
      * @param path The absolute path to the repository item. (required)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param responseType The type of the response body (required).
      * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
@@ -402,19 +381,12 @@ public final class CatalogClient {
      * @param contribSpaces An optional query parameter which determines if the spaces a user can contribute to are
      *            included when requesting a users directory, and the format these spaces should be written in. This
      *            parameter is ignored if another other than a users directory is requested. (optional, default to none)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
@@ -447,19 +419,12 @@ public final class CatalogClient {
      * @param contribSpaces An optional query parameter which determines if the spaces a user can contribute to are
      *            included when requesting a users directory, and the format these spaces should be written in. This
      *            parameter is ignored if another other than a users directory is requested. (optional, default to none)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
@@ -492,19 +457,12 @@ public final class CatalogClient {
      * @param contribSpaces An optional query parameter which determines if the spaces a user can contribute to are
      *            included when requesting a users directory, and the format these spaces should be written in. This
      *            parameter is ignored if another other than a users directory is requested. (optional, default to none)
-     * @param version Optional query parameter which specifies the version of the item to retrieve.
-     *            <ul>
-     *            <li>The version number of an existing item version. Must be a positive integer.</li>
-     *            <li>The special value "most-recent", which points to the latest version of the item.</li>
-     *            <li>The special value "current-state", which points to the latest overall state of the item, i.e.
-     *            including unversioned changes.</li>
-     *            </ul>
-     *            If used together with query parameter "spaceVersion" the two parameters need to refer to the same
-     *            version. (optional, default to current-state)
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
@@ -535,7 +493,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverCopyByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
@@ -567,7 +525,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverMoveByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
@@ -599,9 +557,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
         final MediaType contentType, final UploadContentHandler<R> contentHandler,
@@ -632,7 +590,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -661,7 +619,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -690,9 +648,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
@@ -719,7 +677,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -747,7 +705,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -775,9 +733,9 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException
-     * @throws CancelationException
-     * @throws CouldNotAuthorizeException
+     * @throws IOException if the operation had an I/O error
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
         final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
@@ -799,7 +757,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<Void> cancelUpload(final String uploadId, final Map<String, String> additionalHeaders)
         throws CouldNotAuthorizeException {
@@ -822,7 +780,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -845,7 +803,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -865,7 +823,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -885,7 +843,7 @@ public final class CatalogClient {
      * @param additionalHeaders Map of additional parameters
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException
+     * @throws CouldNotAuthorizeException if authorization fails
      */
     public ApiResponse<UploadTarget> requestPartUpload(final String uploadId, final Integer partNumber,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException {
@@ -911,9 +869,9 @@ public final class CatalogClient {
     public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
         CheckUtils.checkArgumentNotNull(version);
         return Optional.ofNullable(version.match(//
-            cs -> null, //
-            mr -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER),
-            sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, sv.getVersionString())));
+            () -> null, //
+            () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER),
+            sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, Integer.toString(sv))));
     }
 
 }

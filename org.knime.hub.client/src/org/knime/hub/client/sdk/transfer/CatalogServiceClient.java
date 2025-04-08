@@ -274,7 +274,8 @@ public class CatalogServiceClient {
      * @return pair of fetched repository item and corresponding entity tag, or {@link Optional#empty()} if
      *     {@code ifNoneMatch} was non-{@code null} and the HTTP response was {@code 304 Not Modified} or
      *     {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
-     * @throws ResourceAccessException
+     *
+     * @throws ResourceAccessException if the request was not successful
      */
     public Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
@@ -323,8 +324,9 @@ public class CatalogServiceClient {
      * @param itemType the type of the item which should be downloaded
      * @param contentHandler callback consuming the response data
      * @return value returned by the callback
-     * @throws IOException
-     * @throws CancelationException
+     *
+     * @throws IOException if an I/O error occurred while downloading
+     * @throws CancelationException if the operation was canceled
      */
     public <R> R downloadItem(final ItemID id, final RepositoryItemType itemType,
             final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
