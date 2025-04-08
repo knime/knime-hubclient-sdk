@@ -293,7 +293,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -330,7 +330,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -364,7 +364,7 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType) //
             .withHeaders(additionalHeaders)
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -403,7 +403,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -438,7 +438,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -476,7 +476,7 @@ public final class CatalogClient {
             .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
             .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
             .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
-            .withQueryParam(getQueryParameter(version == null ? CurrentState.getInstance() : version).orElse(null))
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -858,20 +858,21 @@ public final class CatalogClient {
     }
 
     /**
-     * Returns the given item version for the Catalog service as a query parameter key-value pair, if it is
-     * {@link ItemVersion#isVersioned()}, or {@link Optional#empty()} if the given version refers to the "current
-     * state".
+     * Returns the given item version for the Catalog service as a query parameter key-value pair, or
+     * {@link Optional#empty()} if the argument was {@code null}.
      *
-     * @param version non-{@code null} version to map to its string representation
-     * @return query parameter key-value pair representing the given item version or {@link Optional#empty()} if it
-     *         refers to the "current state"
+     * @param version {@code null}-able version to map to its string representation
+     * @return query parameter key-value pair representing the given item version or {@link Optional#empty()} if
+     *         argument was {@code null}
      */
     public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
-        CheckUtils.checkArgumentNotNull(version);
-        return Optional.ofNullable(version.match(//
-            () -> null, //
-            () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER),
-            sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, Integer.toString(sv))));
+        return Optional.ofNullable(version) //
+                .map(v -> v.match(//
+                    () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
+                    () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
+                    sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, Integer.toString(sv)) //
+                    ) //
+                );
     }
 
 }
