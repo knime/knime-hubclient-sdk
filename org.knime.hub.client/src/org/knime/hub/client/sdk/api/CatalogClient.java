@@ -49,13 +49,16 @@
 package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.node.workflow.WorkflowExporter.ItemType;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.CurrentState;
 import org.knime.core.util.hub.ItemVersion;
@@ -67,14 +70,17 @@ import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.knime.hub.client.sdk.transfer.AsyncUploadStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
 
@@ -131,6 +137,15 @@ public final class CatalogClient {
      */
     public CatalogClient(final @NotOwning ApiClient apiClient) {
         m_apiClient = apiClient;
+    }
+
+    /**
+     * Retrieves the associated {@link ApiClient}.
+     *
+     * @return {@link ApiClient}
+     */
+    public @NotOwning ApiClient getApiClient() {
+        return m_apiClient;
     }
 
     /**
@@ -204,7 +219,7 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      */
-    public ApiResponse<Void> deleteByPathItem(final IPath path, final boolean softDelete,
+    public ApiResponse<Void> deleteItemByPath(final IPath path, final boolean softDelete,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(path);
 
@@ -284,10 +299,10 @@ public final class CatalogClient {
      * @throws CancelationException if the operation was canceled
      * @throws CouldNotAuthorizeException if authorization fails
      */
-    public <R> ApiResponse<R> downloadItem(final String accountId, final IPath subPath, final ItemVersion version,
-        final MediaType responseType, final DownloadContentHandler<R> contentHandler,
+    public <R> ApiResponse<R> downloadItemByCanonicalPath(final String accountId, final IPath subPath,
+        final ItemVersion version, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
+                throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(accountId);
@@ -473,7 +488,7 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> getRepositoryItemMetaData(final String id, final String details,
+    public ApiResponse<RepositoryItem> getRepositoryItemById(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(id);
@@ -878,6 +893,25 @@ public final class CatalogClient {
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
             .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
             .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
+    }
+
+    /**
+     * Creates an asynchronous upload stream to the hub.
+     *
+     * @param itemName the relative path of the item in the parent group
+     * @param itemType the {@link ItemType} of the uploaded item
+     * @param parentId the ID of the parent group
+     * @param parentEtag the entity tag of the parent group
+     * @param additionalHeaders additional header parameters
+     *
+     * @return {@link AsyncUploadStream}
+     * @throws IOException if an I/O error occurred during the upload
+     */
+    public @Owning OutputStream createAsyncHubUploadStream(final String itemName, final RepositoryItemType itemType,
+        final String parentId, final EntityTag parentEtag,
+        final Map<String, String> additionalHeaders) throws IOException {
+        return AsyncUploadStream.createAsyncUploadStream(
+            this, itemName, parentId, parentEtag, itemType, additionalHeaders);
     }
 
     /**

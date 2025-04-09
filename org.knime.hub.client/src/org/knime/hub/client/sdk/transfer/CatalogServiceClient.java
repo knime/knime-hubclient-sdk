@@ -32,6 +32,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
@@ -46,6 +47,7 @@ import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Success;
+import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
@@ -75,7 +77,7 @@ public class CatalogServiceClient {
             RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
-    private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
+    public static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
     private static final String KNIME_SERVER_NAMESPACE = "knime";
 
@@ -114,6 +116,9 @@ public class CatalogServiceClient {
     /** Media type for a KNIME Workflow Group */
     public static final MediaType KNIME_WORKFLOW_GROUP_MEDIA_TYPE =
             new MediaType("application", "vnd.knime.workflow-group+zip");
+    /** Media type of a workflow group no zip */
+    public static final String MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP =
+            StringUtils.removeEnd(CatalogServiceClient.KNIME_WORKFLOW_GROUP_MEDIA_TYPE.toString(), "+zip");
 
     /**
      * Target description for a file HTTP download.
@@ -146,18 +151,20 @@ public class CatalogServiceClient {
     }
 
     @NotOwning
-    private final HubClientAPI m_hubClient;
+    private final CatalogClient m_catalogClient;
 
     private final Map<String, String> m_additionalHeaders;
 
     /**
      * Catalog service client which is used to handle request for async up and download.
      *
-     * @param hubClient {@link HubClientAPI}
+     * @param catalogClient {@link HubClientAPI}
+     * @param apiBaseURI the base api URI of the hub instance
      * @param additionalHeaders additional header parameters for up and download
      */
-    public CatalogServiceClient(final HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
-        m_hubClient = hubClient;
+    public CatalogServiceClient(final CatalogClient catalogClient,
+        final Map<String, String> additionalHeaders) {
+        m_catalogClient = catalogClient;
         m_additionalHeaders = additionalHeaders;
     }
 
@@ -179,7 +186,7 @@ public class CatalogServiceClient {
         }
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog()
+            final var response = m_catalogClient
                     .initiateUpload(parentId.id(), manifest, SLOW_OPERATION_READ_TIMEOUT, additionalHeaders);
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
@@ -204,7 +211,7 @@ public class CatalogServiceClient {
     public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
             throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().requestPartUpload(uploadId, partNumber, m_additionalHeaders);
+            final var response = m_catalogClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -222,7 +229,7 @@ public class CatalogServiceClient {
      */
     public UploadStatus pollUploadState(final String uploadId) throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().pollUploadStatus(uploadId, m_additionalHeaders);
+            final var response = m_catalogClient.pollUploadStatus(uploadId, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -247,7 +254,7 @@ public class CatalogServiceClient {
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response =
-                    m_hubClient.catalog().reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
+                    m_catalogClient.reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -264,7 +271,7 @@ public class CatalogServiceClient {
      */
     public void cancelUpload(final String uploadId) throws ResourceAccessException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = m_hubClient.catalog().cancelUpload(uploadId, m_additionalHeaders);
+            final var response = m_catalogClient.cancelUpload(uploadId, m_additionalHeaders);
             checkSuccessful(response);
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -311,9 +318,9 @@ public class CatalogServiceClient {
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = itemIDOrPath.startsWith("*") ?
-                    m_hubClient.catalog().getRepositoryItemMetaData(itemIDOrPath, detailsParam, deepParam,
+                    m_catalogClient.getRepositoryItemById(itemIDOrPath, detailsParam, deepParam,
                         spaceDetailsParam, contribSpacesParam, version, additionalHeaders) :
-                    m_hubClient.catalog().getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
+                    m_catalogClient.getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
                             spaceDetailsParam, contribSpacesParam, version, additionalHeaders);
             if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode()) ||
                     (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
@@ -350,7 +357,7 @@ public class CatalogServiceClient {
                 accept = KNIME_WORKFLOW_MEDIA_TYPE;
             }
             final var response =
-                m_hubClient.catalog().downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
+                m_catalogClient.downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
             return checkSuccessful(response).value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -365,7 +372,7 @@ public class CatalogServiceClient {
      * @return {@link Success}
      * @throws ResourceAccessException if the request was unsuccessful
      */
-    static <R> Success<R> checkSuccessful(final ApiResponse<R> response) throws ResourceAccessException {
+    public static <R> Success<R> checkSuccessful(final ApiResponse<R> response) throws ResourceAccessException {
         final var result = response.result();
         if (!result.successful()) {
             final var failure = (Result.Failure<R>)result;
@@ -380,7 +387,7 @@ public class CatalogServiceClient {
      * @return hub base URI
      */
     public URI getHubAPIBaseURI() {
-        return m_hubClient.getApiClient().getBaseURI();
+        return m_catalogClient.getApiClient().getBaseURI();
     }
 
 }

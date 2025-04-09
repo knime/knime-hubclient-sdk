@@ -245,9 +245,10 @@ public final class HubDownloader extends AbstractHubTransfer {
                 final var future = unfinishedJob.getValue();
 
                 try {
-                    final var downloadResult = waitForCancellable(future, cancelChecker, throwable -> {
-                        if (throwable instanceof CancelationException cee) { // NOSONAR
-                            throw cee;
+                    final var downloadResult = waitForCancellable(future, cancelChecker, CancelationException::new,
+                        (throwable, supplier) -> {
+                        if (throwable instanceof CancelationException) { // NOSONAR
+                            throw supplier.get();
                         } else {
                             return Result.failure(throwable.getMessage(), throwable);
                         }

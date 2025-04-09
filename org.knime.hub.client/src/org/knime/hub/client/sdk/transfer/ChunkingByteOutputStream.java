@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,63 +41,60 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Mar 25, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.transfer;
 
-package org.knime.hub.client.sdk.api;
-
-import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
-import org.knime.hub.client.sdk.ApiClient;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.util.function.Supplier;
 
 /**
- * Hub Client API for KNIME Hub.
+ * Output stream which writes the data to a series of chunks of a specified size and calls
+ * {@link #chunkFinished(int, byte[], long, byte[])} for each finished chunk.
+ * The last chunk may have any (non-zero) size.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class HubClientAPI implements AutoCloseable {
+abstract class ChunkingByteOutputStream extends ChunkingOutputStream {
 
-    private final @Owning ApiClient m_apiClient;
-
-    private final CatalogClient m_catalog;
+    private Supplier<byte[]> m_currentChunk;
 
     /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
-     *
-     * @param apiClient {@link ApiClient}
+     * @param chunkSize size size which every output file except for the last one should have
+     * @param digest message digest for computing file hashes, may be {@code null}
      */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
-        m_apiClient = apiClient;
-        m_catalog = new CatalogClient(m_apiClient);
+    protected ChunkingByteOutputStream(final int chunkSize, final MessageDigest digest) {
+        super(chunkSize, digest);
     }
 
     /**
-     * Retrieves the associated {@link ApiClient}.
+     * Called whenever an output file has been finished.
      *
-     * @return {@link ApiClient}
+     * @param chunkNumber number of the output file (zero-based)
+     * @param chunk path to the output file
+     * @param digest calculated digest if a {@link MessageDigest} was supplied in the constructor,
+     *     {@code null} otherwise
+     * @throws IOException if processing the file failed
      */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
-    }
+    public abstract void chunkFinished(int chunkNumber, byte[] chunk, byte[] digest) throws IOException;
 
-    /**
-     * Retrieves the catalog client
-     *
-     * @return {@link CatalogClient}
-     */
-    public CatalogClient catalog() {
-        return m_catalog;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void close() {
-        m_apiClient.close();
+    public void chunkFinished(final int chunkNumber, final byte[] digest) throws IOException {
+        chunkFinished(chunkNumber, m_currentChunk.get(), digest);
+        m_currentChunk = null;
+    }
+
+    @Override
+    public OutputStream createChunk() throws IOException {
+        final var baos = new ByteArrayOutputStream((int)m_maxChunkSize);
+        m_currentChunk = baos::toByteArray;
+        return baos;
     }
 
 }

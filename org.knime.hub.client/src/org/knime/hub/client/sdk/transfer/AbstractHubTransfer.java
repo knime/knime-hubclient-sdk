@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.function.Supplier;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -67,16 +68,17 @@ class AbstractHubTransfer {
      * @param <E> declared exception
      */
     @FunctionalInterface
-    interface ErrorHandler<T, E extends Exception> {
+    interface ErrorHandler<T, E extends Exception, C extends Exception> {
         /**
          * Handle the throwable thrown by a {@link Future}.
          *
          * @param throwable from the {@link Future}
+         * @param cancelationExceptionSupplier supplies the exception used when the user cancelled the process
          * @return result to be returned
          * @throws E custom declared exception
-         * @throws CancelationException if the user cancelled
+         * @throws C if the user cancelled
          */
-        T handle(Throwable throwable) throws E, CancelationException;
+        T handle(Throwable throwable, Supplier<C> cancelationExceptionSupplier) throws E, C;
     }
 
     static final int MAX_PATH_LENGTH_IN_MESSAGE = 64;
@@ -96,11 +98,11 @@ class AbstractHubTransfer {
     CatalogServiceClient m_catalogClient;
 
     /**
-     * @param apiClient Hub API client
+     * @param hubClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
-    AbstractHubTransfer(final @NotOwning HubClientAPI apiClient, final Map<String, String> additionalHeaders) {
-        m_catalogClient = new CatalogServiceClient(apiClient, additionalHeaders);
+    AbstractHubTransfer(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
+        m_catalogClient = new CatalogServiceClient(hubClient.catalog(), additionalHeaders);
     }
 
     /**
@@ -199,25 +201,26 @@ class AbstractHubTransfer {
      * @param cancelChecker for checking whether the user requested cancellation
      * @param errorHandler error handler for handling errors/exceptions in the {@link Future}'s execution
      * @return result
-     * @throws E
-     * @throws CancelationException
+     * @throws E exception which is thrown in case of {@link ExecutionException}
+     * @throws C exception which is thrown in case the process is canceled
      */
-    static <T, E extends Exception> T waitForCancellable(final Future<T> task, final BooleanSupplier cancelChecker,
-            final ErrorHandler<T, E> errorHandler) throws E, CancelationException {
+    static <T, E extends Exception, C extends Exception> T waitForCancellable(final Future<T> task,
+        final BooleanSupplier cancelChecker, final Supplier<C> cancelationExceptionSupplier,
+        final ErrorHandler<T, E, C> errorHandler) throws E, C {
         try {
             while (true) {
                 try {
-                    if (cancelChecker.getAsBoolean()) { // NOSONAR
-                        throw new CancelationException();
+                    if (cancelChecker.getAsBoolean()) {
+                        throw cancelationExceptionSupplier.get();
                     }
                     return task.get(200, TimeUnit.MILLISECONDS);
                 } catch (TimeoutException e) { // NOSONAR
                     // continue waiting until cancelled
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new CancelationException();
+                    throw cancelationExceptionSupplier.get();
                 } catch (final ExecutionException e) { // NOSONAR cause is propagated
-                    return errorHandler.handle(e.getCause());
+                    return errorHandler.handle(e.getCause(), cancelationExceptionSupplier);
                 }
             }
         } finally {
@@ -274,11 +277,12 @@ class AbstractHubTransfer {
     private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,
             final FailableSupplier<T, ResourceAccessException> job)
             throws ResourceAccessException, CancelationException {
-        return waitForCancellable(ForkJoinPool.commonPool().submit(job::get), cancelChecker, throwable -> {
+        return waitForCancellable(ForkJoinPool.commonPool().submit(job::get),
+            cancelChecker, CancelationException::new, (throwable, supplier) -> {
             if (throwable instanceof RuntimeException rte) {
                 throw rte;
-            } else if (throwable instanceof CancelationException cee) {
-                throw cee;
+            } else if (throwable instanceof CancelationException) {
+                throw supplier.get();
             } else {
                 // the only declared exception
                 throw (ResourceAccessException)throwable;

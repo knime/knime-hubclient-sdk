@@ -22,6 +22,7 @@ package org.knime.hub.client.sdk.transfer;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -145,6 +146,24 @@ public final class FilePartUploader {
     }
 
     /**
+     * Uploads a chunk of data.
+     *
+     * @param path name/description of the file to be uploaded (for error and logging messages)
+     * @param partNum part number of this part inside the upload
+     * @param targetFetcher fetcher for the upload target
+     * @param dataChunk a chunk of the data
+     * @param md5Hash hash of the input data, may be {@code null}
+     * @param monitor exec monitor for the upload
+     * @return future
+     */
+    public Future<Pair<Integer, EntityTag>> uploadDataChunk(final String path, final Integer partNum,
+            final UploadTargetFetcher targetFetcher, final byte[] dataChunk, final byte[] md5Hash,
+            final LeafExecMonitor monitor) {
+        return FILE_PART_UPLOAD_POOL.submit(() -> uploadDataChunkJob(path, partNum, targetFetcher, dataChunk,
+            md5Hash == null ? null : Base64.encodeBase64String(md5Hash), monitor));
+    }
+
+    /**
      * Uploads a segment of the given file and <i>does not delete</i> the file afterwards.
      *
      * @param path name/description of the file to be uploaded (for error and logging messages)
@@ -189,6 +208,30 @@ public final class FilePartUploader {
             }
         } finally {
             Files.deleteIfExists(file);
+        }
+    }
+
+    private Pair<Integer, EntityTag> uploadDataChunkJob(final String path, final Integer partNum,
+        final UploadTargetFetcher targetFetcher, final byte[] dataChunk, final String md5Hash,
+        final LeafExecMonitor monitor) throws IOException, CancelationException {
+        final var fileChunkSize = dataChunk.length;
+        var retriesRemaining = m_numRetries;
+        for (var attempt = 0;; attempt++) {
+            try {
+                try (final var inputStream = new ByteArrayInputStream(dataChunk)) { // NOSONAR
+                    return Pair.of(partNum, uploadArtifactPart(path, partNum, attempt, targetFetcher, inputStream,
+                        fileChunkSize, md5Hash, monitor));
+                }
+            } catch (final IOException e) {
+                if (retriesRemaining > 0) {
+                    retriesRemaining--;
+                    final var remaining = retriesRemaining;
+                    LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
+                        .formatted(partNum, path, remaining, m_numRetries), e);
+                } else {
+                    throw e;
+                }
+            }
         }
     }
 
