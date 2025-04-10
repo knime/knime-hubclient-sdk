@@ -52,6 +52,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.knime.core.util.exception.HttpExceptionUtils;
+import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.Result.Success;
+
 import jakarta.ws.rs.core.EntityTag;
 
 /**
@@ -72,4 +76,20 @@ public record ApiResponse<R> (
         int statusCode,
         String statusMessage,
         Optional<EntityTag> etag,
-        Result<R> result) {}
+        Result<R> result) {
+
+    /**
+     * Checks that the given response signals success (via a 4XX HTTP status code).
+     *
+     * @return {@link Success}
+     * @throws ResourceAccessException if the request was unsuccessful
+     */
+    public Success<R> checkSuccessful() throws ResourceAccessException {
+        if (!result.successful()) {
+            final var failure = (Result.Failure<R>)result;
+            throw HttpExceptionUtils.wrapException(statusCode, failure.message());
+        }
+        return (Result.Success<R>) result;
+    }
+
+}

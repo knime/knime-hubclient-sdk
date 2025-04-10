@@ -472,7 +472,7 @@ public class ApiClient implements AutoCloseable {
          * @throws IOException
          */
         private static Response executeHttpRequest(final Invocation.Builder builder, final Method method,
-                final Object requestBody) throws IOException {
+            final Object requestBody) throws IOException {
             try {
                 return switch (method) {
                     case POST, PUT, PATCH -> builder.build(method.name(),
@@ -483,12 +483,10 @@ public class ApiClient implements AutoCloseable {
                 throw new IOException("Response processing failed", e.getCause());
             } catch (ProcessingException e) {
                 final var cause = e.getCause();
-                if (cause != null) {
-                    if (cause instanceof SocketTimeoutException socketTimeoutException) {
-                        throw socketTimeoutException;
-                    }
-                    // Handle additional kinds of processing exceptions here
+                if (cause != null && cause instanceof SocketTimeoutException socketTimeoutException) {
+                    throw socketTimeoutException;
                 }
+                // Handle additional kinds of processing exceptions here
                 throw new IOException("Processing failed", cause);
             }
         }

@@ -20,6 +20,7 @@
  */
 package org.knime.hub.client.sdk.transfer;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -238,7 +239,7 @@ class AbstractHubTransfer {
      * @throws CancelationException
      */
     TaggedRepositoryItem deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws ResourceAccessException, CancelationException {
+            throws IOException, CancelationException {
         return runInCommonPool(cancelChecker, () -> {
             final var itemAndETag = m_catalogClient //
                 .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
@@ -258,7 +259,7 @@ class AbstractHubTransfer {
      * @throws CancelationException
      */
     Optional<TaggedRepositoryItem> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws ResourceAccessException, CancelationException {
+            throws IOException, CancelationException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
                 final var itemAndETag = m_catalogClient //
@@ -275,8 +276,8 @@ class AbstractHubTransfer {
     }
 
     private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,
-            final FailableSupplier<T, ResourceAccessException> job)
-            throws ResourceAccessException, CancelationException {
+            final FailableSupplier<T, IOException> job)
+            throws IOException, CancelationException {
         return waitForCancellable(ForkJoinPool.commonPool().submit(job::get),
             cancelChecker, CancelationException::new, (throwable, supplier) -> {
             if (throwable instanceof RuntimeException rte) {

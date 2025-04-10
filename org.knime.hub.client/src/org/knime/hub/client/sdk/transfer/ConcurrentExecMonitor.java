@@ -150,12 +150,13 @@ public sealed interface ConcurrentExecMonitor {
         }
 
         /**
-         * Creates a non updating progress monitor.
+         * Creates a null progress monitor which can be cancelled.
          *
          * @param cancelChecker for checking whether the user has requested cancellation
+         * @return {@link BranchingExecMonitor}
          */
-        public BranchingExecMonitor(final BooleanSupplier cancelChecker) {
-            this(cancelChecker, new AtomicLong(), p -> {});
+        public static BranchingExecMonitor nullProgressMonitor(final BooleanSupplier cancelChecker) {
+            return new BranchingExecMonitor(cancelChecker, new AtomicLong(), p -> {});
         }
 
         /**

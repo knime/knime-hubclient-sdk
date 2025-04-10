@@ -49,7 +49,6 @@ import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
-import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.proxy.URLConnectionFactory;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.ent.UploadTarget;
@@ -84,9 +83,9 @@ public final class FilePartUploader {
          *
          * @param partNo part number
          * @return fetched upload target specification
-         * @throws ResourceAccessException if an error occurs while fetching
+         * @throws IOException if an error occurs while fetching
          */
-        UploadTarget fetch(int partNo) throws ResourceAccessException;
+        UploadTarget fetch(int partNo) throws IOException;
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartUploader.class);
@@ -218,7 +217,7 @@ public final class FilePartUploader {
         var retriesRemaining = m_numRetries;
         for (var attempt = 0;; attempt++) {
             try {
-                try (final var inputStream = new ByteArrayInputStream(dataChunk)) { // NOSONAR
+                try (final var inputStream = new ByteArrayInputStream(dataChunk)) {
                     return Pair.of(partNum, uploadArtifactPart(path, partNum, attempt, targetFetcher, inputStream,
                         fileChunkSize, md5Hash, monitor));
                 }
@@ -226,8 +225,10 @@ public final class FilePartUploader {
                 if (retriesRemaining > 0) {
                     retriesRemaining--;
                     final var remaining = retriesRemaining;
-                    LOGGER.debug("Retrying to upload part %d of '%s', %d/%d retries left" //
-                        .formatted(partNum, path, remaining, m_numRetries), e);
+                    LOGGER.atDebug()
+                    .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
+                    .setCause(e)
+                    .log("Retrying to upload part {} retries left");
                 } else {
                     throw e;
                 }

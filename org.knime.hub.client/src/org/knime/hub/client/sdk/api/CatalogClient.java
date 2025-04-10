@@ -49,7 +49,6 @@
 package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -58,7 +57,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.node.workflow.WorkflowExporter.ItemType;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.CurrentState;
 import org.knime.core.util.hub.ItemVersion;
@@ -70,13 +68,13 @@ import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
-import org.knime.hub.client.sdk.transfer.AsyncUploadStream;
+import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
+import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream.AsyncUploadStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -821,7 +819,9 @@ public final class CatalogClient {
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders)
                 throws CouldNotAuthorizeException, IOException {
-        LOGGER.debug("Initiating upload of %d items".formatted(requestBody.getItems().size()));
+        LOGGER.atDebug() //
+        .addArgument(() -> requestBody.getItems().size()) //
+        .log("Initiating upload of {} items");
 
         CheckUtils.checkArgumentNotNull(parentId);
 
@@ -896,22 +896,28 @@ public final class CatalogClient {
     }
 
     /**
-     * Creates an asynchronous upload stream to the hub.
+     * Creates an asynchronous upload stream to the hub. This upload supports single workflows,
+     * components and data files. Workflow group upload is not supported.
      *
      * @param itemName the relative path of the item in the parent group
-     * @param itemType the {@link ItemType} of the uploaded item
+     * @param isWorkflowLike <code>true</code> if the item which is uploaded is a workflow or component
      * @param parentId the ID of the parent group
      * @param parentEtag the entity tag of the parent group
      * @param additionalHeaders additional header parameters
      *
-     * @return {@link AsyncUploadStream}
+     * @return {@link AsyncHubUploadStream}
      * @throws IOException if an I/O error occurred during the upload
      */
-    public @Owning OutputStream createAsyncHubUploadStream(final String itemName, final RepositoryItemType itemType,
-        final String parentId, final EntityTag parentEtag,
-        final Map<String, String> additionalHeaders) throws IOException {
-        return AsyncUploadStream.createAsyncUploadStream(
-            this, itemName, parentId, parentEtag, itemType, additionalHeaders);
+    public @Owning AsyncUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
+        final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
+        throws IOException {
+        return new AsyncHubUploadStream().createAsyncUploadStream()
+            .withCatalogClient(this)
+            .withItemName(itemName)
+            .withParentId(parentId)
+            .withParentETag(parentEtag)
+            .isWorkflowLike(isWorkflowLike)
+            .withHeaders(additionalHeaders).build();
     }
 
     /**

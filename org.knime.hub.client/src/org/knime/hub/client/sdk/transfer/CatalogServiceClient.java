@@ -32,21 +32,16 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.StringUtils;
-import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
-import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
-import org.knime.hub.client.sdk.Result;
-import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
@@ -117,8 +112,8 @@ public class CatalogServiceClient {
     public static final MediaType KNIME_WORKFLOW_GROUP_MEDIA_TYPE =
             new MediaType("application", "vnd.knime.workflow-group+zip");
     /** Media type of a workflow group no zip */
-    public static final String MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP =
-            StringUtils.removeEnd(CatalogServiceClient.KNIME_WORKFLOW_GROUP_MEDIA_TYPE.toString(), "+zip");
+    public static final MediaType MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP =
+            new MediaType("application", "vnd.knime.workflow-group");
 
     /**
      * Target description for a file HTTP download.
@@ -159,7 +154,6 @@ public class CatalogServiceClient {
      * Catalog service client which is used to handle request for async up and download.
      *
      * @param catalogClient {@link HubClientAPI}
-     * @param apiBaseURI the base api URI of the hub instance
      * @param additionalHeaders additional header parameters for up and download
      */
     public CatalogServiceClient(final CatalogClient catalogClient,
@@ -176,10 +170,10 @@ public class CatalogServiceClient {
      * @param eTag expected entity tag for the parent group, may be {@code null}
      * @return mapping from relative path to file upload instructions, or {@link Optional#empty()} if the
      *     parent workflow group has changed
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if an I/O error occurred
      */
     public Optional<UploadStarted> initiateUpload(final ItemID parentId,
-            final UploadManifest manifest, final EntityTag eTag) throws ResourceAccessException {
+            final UploadManifest manifest, final EntityTag eTag) throws IOException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         if (eTag != null) {
             additionalHeaders.put(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(eTag));
@@ -191,12 +185,10 @@ public class CatalogServiceClient {
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
             } else {
-                return Optional.ofNullable(checkSuccessful(response).value());
+                return Optional.ofNullable(response.checkSuccessful().value());
             }
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -206,17 +198,15 @@ public class CatalogServiceClient {
      * @param uploadId upload ID
      * @param partNumber part number of the next part (must be one larger than the last requested one)
      * @return target of the new upload part
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if an I/O error occurred
      */
     public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
-            throws ResourceAccessException {
+            throws IOException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
-            return checkSuccessful(response).value();
+            return response.checkSuccessful().value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -225,16 +215,14 @@ public class CatalogServiceClient {
      *
      * @param uploadId upload ID
      * @return state of the upload
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if an I/O error occurred
      */
-    public UploadStatus pollUploadState(final String uploadId) throws ResourceAccessException {
+    public UploadStatus pollUploadState(final String uploadId) throws IOException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.pollUploadStatus(uploadId, m_additionalHeaders);
-            return checkSuccessful(response).value();
+            return response.checkSuccessful().value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -243,10 +231,10 @@ public class CatalogServiceClient {
      *
      * @param uploadId upload ID
      * @param artifactETags mapping from upload part number to entity tag received when uploading
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if an I/O error occurred
      */
     public void reportUploadFinished(final String uploadId, final Map<Integer, EntityTag> artifactETags)
-        throws ResourceAccessException {
+        throws IOException {
         final Map<Integer, String> artifactETagMap = artifactETags.entrySet().stream() //
             .sorted(Comparator.comparingInt(Entry::getKey)) //
             .collect(Collectors.toMap(Entry::getKey, e -> ETAG_DELEGATE.toString(e.getValue()), (a, b) -> a,
@@ -255,11 +243,9 @@ public class CatalogServiceClient {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response =
                     m_catalogClient.reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
-            checkSuccessful(response);
+            response.checkSuccessful();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -267,16 +253,14 @@ public class CatalogServiceClient {
      * Request that the upload process is cancelled.
      *
      * @param uploadId upload ID
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if an I/O error occurred
      */
-    public void cancelUpload(final String uploadId) throws ResourceAccessException {
+    public void cancelUpload(final String uploadId) throws IOException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.cancelUpload(uploadId, m_additionalHeaders);
-            checkSuccessful(response);
+            response.checkSuccessful();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -291,12 +275,11 @@ public class CatalogServiceClient {
      * @return pair of fetched repository item and corresponding entity tag, or {@link Optional#empty()} if
      *     {@code ifNoneMatch} was non-{@code null} and the HTTP response was {@code 304 Not Modified} or
      *     {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
-     *
-     * @throws ResourceAccessException if the request was not successful
+     * @throws IOException if an I/O error occurred
      */
     public Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
-            final EntityTag ifMatch) throws ResourceAccessException {
+            final EntityTag ifMatch) throws IOException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         additionalHeaders.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
         if (ifNoneMatch != null) {
@@ -320,18 +303,16 @@ public class CatalogServiceClient {
             final var response = itemIDOrPath.startsWith("*") ?
                     m_catalogClient.getRepositoryItemById(itemIDOrPath, detailsParam, deepParam,
                         spaceDetailsParam, contribSpacesParam, version, additionalHeaders) :
-                    m_catalogClient.getRepositoryItemByPath(new Path(itemIDOrPath), detailsParam, deepParam,
+                    m_catalogClient.getRepositoryItemByPath(IPath.forPosix(itemIDOrPath), detailsParam, deepParam,
                             spaceDetailsParam, contribSpacesParam, version, additionalHeaders);
             if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode()) ||
                     (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
                 return Optional.empty();
             }
-            final var item = checkSuccessful(response).value();
+            final var item = response.checkSuccessful().value();
             return Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null)));
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new ResourceAccessException(e.getMessage(), e);
         }
     }
 
@@ -358,27 +339,10 @@ public class CatalogServiceClient {
             }
             final var response =
                 m_catalogClient.downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
-            return checkSuccessful(response).value();
+            return response.checkSuccessful().value();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
-    }
-
-    /**
-     * Checks that the given response signals success (via a 4XX HTTP status code).
-     * @param <R>
-     *
-     * @param response {@link ApiResponse} to check
-     * @return {@link Success}
-     * @throws ResourceAccessException if the request was unsuccessful
-     */
-    public static <R> Success<R> checkSuccessful(final ApiResponse<R> response) throws ResourceAccessException {
-        final var result = response.result();
-        if (!result.successful()) {
-            final var failure = (Result.Failure<R>)result;
-            throw HttpExceptionUtils.wrapException(response.statusCode(), failure.message());
-        }
-        return (Result.Success<R>) result;
     }
 
     /**

@@ -75,6 +75,7 @@ public abstract class ChunkingFileOutputStream extends ChunkingOutputStream {
 
     @Override
     public @Owning OutputStream createChunk() throws IOException {
+        m_currentChunk = newOutputFile();
         return new BufferedOutputStream(Files.newOutputStream(m_currentChunk));
     }
 

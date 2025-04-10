@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
@@ -40,7 +41,6 @@ import java.util.function.DoubleSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.function.FailableBiConsumer;
@@ -123,6 +123,8 @@ public final class HubUploader extends AbstractHubTransfer {
     private final FilePartUploader m_filePartUploader;
 
     /**
+     * Uploader to a hub instance which supports the asynchronous upload flow
+     *
      * @param hubClient Hub API client
      * @param apHeaders Header parameters specific to AP
      * @param chunkSize size of the parts used in multi-part uploads
@@ -143,11 +145,11 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param itemToType relative paths and item types of items to be uploaded
      * @param progMon to enable cancellation
      * @return collisions found if the Hub supports multi-part uploads, a {@link Failure} otherwise
-     * @throws ResourceAccessException
-     * @throws CancelationException
+     * @throws CancelationException if the upload was canceled
+     * @throws IOException if a request to Hub failed
      */
     public Result<CollisionReport> checkCollisions(final ItemID parentId, final Map<IPath, ItemType> itemToType,
-            final IProgressMonitor progMon) throws ResourceAccessException, CancelationException {
+            final IProgressMonitor progMon) throws CancelationException, IOException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
 
@@ -268,18 +270,18 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param parentTag expected entity tag of the surrounding group, may be {@code null}
      * @param numInitialParts number of initial part upload URLs to request per non-folder item
      * @return mapping from path to item upload instructions, or {@link Optional#empty()} if the parent has changed
-     * @throws ResourceAccessException if the request failed
+     * @throws IOException if a request to Hub failed
      */
     public Optional<Map<IPath, ItemToUpload>> initiateUpload(final ItemID parentId,
             final Map<IPath, LocalItem> items, final EntityTag parentTag,
-            final int numInitialParts) throws ResourceAccessException {
+            final int numInitialParts) throws IOException {
 
         final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
         int partsRemaining = CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
         for (final var entry : items.entrySet()) {
             final var itemType = entry.getValue().type();
             final String mediaType = switch (itemType) {
-                case WORKFLOW_GROUP -> CatalogServiceClient.MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP;
+                case WORKFLOW_GROUP -> CatalogServiceClient.MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP.toString();
                 case WORKFLOW_LIKE -> CatalogServiceClient.KNIME_WORKFLOW_MEDIA_TYPE.toString();
                 case DATA_FILE -> MediaType.APPLICATION_OCTET_STREAM;
             };
@@ -577,17 +579,16 @@ public final class HubUploader extends AbstractHubTransfer {
      * Awaits the completion of the part upload.
      *
      * @param pendingUploads the pending uploads
-     * @param cancelChecker supplies a cancellation checker
      * @return finished part with part number as key and entity tag as value
      *
      * @throws IOException if an I/O error occurred during the part upload
      * @throws RuntimeCancelationException if the part upload was cancelled
      */
     public static Optional<Pair<Integer, EntityTag>> awaitPartFinished(
-        final CircularFifoQueue<Future<Pair<Integer, EntityTag>>> pendingUploads, final BooleanSupplier cancelChecker)
+        final Queue<Future<Pair<Integer, EntityTag>>> pendingUploads)
         throws IOException, RuntimeCancelationException {
         if (!pendingUploads.isEmpty()) {
-            final var result = waitForCancellable(pendingUploads.poll(), cancelChecker,
+            final var result = waitForCancellable(pendingUploads.poll(), () -> false,
                 RuntimeCancelationException::new, (throwable, supplier) -> {
                     if (throwable instanceof IOException ioe) {
                         throw ioe;
@@ -703,7 +704,7 @@ public final class HubUploader extends AbstractHubTransfer {
         }
 
         @Override
-        public UploadTarget fetch(final int partNo) throws ResourceAccessException {
+        public UploadTarget fetch(final int partNo) throws IOException {
             // get and remove initial part, a new one will be requested if this one didn't work
             final var initial = m_initialParts.remove(partNo);
             return initial != null ? initial : m_client.requestAdditionalUploadPart(m_uploadId, partNo);

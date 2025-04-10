@@ -44,7 +44,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
-import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
@@ -114,11 +113,11 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @param itemIds IDs of the items to download
      * @param progMon progress monitor
      * @return description of all items that have to be downloaded
-     * @throws ResourceAccessException if a request to Hub failed
      * @throws CancelationException if the operation was canceled
+     * @throws IOException if a request to Hub failed
      */
     public Pair<DownloadResources, Map<IPath, Failure<Void>>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
-            final IProgressMonitor progMon) throws ResourceAccessException, CancelationException {
+            final IProgressMonitor progMon) throws CancelationException, IOException {
         progMon.beginTask("Collecting items to download...", itemIds.size());
         final Map<IPath, Pair<HubItem, Result<DownloadInfo>>> results = new LinkedHashMap<>();
         var optTotalSize = 0L;
