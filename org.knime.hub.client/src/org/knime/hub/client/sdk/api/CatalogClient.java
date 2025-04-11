@@ -50,6 +50,7 @@ package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -171,8 +172,9 @@ public final class CatalogClient {
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.PUT,
-            spaceRequestBody, REPOSITORY_ITEM);
+        return m_apiClient.createApiRequest()
+                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
+                .withHeaders(additionalHeaders).invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -198,8 +200,10 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.PUT,
-            spaceRequestBody, REPOSITORY_ITEM);
+        return m_apiClient.createApiRequest()
+                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
+                .withHeaders(additionalHeaders)
+                .invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -417,11 +421,8 @@ public final class CatalogClient {
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_DETAILS, details)
-            .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
-            .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null))
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -453,11 +454,8 @@ public final class CatalogClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_DETAILS, details)
-            .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
-            .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null))
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -492,12 +490,19 @@ public final class CatalogClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
 
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_DETAILS, details)
-            .withQueryParam(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null)
-            .withQueryParam(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null)
-            .withQueryParam(QUERY_PARAM_CONTRIB_SPACES, contribSpaces)
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null))
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
+    }
+
+    private static Map<String, String> metaDataQueryParameters(final String details, final boolean deep,
+        final boolean spaceDetails, final String contribSpaces) {
+        Map<String, String> queryParams = new HashMap<>();
+        queryParams.put(QUERY_PARAM_DETAILS, details);
+        queryParams.put(QUERY_PARAM_DEEP, deep ? Boolean.toString(deep) : null);
+        queryParams.put(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null);
+        queryParams.put(QUERY_PARAM_CONTRIB_SPACES, contribSpaces);
+        return queryParams;
     }
 
     /**
@@ -825,7 +830,9 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_UPLOAD_MANIFEST);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).withReadTimeout(readTimeout)
+        return m_apiClient.createApiRequest()
+                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
+                .withHeaders(additionalHeaders).withReadTimeout(readTimeout)
                 .invokeAPI(requestPath, Method.POST, requestBody, UPLOAD_STARTED);
     }
 
@@ -866,8 +873,10 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.POST,
-            requestBody, VOID);
+        return m_apiClient.createApiRequest()
+                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
+                .withHeaders(additionalHeaders)
+                .invokeAPI(requestPath, Method.POST, requestBody, VOID);
     }
 
     /**
@@ -888,9 +897,10 @@ public final class CatalogClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_PARTS);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
-            .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
+        return m_apiClient.createApiRequest()
+                .withHeaders(additionalHeaders)
+                .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
+                .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
     }
 
     /**

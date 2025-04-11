@@ -64,6 +64,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
@@ -218,8 +219,7 @@ public class ApiClient implements AutoCloseable {
         private final Map<String, String> m_headerParams = new HashMap<>();
         private final Map<String, String> m_queryParams = new HashMap<>();
         private final Map<String, String> m_cookieParams = new HashMap<>();
-        private static final MediaType DEFAULT_CONTENT_TYPE = MediaType.APPLICATION_JSON_TYPE;
-        private MediaType m_contentType = DEFAULT_CONTENT_TYPE;
+        private MediaType m_contentType;
         private String m_headerAccept;
 
         private Duration m_requestReadTimeout;
@@ -291,6 +291,7 @@ public class ApiClient implements AutoCloseable {
             if (queryParamMap != null) {
                 m_queryParams.putAll(queryParamMap);
             }
+            m_queryParams.values().removeIf(Objects::isNull);
             return this;
         }
 
@@ -328,9 +329,7 @@ public class ApiClient implements AutoCloseable {
          * @return {@link ApiResponse}
          */
         public ApiRequest withContentTypeHeader(final MediaType contentType) {
-            if (contentType == null) {
-                m_contentType = DEFAULT_CONTENT_TYPE;
-            } else {
+            if (contentType != null) {
                 m_contentType = contentType;
             }
             return this;
@@ -409,7 +408,7 @@ public class ApiClient implements AutoCloseable {
         private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody,
             final Authenticator auth) throws CouldNotAuthorizeException, IOException {
             // Build the invocation builder which makes the request
-            var builder = createInvocationBuilder(uri, auth);
+            var builder = createInvocationBuilder(uri, auth, requestBody);
 
             // Execute the request and retrieve the response
             return executeHttpRequest(builder, method, requestBody);
@@ -419,10 +418,14 @@ public class ApiClient implements AutoCloseable {
          * Creates the {@link Invocation.Builder} for the HTTP request.
          *
          * @param uri the request URL
+         * @param auth the {@link Authenticator}
+         * @param body the request body
+         *
          * @return the {@link Invocation.Builder}
+         *
          * @throws CouldNotAuthorizeException
          */
-        private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth)
+        private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth, final Object body)
                 throws CouldNotAuthorizeException {
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
@@ -433,9 +436,12 @@ public class ApiClient implements AutoCloseable {
                 m_headerAccept = m_headerParams.get(HttpHeaders.ACCEPT);
             }
 
-            if (!m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
-                m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
+            if (m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
+                m_contentType = MediaType.valueOf(m_headerParams.get(HttpHeaders.CONTENT_TYPE));
             }
+
+            CheckUtils.checkState(hasRequiredContentType(body),
+                "Missing required content type for '%s'".formatted(uri));
 
             WebTarget target = m_httpClient.target(uri);
             if (m_requestReadTimeout != null) {
@@ -471,12 +477,13 @@ public class ApiClient implements AutoCloseable {
          * @throws IOException
          */
         @SuppressWarnings("java:S1166")
-        private static Response executeHttpRequest(final Invocation.Builder builder, final Method method,
+        private Response executeHttpRequest(final Invocation.Builder builder, final Method method,
             final Object requestBody) throws IOException {
             try {
                 return switch (method) {
-                    case POST, PUT, PATCH -> builder.build(method.name(),
-                        requestBody != null ? Entity.entity(requestBody, DEFAULT_CONTENT_TYPE) : null).invoke();
+                    case POST, PUT, PATCH -> builder
+                        .build(method.name(), requestBody != null ? Entity.entity(requestBody, m_contentType) : null)
+                        .invoke();
                     case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
                 };
             } catch (ProcessingException e) {
@@ -485,6 +492,10 @@ public class ApiClient implements AutoCloseable {
                 final var cause = e.getCause();
                 throw cause instanceof IOException ioe ? ioe : new IOException(message, cause);
             }
+        }
+
+        private boolean hasRequiredContentType(final Object body) {
+            return body == null || m_contentType != null;
         }
 
         /**
@@ -615,8 +626,8 @@ public class ApiClient implements AutoCloseable {
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
                     // TODO JSON error handling
-                    final var message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                            null, responseStatusInfo::getReasonPhrase);
+                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
                             responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
                 } else if (Family.REDIRECTION == responseStatusFamily) {
@@ -662,7 +673,14 @@ public class ApiClient implements AutoCloseable {
                         throws IOException, CancelationException, CouldNotAuthorizeException {
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
+
+            if (m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
+                m_contentType = MediaType.valueOf(m_headerParams.get(HttpHeaders.CONTENT_TYPE));
+            }
+            CheckUtils.checkArgumentNotNull(m_contentType,
+                "Missing required content type for '%s' '%s'".formatted(method, path));
             m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
+
             if (m_headerAccept != null) {
                 m_headerParams.put(HttpHeaders.ACCEPT,
                         String.join(", ", Arrays.asList(m_headerAccept).stream().map(Object::toString).toList()));
