@@ -53,7 +53,7 @@ public abstract class ChunkingFileOutputStream extends ChunkingOutputStream {
      * @return new output file
      * @throws IOException if file creation failed
      */
-    public abstract Path newOutputFile() throws IOException;
+    protected abstract Path newOutputFile() throws IOException;
 
     /**
      * Called whenever an output file has been finished.
@@ -65,16 +65,16 @@ public abstract class ChunkingFileOutputStream extends ChunkingOutputStream {
      *     {@code null} otherwise
      * @throws IOException if processing the file failed
      */
-    public abstract void chunkFinished(int chunkNumber, Path chunk, long size, byte[] digest) throws IOException;
+    protected abstract void chunkFinished(int chunkNumber, Path chunk, long size, byte[] digest) throws IOException;
 
     @Override
-    public void chunkFinished(final int chunkNumber, final byte[] digest) throws IOException {
+    protected final void chunkFinished(final int chunkNumber, final byte[] digest) throws IOException {
         chunkFinished(chunkNumber, m_currentChunk, m_currentChunkSize, digest);
         m_currentChunk = null;
     }
 
     @Override
-    public @Owning OutputStream createChunk() throws IOException {
+    protected final @Owning OutputStream createChunk() throws IOException {
         m_currentChunk = newOutputFile();
         return new BufferedOutputStream(Files.newOutputStream(m_currentChunk));
     }

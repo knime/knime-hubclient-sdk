@@ -226,9 +226,8 @@ public final class FilePartUploader {
                     retriesRemaining--;
                     final var remaining = retriesRemaining;
                     LOGGER.atDebug()
-                    .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
-                    .setCause(e)
-                    .log("Retrying to upload part {} retries left");
+                        .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
+                        .setCause(e).log("Retrying to upload part {} retries left");
                 } else {
                     throw e;
                 }

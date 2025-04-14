@@ -74,7 +74,6 @@ import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
-import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream.AsyncUploadStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +122,6 @@ public final class CatalogClient {
     private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
     private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
 
-    @SuppressWarnings("resource") // Owned by Hub Client API
     private final @NotOwning ApiClient m_apiClient;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CatalogClient.class);
@@ -908,16 +906,12 @@ public final class CatalogClient {
      * @return {@link AsyncHubUploadStream}
      * @throws IOException if an I/O error occurred during the upload
      */
-    public @Owning AsyncUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
+    public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
         throws IOException {
-        return new AsyncHubUploadStream().createAsyncUploadStream()
-            .withCatalogClient(this)
-            .withItemName(itemName)
-            .withParentId(parentId)
-            .withParentETag(parentEtag)
-            .isWorkflowLike(isWorkflowLike)
-            .withHeaders(additionalHeaders).build();
+        return AsyncHubUploadStream.builder().withCatalogClient(this)
+            .withItemName(itemName).withParentId(parentId)
+            .withParentETag(parentEtag).isWorkflowLike(isWorkflowLike).withHeaders(additionalHeaders).build();
     }
 
     /**

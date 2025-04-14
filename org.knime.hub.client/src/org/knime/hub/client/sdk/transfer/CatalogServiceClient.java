@@ -72,7 +72,7 @@ public class CatalogServiceClient {
             RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
-    public static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
+    static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
     private static final String KNIME_SERVER_NAMESPACE = "knime";
 
@@ -156,8 +156,7 @@ public class CatalogServiceClient {
      * @param catalogClient {@link HubClientAPI}
      * @param additionalHeaders additional header parameters for up and download
      */
-    public CatalogServiceClient(final CatalogClient catalogClient,
-        final Map<String, String> additionalHeaders) {
+    public CatalogServiceClient(final CatalogClient catalogClient, final Map<String, String> additionalHeaders) {
         m_catalogClient = catalogClient;
         m_additionalHeaders = additionalHeaders;
     }
@@ -185,7 +184,7 @@ public class CatalogServiceClient {
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Optional.empty();
             } else {
-                return Optional.ofNullable(response.checkSuccessful().value());
+                return Optional.ofNullable(response.checkSuccessful());
             }
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -204,7 +203,7 @@ public class CatalogServiceClient {
             throws IOException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
-            return response.checkSuccessful().value();
+            return response.checkSuccessful();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
@@ -220,7 +219,7 @@ public class CatalogServiceClient {
     public UploadStatus pollUploadState(final String uploadId) throws IOException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.pollUploadStatus(uploadId, m_additionalHeaders);
-            return response.checkSuccessful().value();
+            return response.checkSuccessful();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
@@ -309,7 +308,7 @@ public class CatalogServiceClient {
                     (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
                 return Optional.empty();
             }
-            final var item = response.checkSuccessful().value();
+            final RepositoryItem item = response.checkSuccessful();
             return Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null)));
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
@@ -339,7 +338,7 @@ public class CatalogServiceClient {
             }
             final var response =
                 m_catalogClient.downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
-            return response.checkSuccessful().value();
+            return response.checkSuccessful();
         } catch (CouldNotAuthorizeException e) {
             throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }

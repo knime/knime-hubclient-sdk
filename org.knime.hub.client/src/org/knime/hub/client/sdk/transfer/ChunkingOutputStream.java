@@ -50,7 +50,6 @@ package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Path;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 
@@ -59,7 +58,7 @@ import org.knime.core.node.util.CheckUtils;
 
 /**
  * Output stream which writes the data to a series of chunks of a specified size and calls
- * {@link #chunkFinished(int, Path, long, byte[])} for each finished chunk. The last file may have any (non-zero) size.
+ * {@link #chunkFinished(int, byte[])} for each finished chunk. The last file may have any (non-zero) size.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
@@ -93,7 +92,7 @@ abstract class ChunkingOutputStream extends OutputStream {
      *     {@code null} otherwise
      * @throws IOException if processing the file failed
      */
-    public abstract void chunkFinished(int chunkNumber, byte[] digest) throws IOException;
+    protected abstract void chunkFinished(int chunkNumber, byte[] digest) throws IOException;
 
     /**
      * Creates a new chunk.
@@ -101,7 +100,7 @@ abstract class ChunkingOutputStream extends OutputStream {
      * @return {@link OutputStream}
      * @throws IOException if an I/O error occurred during creation of the chunk
      */
-    public abstract @Owning OutputStream createChunk() throws IOException;
+    protected abstract @Owning OutputStream createChunk() throws IOException;
 
     private void ensureOpen() throws IOException {
         if (m_currentChunkNo < 0) {

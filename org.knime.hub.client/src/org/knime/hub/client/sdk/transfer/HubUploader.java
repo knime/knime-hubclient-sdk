@@ -31,10 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
@@ -43,7 +41,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.commons.lang3.function.FailableBiConsumer;
 import org.apache.commons.lang3.function.FailableConsumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
@@ -57,7 +54,6 @@ import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
-import org.knime.hub.client.sdk.RuntimeCancelationException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
@@ -403,10 +399,9 @@ public final class HubUploader extends AbstractHubTransfer {
             final var future = unfinishedJob.getValue();
 
             try {
-                final var uploadResult = waitForCancellable(future, cancelChecker, CancelationException::new,
-                    (throwable, supplier) -> {
+                final var uploadResult = waitForCancellable(future, cancelChecker, throwable -> {
                     if (throwable instanceof CancelationException cee) { // NOSONAR
-                        throw supplier.get();
+                        throw cee;
                     } else {
                         LOGGER.atDebug().setCause(throwable) //
                             .addArgument(path) //
@@ -554,13 +549,12 @@ public final class HubUploader extends AbstractHubTransfer {
      * @throws IOException if an I/O error occurred during the part upload
      * @throws CancelationException if the part upload was cancelled
      */
-    public static Map<Integer, EntityTag> awaitPartsFinished(
+    private static Map<Integer, EntityTag> awaitPartsFinished(
             final Deque<Future<Pair<Integer, EntityTag>>> pendingUploads, final BooleanSupplier cancelChecker)
             throws IOException, CancelationException {
         final Map<Integer, EntityTag> finished = new LinkedHashMap<>();
         while (!pendingUploads.isEmpty()) {
-            final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker, CancelationException::new,
-                (throwable, supplier) -> {
+            final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker, throwable -> {
                 if (throwable instanceof IOException ioe) {
                     throw ioe;
                 } else {
@@ -582,28 +576,22 @@ public final class HubUploader extends AbstractHubTransfer {
      * @return finished part with part number as key and entity tag as value
      *
      * @throws IOException if an I/O error occurred during the part upload
-     * @throws RuntimeCancelationException if the part upload was cancelled
      */
-    public static Optional<Pair<Integer, EntityTag>> awaitPartFinished(
-        final Queue<Future<Pair<Integer, EntityTag>>> pendingUploads)
-        throws IOException, RuntimeCancelationException {
-        if (!pendingUploads.isEmpty()) {
-            final var result = waitForCancellable(pendingUploads.poll(), () -> false,
-                RuntimeCancelationException::new, (throwable, supplier) -> {
-                    if (throwable instanceof IOException ioe) {
-                        throw ioe;
-                    } else {
-                        LOGGER.debug("Unexpected exception while uploading data part", throwable);
-                        throw ExceptionUtils.asRuntimeException(throwable);
-                    }
-                });
-            final AtomicReference<Pair<Integer, EntityTag>> finished = new AtomicReference<>();
-            FailableBiConsumer<Integer, EntityTag, RuntimeException> getFinished =
-                    (t, u) -> finished.set(Pair.of(t, u));
-            result.accept(getFinished);
-            return Optional.of(finished.getAndSet(null));
+    static Pair<Integer, EntityTag> awaitPartFinished(final Future<Pair<Integer, EntityTag>> pendingUpload)
+        throws IOException {
+        try {
+            return waitForCancellable(pendingUpload, () -> false, throwable -> {
+                if (throwable instanceof IOException ioe) {
+                    throw ioe;
+                } else {
+                    LOGGER.debug("Unexpected exception while uploading data part", throwable);
+                    throw ExceptionUtils.asRuntimeException(throwable);
+                }
+            });
+        } catch (CancelationException ex) {
+            // can't be canceled, so this would be a bug
+            throw new IllegalStateException("Upload was canceled unexpectedly", ex);
         }
-        return Optional.empty();
     }
 
     private @Owning OutputStream uploadingOutputStream(final String path, final UploadPartSupplier partSupplier,
@@ -683,7 +671,7 @@ public final class HubUploader extends AbstractHubTransfer {
      *
      * @author Magnus Gohm, KNIME AG, Konstanz, Germany
      */
-    public static final class UploadPartSupplier implements UploadTargetFetcher {
+    static final class UploadPartSupplier implements UploadTargetFetcher {
 
         private final String m_uploadId;
 

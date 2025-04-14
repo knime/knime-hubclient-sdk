@@ -53,7 +53,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
-import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -471,6 +470,7 @@ public class ApiClient implements AutoCloseable {
          * @return the {@link Response}
          * @throws IOException
          */
+        @SuppressWarnings("java:S1166")
         private static Response executeHttpRequest(final Invocation.Builder builder, final Method method,
             final Object requestBody) throws IOException {
             try {
@@ -483,8 +483,8 @@ public class ApiClient implements AutoCloseable {
                 throw new IOException("Response processing failed", e.getCause());
             } catch (ProcessingException e) {
                 final var cause = e.getCause();
-                if (cause != null && cause instanceof SocketTimeoutException socketTimeoutException) {
-                    throw socketTimeoutException;
+                if (cause instanceof IOException ioexception) {
+                    throw ioexception;
                 }
                 // Handle additional kinds of processing exceptions here
                 throw new IOException("Processing failed", cause);

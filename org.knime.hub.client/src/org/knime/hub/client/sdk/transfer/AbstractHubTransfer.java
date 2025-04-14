@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
-import java.util.function.Supplier;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -69,17 +68,16 @@ class AbstractHubTransfer {
      * @param <E> declared exception
      */
     @FunctionalInterface
-    interface ErrorHandler<T, E extends Exception, C extends Exception> {
+    interface ErrorHandler<T, E extends Exception> {
         /**
          * Handle the throwable thrown by a {@link Future}.
          *
          * @param throwable from the {@link Future}
-         * @param cancelationExceptionSupplier supplies the exception used when the user cancelled the process
          * @return result to be returned
          * @throws E custom declared exception
-         * @throws C if the user cancelled
+         * @throws CancelationException if the process got cancelled
          */
-        T handle(Throwable throwable, Supplier<C> cancelationExceptionSupplier) throws E, C;
+        T handle(Throwable throwable) throws E, CancelationException;
     }
 
     static final int MAX_PATH_LENGTH_IN_MESSAGE = 64;
@@ -203,25 +201,24 @@ class AbstractHubTransfer {
      * @param errorHandler error handler for handling errors/exceptions in the {@link Future}'s execution
      * @return result
      * @throws E exception which is thrown in case of {@link ExecutionException}
-     * @throws C exception which is thrown in case the process is canceled
      */
-    static <T, E extends Exception, C extends Exception> T waitForCancellable(final Future<T> task,
-        final BooleanSupplier cancelChecker, final Supplier<C> cancelationExceptionSupplier,
-        final ErrorHandler<T, E, C> errorHandler) throws E, C {
+    static <T, E extends Exception> T waitForCancellable(final Future<T> task,
+        final BooleanSupplier cancelChecker,
+        final ErrorHandler<T, E> errorHandler) throws E, CancelationException {
         try {
             while (true) {
+                if (cancelChecker.getAsBoolean()) {
+                    throw new CancelationException();
+                }
                 try {
-                    if (cancelChecker.getAsBoolean()) {
-                        throw cancelationExceptionSupplier.get();
-                    }
                     return task.get(200, TimeUnit.MILLISECONDS);
                 } catch (TimeoutException e) { // NOSONAR
                     // continue waiting until cancelled
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw cancelationExceptionSupplier.get();
+                    throw new CancelationException();
                 } catch (final ExecutionException e) { // NOSONAR cause is propagated
-                    return errorHandler.handle(e.getCause(), cancelationExceptionSupplier);
+                    return errorHandler.handle(e.getCause());
                 }
             }
         } finally {
@@ -279,11 +276,11 @@ class AbstractHubTransfer {
             final FailableSupplier<T, IOException> job)
             throws IOException, CancelationException {
         return waitForCancellable(ForkJoinPool.commonPool().submit(job::get),
-            cancelChecker, CancelationException::new, (throwable, supplier) -> {
+            cancelChecker, throwable -> {
             if (throwable instanceof RuntimeException rte) {
                 throw rte;
-            } else if (throwable instanceof CancelationException) {
-                throw supplier.get();
+            } else if (throwable instanceof CancelationException ce) {
+                throw ce;
             } else {
                 // the only declared exception
                 throw (ResourceAccessException)throwable;

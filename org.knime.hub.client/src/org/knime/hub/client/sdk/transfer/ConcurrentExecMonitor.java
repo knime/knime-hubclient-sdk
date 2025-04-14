@@ -77,6 +77,16 @@ public sealed interface ConcurrentExecMonitor {
     record LeafExecMonitor(BooleanSupplier cancelChecker, LongConsumer bytesTransferred,
             DoubleConsumer progress) implements ConcurrentExecMonitor {
 
+        /**
+         * Creates a null progress monitor which can be cancelled.
+         *
+         * @param cancelChecker for checking whether the user has requested cancellation
+         * @return {@link LeafExecMonitor}
+         */
+        static LeafExecMonitor nullExecMonitor(final BooleanSupplier cancelChecker) {
+            return new LeafExecMonitor(cancelChecker, l -> {}, p -> {});
+        }
+
         @Override
         public void done() {
             progress.accept(1.0);
@@ -105,6 +115,16 @@ public sealed interface ConcurrentExecMonitor {
      * An execution monitor for an operation that splits into multiple parts that report independent progress.
      */
     final class BranchingExecMonitor implements ConcurrentExecMonitor {
+
+        /**
+         * Creates a null progress monitor which can be cancelled.
+         *
+         * @param cancelChecker for checking whether the user has requested cancellation
+         * @return {@link BranchingExecMonitor}
+         */
+        public static BranchingExecMonitor nullMonitor(final BooleanSupplier cancelChecker) {
+            return new BranchingExecMonitor(cancelChecker, new AtomicLong(), p -> {});
+        }
 
         /**
          * @param active list of currently active sub-operations, each represented as a pair of its name and progress
@@ -147,16 +167,6 @@ public sealed interface ConcurrentExecMonitor {
             m_cancelChecker = cancelChecker;
             m_bytesTransferred = bytesTransferred;
             m_upstreamProgress = upstreamProgress;
-        }
-
-        /**
-         * Creates a null progress monitor which can be cancelled.
-         *
-         * @param cancelChecker for checking whether the user has requested cancellation
-         * @return {@link BranchingExecMonitor}
-         */
-        public static BranchingExecMonitor nullProgressMonitor(final BooleanSupplier cancelChecker) {
-            return new BranchingExecMonitor(cancelChecker, new AtomicLong(), p -> {});
         }
 
         /**

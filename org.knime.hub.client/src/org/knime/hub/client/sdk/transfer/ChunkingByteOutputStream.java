@@ -82,19 +82,18 @@ abstract class ChunkingByteOutputStream extends ChunkingOutputStream {
      *     {@code null} otherwise
      * @throws IOException if processing the file failed
      */
-    public abstract void chunkFinished(int chunkNumber, byte[] chunk, byte[] digest) throws IOException;
+    protected abstract void chunkFinished(int chunkNumber, byte[] chunk, byte[] digest) throws IOException;
 
     @Override
-    public void chunkFinished(final int chunkNumber, final byte[] digest) throws IOException {
+    protected void chunkFinished(final int chunkNumber, final byte[] digest) throws IOException {
         chunkFinished(chunkNumber, m_currentChunk.get(), digest);
         m_currentChunk = null;
     }
 
     @Override
-    public OutputStream createChunk() throws IOException {
-        final var baos = new ByteArrayOutputStream((int)m_maxChunkSize);
+    protected OutputStream createChunk() throws IOException {
+        final var baos = new ByteArrayOutputStream(Math.toIntExact(m_maxChunkSize));
         m_currentChunk = baos::toByteArray;
         return baos;
     }
-
 }

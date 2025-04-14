@@ -51,15 +51,11 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.Future;
 
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -69,7 +65,6 @@ import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.UploadManifest;
-import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
 import org.slf4j.Logger;
@@ -79,32 +74,58 @@ import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * Provides the asynchronous output stream to a hub instance.
- *
- * This class wraps the {@link AsyncUploadStreamBuilder} to initiate the upload process
- * and also build an {@link AsyncUploadStream} to write to.
+ * Provides an asynchronous output stream to a hub instance.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class AsyncHubUploadStream {
+public final class AsyncHubUploadStream extends OutputStream {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AsyncHubUploadStream.class);
     private static final int NUMBER_OF_INITIAL_PARTS = 1;
+    private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
+    private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
 
-    private CatalogServiceClient m_catalogClient;
-    private @NotOwning CatalogClient m_hubClient;
-    private Map<String, String> m_additionalHeaders = new HashMap<>();
+    private final @NotOwning CatalogClient m_hubClient;
+    private final CatalogServiceClient m_catalogClient;
 
-    private String m_itemName;
-    private String m_uploadId;
-    private ItemUploadInstructions m_uploadInstructions;
-    private Duration m_timeout = Duration.ofMillis(Long.MAX_VALUE);
+    private final String m_itemName;
+    private final String m_uploadId;
+    private final Duration m_timeout;
 
-    /**
-     * Constructor
-     */
-    public AsyncHubUploadStream() {
-        // wrapper class for builder and stream
+    private final FilePartUploader m_filePartUploader;
+    private final Map<Integer, EntityTag> m_finishedParts = new LinkedHashMap<>();
+
+    private @Owning ChunkingByteOutputStream m_chunkingOutputStream;
+    private Future<Pair<Integer, EntityTag>> m_pendingUpload;
+    private volatile boolean m_canceled;
+
+    private AsyncHubUploadStream(final AsyncUploadStreamBuilder builder) {
+        m_catalogClient = builder.m_catalogClient;
+        m_hubClient = builder.m_hubClient;
+        m_itemName = builder.m_itemName;
+        m_uploadId = builder.m_uploadInstructions.getUploadId();
+        m_timeout = builder.m_timeout;
+
+        // Create file part uploader to upload separate chunks of data
+        m_filePartUploader = new FilePartUploader(m_hubClient.getApiClient().getConnectTimeout(),
+            m_hubClient.getApiClient().getReadTimeout(), NUMBER_OF_PART_UPLOAD_RETRIES);
+
+        // Create the supplier which can request additional upload parts
+        final var partSupplier = new UploadPartSupplier(m_catalogClient, builder.m_uploadInstructions);
+        final var execMonitor = LeafExecMonitor.nullExecMonitor(() -> m_canceled);
+
+        // Create chunking output stream
+        m_chunkingOutputStream = new ChunkingByteOutputStream(MAX_CHUNK_SIZE, null) {
+            @Override
+            public void chunkFinished(final int chunkNumber, final byte[] chunk, final byte[] hash) throws IOException {
+                if (m_pendingUpload != null) {
+                    awaitPartFinished();
+                }
+                final var partNumber = chunkNumber + 1;
+                m_pendingUpload =
+                    m_filePartUploader.uploadDataChunk(m_itemName, partNumber, partSupplier, chunk, hash, execMonitor);
+            }
+        };
     }
 
     /**
@@ -112,7 +133,7 @@ public final class AsyncHubUploadStream {
      *
      * @return {@link AsyncUploadStreamBuilder}
      */
-    public AsyncUploadStreamBuilder createAsyncUploadStream() {
+    public static AsyncUploadStreamBuilder builder() {
         return new AsyncUploadStreamBuilder();
     }
 
@@ -121,11 +142,19 @@ public final class AsyncHubUploadStream {
      *
      * @author Magnus Gohm, KNIME AG, Konstanz, Germany
      */
-    public final class AsyncUploadStreamBuilder {
+    public static final class AsyncUploadStreamBuilder {
 
+        private CatalogServiceClient m_catalogClient;
+        private @NotOwning CatalogClient m_hubClient;
+        private Map<String, String> m_additionalHeaders = new HashMap<>();
+
+        private String m_itemName;
+        private boolean m_isWorkflowLike;
         private String m_parentId;
         private EntityTag m_parentETag;
-        private boolean m_isWorkflowLike;
+
+        private ItemUploadInstructions m_uploadInstructions;
+        private Duration m_timeout = Duration.ofMillis(Long.MAX_VALUE);
 
         private AsyncUploadStreamBuilder() {
         }
@@ -136,7 +165,7 @@ public final class AsyncHubUploadStream {
          * @param catalogClient {@link CatalogClient}
          * @return {@link AsyncUploadStreamBuilder}
          */
-        public AsyncUploadStreamBuilder withCatalogClient(@NotOwning final CatalogClient catalogClient) {
+        public AsyncUploadStreamBuilder withCatalogClient(final CatalogClient catalogClient) {
             m_hubClient = catalogClient;
             return this;
         }
@@ -219,7 +248,7 @@ public final class AsyncHubUploadStream {
          *
          * @throws IOException if an I/O error occurred during the upload
          */
-        public @Owning AsyncUploadStream build() throws IOException {
+        public @Owning AsyncHubUploadStream build() throws IOException {
             CheckUtils.checkArgumentNotNull(m_hubClient);
             CheckUtils.checkArgumentNotNull(m_parentId);
             CheckUtils.checkArgumentNotNull(m_itemName);
@@ -230,12 +259,10 @@ public final class AsyncHubUploadStream {
                 : MediaType.APPLICATION_OCTET_STREAM;
             final var uploadParts =
                     Math.min(CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
-            final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
-            uploadRequests.put(m_itemName, new ItemUploadRequest(mediaType, uploadParts));
-
             // Initiate upload request
-            final var preparedUploadOpt = m_catalogClient.initiateUpload(
-                new ItemID(m_parentId), new UploadManifest(uploadRequests), m_parentETag);
+            final var manifest = new UploadManifest(Map.of(m_itemName, new ItemUploadRequest(mediaType, uploadParts)));
+            final var preparedUploadOpt =
+                m_catalogClient.initiateUpload(new ItemID(m_parentId), manifest, m_parentETag);
             if (preparedUploadOpt.isEmpty()) {
                 return null;
             }
@@ -243,194 +270,152 @@ public final class AsyncHubUploadStream {
             // Obtain upload instructions and create supplier for additional upload parts
             final var itemInstructions = preparedUploadOpt.get().getItems();
             m_uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(m_itemName));
-            m_uploadId = m_uploadInstructions.getUploadId();
-
-            return new AsyncUploadStream();
+            return new AsyncHubUploadStream(this);
         }
 
+    }
+
+    @Override
+    public void write(final int b) throws IOException {
+        try {
+            m_chunkingOutputStream.write(b);
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+    }
+
+    @Override
+    public void write(final byte[] b, final int off, final int len) throws IOException {
+        try {
+            m_chunkingOutputStream.write(b, off, len);
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+    }
+
+    @Override
+    public void write(final byte[] b) throws IOException {
+        try {
+            m_chunkingOutputStream.write(b);
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+    }
+
+    private void awaitPartFinished() throws IOException {
+        final var pending = m_pendingUpload;
+        if (pending != null) {
+            m_pendingUpload = null;
+            final Pair<Integer, EntityTag> finishedPart = HubUploader.awaitPartFinished(pending);
+            finishedPart.accept(m_finishedParts::put);
+        }
     }
 
     /**
-     * Asynchronous upload stream.
+     * Cancels the upload process.
      *
-     * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+     * @throws IOException if an I/O error occurred during cancellation
      */
-    public final class AsyncUploadStream extends OutputStream {
+    public void cancel() throws IOException {
+        if (m_chunkingOutputStream != null) {
+            // discard the (in-memory) chunking stream, thereby closing the outer one without triggering an upload
+            m_chunkingOutputStream = null;
 
-        private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
-        private static final int MAX_UPLOAD_STATUS_RETRY_TIME = 1_000;
-        private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
-
-        private FilePartUploader m_filePartUploader;
-        private @Owning ChunkingByteOutputStream m_chunkingOuputStream;
-
-        private Deque<Future<Pair<Integer, EntityTag>>> m_pendingUploads = new ArrayDeque<>();
-        private Map<Integer, EntityTag> m_finishedParts = new LinkedHashMap<>();
-
-        private AsyncUploadStream() {
-            // Create file part uploader to upload separate chunks of data
-            m_filePartUploader = new FilePartUploader(m_hubClient.getApiClient().getConnectTimeout(),
-                m_hubClient.getApiClient().getReadTimeout(), NUMBER_OF_PART_UPLOAD_RETRIES);
-
-            // Create an empty branching execution monitor since we don't know the uploaded data size
-            final var nullSplitterMonitor = BranchingExecMonitor.nullProgressMonitor(() -> false);
-
-            // Create the supplier which can request additional upload parts
-            final var partSupplier = new UploadPartSupplier(m_catalogClient, m_uploadInstructions);
-
-            // Create chunking output stream
-            m_chunkingOuputStream = createChunkingOutputStream(partSupplier, nullSplitterMonitor);
-        }
-
-        private @Owning ChunkingByteOutputStream createChunkingOutputStream(final UploadPartSupplier partSupplier,
-            final BranchingExecMonitor splitter) {
-            return new ChunkingByteOutputStream(MAX_CHUNK_SIZE, DigestUtils.getMd5Digest()) { // NOSONAR
-
-                private final BranchingExecMonitor m_splitProgress = splitter;
-
-                @Override
-                public void chunkFinished(final int chunkNumber, final byte[] chunk, final byte[] hash)
-                        throws IOException {
-                    awaitPartFinished();
-
-                    final var partNumber = chunkNumber + 1;
-                    final LeafExecMonitor subMonitor = m_splitProgress.createLeafChild(Integer.toString(partNumber), 0);
-                    m_pendingUploads.add(m_filePartUploader.uploadDataChunk(
-                        m_itemName, partNumber, partSupplier, chunk, hash, subMonitor));
-                }
-
-                @Override
-                public void close() throws IOException {
-                    super.close();
-                    // Wait on the last chunk to be uploaded
-                    awaitPartFinished();
-                }
-
-                private void awaitPartFinished() throws IOException {
-                    Optional<Pair<Integer, EntityTag>> finishedPartOpt =
-                            HubUploader.awaitPartFinished(m_pendingUploads);
-                    if (finishedPartOpt.isPresent()) {
-                        m_finishedParts.put(finishedPartOpt.get().getLeft(), finishedPartOpt.get().getRight());
-                    }
-                }
-
-            };
-        }
-
-        @Override
-        public void write(final int b) throws IOException {
-            try {
-                m_chunkingOuputStream.write(b);
-            } catch (IOException e) {
-                cancelUpload();
-                throw e;
+            // cancel already pending upload if necessary
+            m_canceled = true;
+            final var pending = m_pendingUpload;
+            if (pending != null) {
+                m_pendingUpload = null;
+                pending.cancel(true);
             }
-        }
 
-        @Override
-        public void write(final byte[] b, final int off, final int len) throws IOException {
-            try {
-                m_chunkingOuputStream.write(b, off, len);
-            } catch (IOException e) {
-                cancelUpload();
-                throw e;
-            }
-        }
-
-        @Override
-        public void write(final byte[] b) throws IOException {
-            try {
-                m_chunkingOuputStream.write(b);
-            } catch (IOException e) {
-                cancelUpload();
-                throw e;
-            }
-        }
-
-        @Override
-        public void flush() throws IOException {
-            try {
-                m_chunkingOuputStream.flush();
-            } catch (IOException e) {
-                cancelUpload();
-                throw e;
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            try {
-                if (m_chunkingOuputStream != null) {
-                    // Closes the chunking output stream and uploads the remaining part
-                    m_chunkingOuputStream.close();
-                    // Reports back to catalog and waits for the upload to be completed
-                    completeUpload();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Upload of '%s' has been aborted".formatted(m_itemName));
-            } finally {
-                m_chunkingOuputStream = null;
-            }
-        }
-
-        private void completeUpload() throws IOException, InterruptedException {
-            // Report to catalog that the upload is completed
-            m_catalogClient.reportUploadFinished(m_uploadId, m_finishedParts);
-
-            // Wait until the upload status is completed
-            var numberOfStatusPolls = 1;
-            var totalTime = 0;
-            while (true) {
-                final var state = m_catalogClient.pollUploadState(m_uploadId);
-                LOGGER.atDebug() //
-                .addArgument(m_itemName) //
-                .addArgument(state.getStatus()) //
-                .addArgument(state.getStatusMessage()) //
-                .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
-                .log();
-
-                switch (state.getStatus()) {
-                    case ABORTED:
-                        throw new IOException(state.getStatusMessage());
-                    case ANALYSIS_PENDING, PREPARED:
-                        break;
-                    case COMPLETED:
-                        return;
-                    case FAILED:
-                        throw new IOException(state.getStatusMessage());
-                }
-
-                var backOffTime =
-                        (int)(MAX_UPLOAD_STATUS_RETRY_TIME / (1 + Math.exp(-Math.log(2)*(numberOfStatusPolls - 3))));
-                Thread.sleep(backOffTime);
-                totalTime += backOffTime;
-                numberOfStatusPolls++;
-
-                if (totalTime > m_timeout.toMillis()) {
-                    throw new IOException("Upload exceeded timeout of %s ms".formatted(m_timeout.toMillis()));
-                }
-            }
-        }
-
-        private void cancelUpload() throws IOException {
-            m_pendingUploads.forEach(pending -> pending.cancel(true));
+            // notify Catalog
             m_catalogClient.cancelUpload(m_uploadId);
         }
-
-        /**
-         * Cancels the upload process.
-         *
-         * @throws IOException if an I/O error occurred during cancellation
-         */
-        public void cancel() throws IOException {
-            if (m_chunkingOuputStream != null) {
-                m_chunkingOuputStream.close();
-                m_chunkingOuputStream = null;
-                cancelUpload();
-            }
-        }
-
     }
 
+    private IOException cancelAfter(final IOException ioe) throws IOException {
+        try {
+            cancel();
+        } catch (final IOException inner) {
+            ioe.addSuppressed(inner);
+        }
+        throw ioe;
+    }
+
+    @Override
+    public void flush() throws IOException {
+        try {
+            m_chunkingOutputStream.flush();
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        // close the chunking output stream, potentially starting a last chunk upload
+        try (final var out = m_chunkingOutputStream) {
+            if (out == null) {
+                // already closed
+                return;
+            }
+            m_chunkingOutputStream = null;
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+
+        try {
+            // await that last upload
+            awaitPartFinished();
+        } catch (final IOException ioe) {
+            throw cancelAfter(ioe);
+        }
+
+        try {
+            // report back to catalog
+            m_catalogClient.reportUploadFinished(m_uploadId, m_finishedParts);
+
+            // wait for the upload to be completed server-side
+            pollUntilCompletion();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Upload of '%s' has been interrupted while waiting for Hub".formatted(m_itemName));
+        }
+    }
+
+    private void pollUntilCompletion() throws IOException, InterruptedException {
+        // Wait until the upload status is completed
+        final var t0 = System.currentTimeMillis();
+        for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {
+            final var state = m_catalogClient.pollUploadState(m_uploadId);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.atDebug() //
+                    .addArgument(m_itemName) //
+                    .addArgument(state.getStatus()) //
+                    .addArgument(state.getStatusMessage()) //
+                    .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
+                    .log();
+            }
+
+            switch (state.getStatus()) {
+                case ABORTED:
+                    throw new IOException(state.getStatusMessage());
+                case ANALYSIS_PENDING, PREPARED:
+                    break;
+                case COMPLETED:
+                    return;
+                case FAILED:
+                    throw new IOException(state.getStatusMessage());
+            }
+
+            // Sequence: 200ms, 400ms, 600ms, 800ms and then 1s until the timeout is reached
+            Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
+
+            final long elapsed = System.currentTimeMillis() - t0;
+            if (elapsed > m_timeout.toMillis()) {
+                throw new IOException("Hub didn't complete upload within %.1fs".formatted(elapsed / 1000.0));
+            }
+        }
+    }
 }
