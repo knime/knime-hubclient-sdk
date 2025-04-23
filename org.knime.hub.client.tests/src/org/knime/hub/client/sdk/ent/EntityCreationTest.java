@@ -411,4 +411,15 @@ class EntityCreationTest {
         assertEquals("https://s3.us-east-1.amazonaws.com/",
             downloadStatus.getDownloadUrl().get().toString(), "Unexpected download url");
     }
+
+    @Test
+    void testCreateRFC9457ErrorResponse() throws IOException, URISyntaxException {
+        final var rfc9457 = load("rfc9457.json", RFC9457.class);
+        assertTrue(rfc9457.getType().isEmpty(), "Unexpected type");
+        assertTrue(rfc9457.getStatus().isEmpty(), "Unexpected status");
+        assertEquals("Item '*k9uLSSInH1xt2UHo' does not exist.", rfc9457.getTitle(), "Unexpected title");
+        assertTrue(rfc9457.getInstance().isEmpty(), "Unexpected instance");
+        assertTrue(rfc9457.getDetails().isEmpty(), "Unexpected dteails");
+        assertTrue(rfc9457.getCode().isEmpty(), "Unexpected code");
+    }
 }
