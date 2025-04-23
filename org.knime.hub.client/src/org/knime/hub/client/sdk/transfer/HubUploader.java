@@ -55,6 +55,7 @@ import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
@@ -62,6 +63,7 @@ import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
+import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.UploadManifest;
@@ -148,8 +150,9 @@ public final class HubUploader extends AbstractHubTransfer {
      * @throws IOException if a request to Hub failed
      * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
-    public Result<CollisionReport> checkCollisions(final ItemID parentId, final Map<IPath, ItemType> itemToType,
-            final IProgressMonitor progMon) throws CancelationException, IOException, CouldNotAuthorizeException {
+    public Result<CollisionReport, FailureValue> checkCollisions(final ItemID parentId,
+        final Map<IPath, ItemType> itemToType, final IProgressMonitor progMon)
+                throws CancelationException, IOException, CouldNotAuthorizeException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
 
@@ -158,7 +161,10 @@ public final class HubUploader extends AbstractHubTransfer {
         final var groupItem = parentGroupAndETag.item();
         final var groupItemControls = groupItem.getMasonControls();
         if (!supportsAsyncUpload(groupItemControls, m_catalogClient.getApiClient().getBaseURI().getHost())) {
-            return Result.failure("This Hub does not support multi-part uploads", null);
+            final var message = "This Hub does not support multi-part uploads";
+            return createFailureValue(
+                new RFC9457(null, null, message, null, List.of(), null),
+                Pair.of(message, null));
         }
         final WorkflowGroup parentGroup;
         if (groupItem instanceof WorkflowGroup wfGroup) {
@@ -324,7 +330,7 @@ public final class HubUploader extends AbstractHubTransfer {
      * @throws IOException if the upload as a whole failed
      * @throws CancelationException if the upload was canceled
      */
-    public Map<IPath, Result<String>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
+    public Map<IPath, Result<String, FailureValue>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
             final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
             final IProgressMonitor progMon) throws IOException, CancelationException {
         try (final var poller = startPoller(Duration.ofMillis(200))) {
@@ -335,11 +341,12 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
-    private Map<IPath, Future<Result<String>>> submitUploadJobs(final WorkflowExporter<CancelationException> exporter,
-        final TempFileSupplier tempFileSupplier, final Map<IPath, ItemToUpload> itemsToUpload,
-        final FileResources resources, final IProgressMonitor progMon, final ProgressPoller poller) {
+    private Map<IPath, Future<Result<String, FailureValue>>> submitUploadJobs(
+        final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
+        final Map<IPath, ItemToUpload> itemsToUpload, final FileResources resources, final IProgressMonitor progMon,
+        final ProgressPoller poller) {
 
-        final Map<IPath, Future<Result<String>>> uploadJobs = new LinkedHashMap<>();
+        final Map<IPath, Future<Result<String, FailureValue>>> uploadJobs = new LinkedHashMap<>();
         if (itemsToUpload.size() == 1) {
             // only one item is being uploaded, show part uploads as details
             final var pathInTarget = itemsToUpload.keySet().iterator().next();
@@ -389,30 +396,33 @@ public final class HubUploader extends AbstractHubTransfer {
     }
 
     private void submitUploadJob(final WorkflowExporter<CancelationException> exporter,
-        final TempFileSupplier tempFileSupplier, final Map<IPath, Future<Result<String>>> uploadJobs,
+        final TempFileSupplier tempFileSupplier, final Map<IPath, Future<Result<String, FailureValue>>> uploadJobs,
         final IPath pathInTarget, final FileResources resources, final BranchingExecMonitor subSplitter,
         final ItemToUpload itemToUpload) {
         uploadJobs.put(pathInTarget, HUB_ITEM_TRANSFER_POOL.submit( //
             () -> uploadItem(itemToUpload, exporter, tempFileSupplier, resources.workflowResources(), subSplitter)));
     }
 
-    private static Map<IPath, Result<String>> awaitUploads(final Map<IPath, Future<Result<String>>> uploadJobs,
+    private static Map<IPath, Result<String, FailureValue>> awaitUploads(
+        final Map<IPath, Future<Result<String, FailureValue>>> uploadJobs,
             final BooleanSupplier cancelChecker) throws CancelationException {
-        Map<IPath, Result<String>> uploaded = new LinkedHashMap<>();
+        Map<IPath, Result<String, FailureValue>> uploaded = new LinkedHashMap<>();
         var canceled = false;
         for (final var unfinishedJob : uploadJobs.entrySet()) {
             final var path = unfinishedJob.getKey();
             final var future = unfinishedJob.getValue();
 
             try {
-                final var uploadResult = waitForCancellable(future, cancelChecker, throwable -> {
-                    if (throwable instanceof CancelationException cee) { // NOSONAR
+                final var uploadResult = waitForCancellable(future, cancelChecker, throwable -> { // NOSONAR
+                    if (throwable instanceof CancelationException cee) {
                         throw cee;
                     } else {
                         LOGGER.atDebug().setCause(throwable) //
                             .addArgument(path) //
                             .log("Unexpected exception during upload job for \"{}\"");
-                        return Result.failure(throwable.getMessage(), throwable);
+                        return createFailureValue(
+                            new RFC9457(null, null, throwable.getMessage(), null, List.of(), null),
+                            Pair.of(throwable.getMessage(), throwable));
                     }
                 });
                 uploaded.put(path, uploadResult);
@@ -464,7 +474,7 @@ public final class HubUploader extends AbstractHubTransfer {
         return new FileResources(workflowResources, sizes, totalSize);
     }
 
-    private Result<String> uploadItem(final ItemToUpload itemToUpload,
+    private Result<String, FailureValue> uploadItem(final ItemToUpload itemToUpload,
         final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
         final Map<String, ResourcesToCopy> workflowResources, final BranchingExecMonitor splitter)
         throws IOException, CancelationException, CouldNotAuthorizeException {
@@ -480,25 +490,30 @@ public final class HubUploader extends AbstractHubTransfer {
         try {
             final var finalState = CatalogServiceUtils.awaitUploadProcessed(m_catalogClient, m_clientHeaders,
                 instructions.getUploadId(), -1, state -> {
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.atDebug() //
-                            .addArgument(path) //
-                            .addArgument(state.getStatus()) //
-                            .addArgument(state.getStatusMessage()) //
-                            .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
-                            .log();
-                    }
-                });
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.atDebug() //
+                        .addArgument(path) //
+                        .addArgument(state.getStatus()) //
+                        .addArgument(state.getStatusMessage()) //
+                        .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
+                        .log();
+                }
+            });
             return switch (finalState.getStatus()) {
-                case ABORTED -> Result.failure(finalState.getStatusMessage(), null);
+                case ABORTED -> createFailureValue(
+                    new RFC9457(null, null, finalState.getStatusMessage(), null, List.of(), null),
+                    Pair.of(finalState.getStatusMessage(), null));
                 case ANALYSIS_PENDING, PREPARED -> throw new IllegalStateException(
                     "Stopped polling upload early even though no timeout was provided");
                 case COMPLETED -> Result.success(finalState.getStatusMessage());
-                case FAILED -> Result.failure(finalState.getStatusMessage(), null);
+                case FAILED -> createFailureValue(
+                    new RFC9457(null, null, finalState.getStatusMessage(), null, List.of(), null),
+                    Pair.of(finalState.getStatusMessage(), null));
             };
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Result.failure("Upload of '%s' has been aborted".formatted(path), null);
+            final String message = "Upload of '%s' has been aborted".formatted(path);
+            return createFailureValue(new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null));
         }
     }
 
@@ -718,4 +733,19 @@ public final class HubUploader extends AbstractHubTransfer {
             }
         }
     }
+
+    /**
+     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
+     * a JSON failure otherwise a plain text failure.
+     *
+     * @param problemJSON {@link RFC9457}
+     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
+     *
+     * @return {@link Result}
+     */
+    public static <T> Failure<T, FailureValue> createFailureValue(final RFC9457 problemJSON,
+        final Pair<String, Throwable> exceptionFailure) {
+        return newFailureValue(problemJSON, exceptionFailure);
+    }
+
 }

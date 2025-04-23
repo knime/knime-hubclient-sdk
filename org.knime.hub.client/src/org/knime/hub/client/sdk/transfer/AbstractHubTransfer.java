@@ -47,6 +47,7 @@ import java.util.function.ObjDoubleConsumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -55,8 +56,11 @@ import org.knime.core.util.KNIMETimer;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.transfer.CatalogServiceUtils.TaggedRepositoryItem;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
@@ -64,6 +68,7 @@ import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMoni
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 
 import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.HttpHeaders;
 
 /**
  * Common functionality for Hub upload and download clients.
@@ -71,6 +76,8 @@ import jakarta.ws.rs.core.EntityTag;
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
 class AbstractHubTransfer {
+
+    static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
 
     /**
      * Handler for {@link Throwable}s thrown by a {@link Future} in
@@ -109,11 +116,15 @@ class AbstractHubTransfer {
     final CatalogServiceClient m_catalogClient;
     final Map<String, String> m_clientHeaders;
 
+    private static boolean m_useProblemJSON;
+
     /**
      * @param hubClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
     AbstractHubTransfer(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
+        final String acceptHeader = additionalHeaders.get(HttpHeaders.ACCEPT);
+        m_useProblemJSON = acceptHeader != null && acceptHeader.contains(APPLICATION_PROBLEM_JSON);
         m_catalogClient = hubClient.catalog();
         m_clientHeaders = additionalHeaders;
     }
@@ -400,6 +411,24 @@ class AbstractHubTransfer {
             throws CouldNotAuthorizeException, IOException, CancelationException {
         return waitForCancellable(ForkJoinPool.commonPool().submit(job::run),
             cancelChecker, throwable -> { throw ExceptionUtils.asRuntimeException(throwable); });
+    }
+
+    /**
+     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
+     * a JSON failure otherwise a plain text failure.
+     *
+     * @param problemJSON {@link RFC9457}
+     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
+     *
+     * @return {@link Result}
+     */
+    public static <T> Result.Failure<T, FailureValue> newFailureValue(
+        final RFC9457 problemJSON, final Pair<String, Throwable> exceptionFailure) {
+        if (m_useProblemJSON) {
+            return Result.failure(new FailureValue(Optional.empty(), Optional.of(problemJSON)));
+        } else {
+            return Result.failure(new FailureValue(Optional.of(exceptionFailure), Optional.empty()));
+        }
     }
 
 }

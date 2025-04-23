@@ -46,6 +46,7 @@ import org.knime.core.node.util.ClassUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.Result.Success;
@@ -53,6 +54,7 @@ import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Component;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.Data;
+import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.Sized;
@@ -127,14 +129,14 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @throws IOException if a request to Hub failed
      * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
-    public Pair<DownloadResources, Map<IPath, Failure<Void>>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
+    public Pair<DownloadResources, Map<IPath, Failure<Void, FailureValue>>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
             final IProgressMonitor progMon) throws CancelationException, IOException, CouldNotAuthorizeException {
         progMon.beginTask("Collecting items to download...", itemIds.size());
-        final Map<IPath, Pair<HubItem, Result<DownloadInfo>>> results = new LinkedHashMap<>();
+        final Map<IPath, Pair<HubItem, Result<DownloadInfo, FailureValue>>> results = new LinkedHashMap<>();
         var optTotalSize = 0L;
         var supportsArtifactDownload = false;
 
-        final Map<IPath, Failure<Void>> notDownloadable = new LinkedHashMap<>();
+        final Map<IPath, Failure<Void, FailureValue>> notDownloadable = new LinkedHashMap<>();
         if (!itemIds.isEmpty()) {
             // get the common parent (we expect all items to stem from the same group)
             final var firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).item();
@@ -157,11 +159,13 @@ public final class HubDownloader extends AbstractHubTransfer {
             for (final var itemId : itemIds) {
                 var repositoryItem = deepListedItems.get(itemId.id());
                 if (repositoryItem == null) {
-                    notDownloadable.put(IPath.forPosix(itemId.id()),
-                        Result.failure("Item '%s' could not be found", null));
+                    final var message = "Item '%s' could not be found".formatted(itemId.id());
+                    notDownloadable.put(IPath.forPosix(itemId.id()), createFailureValue(
+                        new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null)));
                 } else if (!firstParent.getMasonControls().containsKey(CatalogServiceUtils.DOWNLOAD)) {
-                    notDownloadable.put(IPath.forPosix(itemId.id()),
-                            Result.failure("Item at '" + repositoryItem.getPath() + "' cannot be downloaded.", null));
+                    final var message = "Item at '" + repositoryItem.getPath() + "' cannot be downloaded.";
+                    notDownloadable.put(IPath.forPosix(itemId.id()), createFailureValue(
+                        new RFC9457( null, null, message, null, List.of(), null), Pair.of(message, null)));
                 } else {
                     final var rootPath = IPath.forPosix(repositoryItem.getPath());
                     progMon.subTask("Analyzing '%s'".formatted(shortenedPath(rootPath.toString())));
@@ -180,13 +184,13 @@ public final class HubDownloader extends AbstractHubTransfer {
             final var itemAndResult = e.getValue();
             final var hubItem = itemAndResult.getLeft();
             final var result = itemAndResult.getRight();
-            if (result instanceof Success<DownloadInfo> success) {
+            if (result instanceof Success<DownloadInfo, FailureValue> success) {
                 itemsToDownload.add(success.value());
                 if (!hubItem.isFolder()) {
                     numDownloads++;
                 }
             } else {
-                notDownloadable.put(targetPath, ((Failure<?>)result).coerceResultType());
+                notDownloadable.put(targetPath, ((Failure<?, FailureValue>)result).coerceResultType());
             }
         }
         final var totalSize = optTotalSize < 0 ? OptionalLong.empty() : OptionalLong.of(optTotalSize);
@@ -207,10 +211,10 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @return mapping from item ID to the type and result (success or failure) of the download
      * @throws CancelationException if the download was canceled
      */
-    public Map<IPath, Pair<HubItem, Result<Optional<Path>>>> download(final DownloadResources resources,
+    public Map<IPath, Pair<HubItem, Result<Optional<Path>, FailureValue>>> download(final DownloadResources resources,
             final TempFileSupplier tempFileSupplier, final IProgressMonitor progMon) throws CancelationException {
 
-        final Map<IPath, Result<Optional<Path>>> downloaded;
+        final Map<IPath, Result<Optional<Path>, FailureValue>> downloaded;
         try (final var poller = startPoller(Duration.ofMillis(200))) {
             final var splitter = beginMultiProgress(progMon, "Downloading items...", poller, (status, transferRate) -> {
                 final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
@@ -230,21 +234,21 @@ public final class HubDownloader extends AbstractHubTransfer {
             downloaded = awaitDownloads(downloadJobs, progMon::isCanceled);
         }
 
-        final Map<IPath, Pair<HubItem, Result<Optional<Path>>>> out = new LinkedHashMap<>();
+        final Map<IPath, Pair<HubItem, Result<Optional<Path>, FailureValue>>> out = new LinkedHashMap<>();
         for (final var download : resources.itemsToDownload()) {
             final var hubItem = download.item();
             final IPath pathInTarget = download.pathInTarget();
-            final Result<Optional<Path>> result = hubItem.isFolder() ? Result.success(Optional.empty()) //
+            final Result<Optional<Path>, FailureValue> result = hubItem.isFolder() ? Result.success(Optional.empty()) //
                 : CheckUtils.checkNotNull(downloaded.get(pathInTarget));
             out.put(pathInTarget, Pair.of(hubItem, result));
         }
         return out;
     }
 
-    private Map<IPath, Future<Result<Path>>> submitDownloadJobs(final boolean isArtifactDownload,
+    private Map<IPath, Future<Result<Path, FailureValue>>> submitDownloadJobs(final boolean isArtifactDownload,
         final List<DownloadInfo> downloadInfos, final boolean allSizesKnown, final TempFileSupplier tempFileSupplier,
         final double maxProgress, final BranchingExecMonitor splitter) {
-        final var downloadJobs = new LinkedHashMap<IPath, Future<Result<Path>>>();
+        final var downloadJobs = new LinkedHashMap<IPath, Future<Result<Path, FailureValue>>>();
         for (final var download : downloadInfos) {
             final var hubItem = download.item();
             if (!hubItem.isFolder()) {
@@ -258,11 +262,11 @@ public final class HubDownloader extends AbstractHubTransfer {
         return downloadJobs;
     }
 
-    private static Map<IPath, Result<Optional<Path>>> awaitDownloads(
-            final Map<IPath, Future<Result<Path>>> downloadJobs, final BooleanSupplier cancelChecker)
+    private static Map<IPath, Result<Optional<Path>, FailureValue>> awaitDownloads(
+            final Map<IPath, Future<Result<Path, FailureValue>>> downloadJobs, final BooleanSupplier cancelChecker)
             throws CancelationException {
 
-        Map<IPath, Result<Optional<Path>>> downloaded = new LinkedHashMap<>();
+        Map<IPath, Result<Optional<Path>, FailureValue>> downloaded = new LinkedHashMap<>();
         try {
             var canceled = false;
             for (final var unfinishedJob : downloadJobs.entrySet()) {
@@ -274,7 +278,9 @@ public final class HubDownloader extends AbstractHubTransfer {
                         if (throwable instanceof CancelationException ce) { // NOSONAR
                             throw ce;
                         } else {
-                            return Result.failure(throwable.getMessage(), throwable);
+                            return createFailureValue(
+                                new RFC9457(null, null, throwable.getMessage(), null, List.of(), null),
+                                Pair.of(throwable.getMessage(), throwable));
                         }
                     });
 
@@ -289,7 +295,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                 throw new CancelationException();
             }
 
-            final Map<IPath, Result<Optional<Path>>> out = downloaded;
+            final Map<IPath, Result<Optional<Path>, FailureValue>> out = downloaded;
             downloaded = null;
             return out;
         } finally {
@@ -299,9 +305,9 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    private static void cleanUpDownloads(final Map<IPath, Result<Optional<Path>>> downloaded) {
+    private static void cleanUpDownloads(final Map<IPath, Result<Optional<Path>, FailureValue>> downloaded) {
         for (final var res : downloaded.values()) {
-            if (res instanceof Success<Optional<Path>> success) {
+            if (res instanceof Success<Optional<Path>, FailureValue> success) {
                 final var path = success.value();
                 final var file = path.orElseThrow();
                 LOGGER.atDebug() //
@@ -319,8 +325,9 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    private Result<Path> downloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
-            final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
+    private Result<Path, FailureValue> downloadItemTask(final DownloadInfo download,
+        final TempFileSupplier tempFileSupplier, final LeafExecMonitor monitor)
+                throws IOException, CancelationException, CouldNotAuthorizeException {
         // set a very small non-zero value to signal that the download job has started
         monitor.setProgress(Double.MIN_VALUE);
         var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
@@ -353,8 +360,9 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    private Result<Path> artifactDownloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
-            final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
+    private Result<Path, FailureValue> artifactDownloadItemTask(final DownloadInfo download,
+        final TempFileSupplier tempFileSupplier, final LeafExecMonitor monitor)
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         // set a very small non-zero value to signal that the download job has started
         monitor.setProgress(Double.MIN_VALUE);
 
@@ -390,7 +398,7 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static long collectItems(final RepositoryItem repositoryItem, final IPath rootPath,
-            final Map<IPath, Pair<HubItem, Result<DownloadInfo>>> results) {
+            final Map<IPath, Pair<HubItem, Result<DownloadInfo, FailureValue>>> results) {
         final var itemId = new ItemID(repositoryItem.getId());
         final var itemPath = IPath.forPosix(repositoryItem.getPath());
         final var hubItem = new HubItem(itemId, repositoryItem.getType(), itemPath);
@@ -414,8 +422,9 @@ public final class HubDownloader extends AbstractHubTransfer {
             results.put(targetPath, Pair.of(hubItem, Result.success(new DownloadInfo(hubItem, targetPath,
                 itemId, size < 0 ? OptionalLong.empty() : OptionalLong.of(size)))));
         } else {
+            final var message = "Unexpected item type at '" + itemPath + "': " + repositoryItem.getType();
             results.put(targetPath, Pair.of(hubItem,
-                Result.failure("Unexpected item type at '" + itemPath + "': " + repositoryItem.getType(), null)));
+                createFailureValue(new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null))));
             return 0L;
         }
         return size;
@@ -432,4 +441,19 @@ public final class HubDownloader extends AbstractHubTransfer {
             return -1L;
         }
     }
+
+    /**
+     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
+     * a JSON failure otherwise a plain text failure.
+     *
+     * @param problemJSON {@link RFC9457}
+     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
+     *
+     * @return {@link Result}
+     */
+    public static <T> Failure<T, FailureValue> createFailureValue(final RFC9457 problemJSON,
+        final Pair<String, Throwable> exceptionFailure) {
+        return newFailureValue(problemJSON, exceptionFailure);
+    }
+
 }

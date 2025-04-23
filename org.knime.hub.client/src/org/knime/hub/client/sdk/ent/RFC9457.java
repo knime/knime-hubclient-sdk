@@ -87,8 +87,18 @@ public final class RFC9457 {
     private static final String JSON_PROPERTY_CODE = "code";
     private final String m_code;
 
+    /**
+     * Problem JSON error according to standard RFC9457.
+     *
+     * @param type the type
+     * @param status the status
+     * @param title the title
+     * @param instance the instance
+     * @param details the details
+     * @param code the code
+     */
     @JsonCreator
-    private RFC9457(
+    public RFC9457(
             @JsonProperty(value = JSON_PROPERTY_TYPE, required = false) final String type,
             @JsonProperty(value = JSON_PROPERTY_STATUS, required = false) final String status,
             @JsonProperty(value = JSON_PROPERTY_TITLE, required = true) final String title,

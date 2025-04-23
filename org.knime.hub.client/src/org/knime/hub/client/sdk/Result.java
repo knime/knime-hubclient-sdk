@@ -26,13 +26,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
 
-import org.apache.commons.lang3.function.FailableBiFunction;
 import org.apache.commons.lang3.function.FailableFunction;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -41,20 +39,22 @@ import org.apache.commons.lang3.tuple.Pair;
  * and/or a {@link Throwable}.
  *
  * @param <V> type of the result's value
+ * @param <E> type of the result's failure
  *
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public sealed interface Result<V> {
+public sealed interface Result<V, E> {
 
     /**
      * Creates a successful result containing a result value.
      *
      * @param <V> type of the result's value
+     * @param <E> type of the failure (ignored here)
      * @param key key of the result (may be {@code null})
      * @param value value of the result (may be {@code null})
      * @return result denoting a success
      */
-    static <V> Success<V> success(final V value) {
+    static <V, E> Success<V, E> success(final V value) {
         return new Success<>(value);
     }
 
@@ -62,20 +62,22 @@ public sealed interface Result<V> {
      * Creates a failure result containing information about the failure.
      *
      * @param <V> type of the result's value
+     * @param <E> type of the failure
      * @param key key of the result (may be {@code null})
-     * @param message error message (may be {@code null})
+     * @param failure failure object (may be {@code null})
+     * @param problemJSON error in RFC9457 standard format (may be {@code null})
      * @param cause cause of the failure (may be {@code null})
      * @return result denoting a failure
      */
-    static <V> Failure<V> failure(final String message, final Throwable cause) {
-        return new Failure<>(message, cause);
+    static <V, E> Failure<V, E> failure(final E failure) {
+        return new Failure<>(failure);
     }
 
     /**
      * @return whether or not this result denotes a success
      */
     default boolean successful() {
-        return match(v -> true, (m, e) -> false);
+        return match(v -> true, f -> false);
     }
 
     /**
@@ -84,7 +86,7 @@ public sealed interface Result<V> {
      * @return extracted value if this result denotes a success, {@link Optional#empty()} otherwise
      */
     default Optional<V> toOptional() {
-        return match(Optional::of, (msg, thrw) -> Optional.empty());
+        return match(Optional::of, failure -> Optional.empty());
     }
 
     /**
@@ -96,7 +98,7 @@ public sealed interface Result<V> {
      * @return potentially modified copy of this result
      * @throws T if thrown from the mapper function
      */
-    default <W, T extends Throwable> Result<W> map(final FailableFunction<V, W, T> mapper) throws T {
+    default <W, T extends Throwable> Result<W, E> map(final FailableFunction<V, W, T> mapper) throws T {
         return andThen(mapper.andThen(Result::success));
     }
 
@@ -104,29 +106,30 @@ public sealed interface Result<V> {
      * A collector which partitions the results into successes (storing only the contained values) and failures.
      *
      * @param <V> value type
+     * @param <E> failure type
      * @return pair of a list of successes and a list of failures
      */
-    static <V> Collector<Result<V>, ?, Pair<List<V>, List<Failure<Void>>>> partitioningCollector() {
-        return new Collector<Result<V>, Pair<List<V>, List<Failure<Void>>>, // NOSONAR
-                Pair<List<V>, List<Failure<Void>>>>() {
+    static <V, E> Collector<Result<V, E>, ?, Pair<List<V>, List<Failure<Void, E>>>> partitioningCollector() {
+        return new Collector<Result<V, E>, Pair<List<V>, List<Failure<Void, E>>>, // NOSONAR
+                Pair<List<V>, List<Failure<Void, E>>>>() {
             @Override
-            public Supplier<Pair<List<V>, List<Failure<Void>>>> supplier() {
+            public Supplier<Pair<List<V>, List<Failure<Void, E>>>> supplier() {
                 return () -> Pair.of(new ArrayList<>(), new ArrayList<>());
             }
 
             @Override
-            public BiConsumer<Pair<List<V>, List<Failure<Void>>>, Result<V>> accumulator() {
+            public BiConsumer<Pair<List<V>, List<Failure<Void, E>>>, Result<V, E>> accumulator() {
                 return (partial, result) -> {
-                    if (result instanceof Success<V> success) {
+                    if (result instanceof Success<V, E> success) {
                         partial.getLeft().add(success.value);
                     } else {
-                        partial.getRight().add(((Failure<V>) result).coerceResultType());
+                        partial.getRight().add(((Failure<V, E>) result).coerceResultType());
                     }
                 };
             }
 
             @Override
-            public BinaryOperator<Pair<List<V>, List<Failure<Void>>>> combiner() {
+            public BinaryOperator<Pair<List<V>, List<Failure<Void, E>>>> combiner() {
                 return (left, right) -> {
                     left.getLeft().addAll(right.getLeft());
                     left.getRight().addAll(right.getRight());
@@ -135,7 +138,7 @@ public sealed interface Result<V> {
             }
 
             @Override
-            public Function<Pair<List<V>, List<Failure<Void>>>, Pair<List<V>, List<Failure<Void>>>> finisher() {
+            public Function<Pair<List<V>, List<Failure<Void, E>>>, Pair<List<V>, List<Failure<Void, E>>>> finisher() {
                 return Function.identity();
             }
 
@@ -155,9 +158,9 @@ public sealed interface Result<V> {
      * @return contained value if this result is {@link #successful()}
      * @throws T if this result is a {@link Failure}
      */
-    default <T extends Throwable> V orElseThrow(final BiFunction<String, Throwable, T> errSupplier) throws T {
-        return match(val -> val, (msg, thrw) -> {
-            throw errSupplier.apply(msg, thrw);
+    default <T extends Throwable> V orElseThrow(final Function<E, T> errSupplier) throws T {
+        return match(val -> val, failure -> {
+            throw errSupplier.apply(failure);
         });
     }
 
@@ -172,7 +175,7 @@ public sealed interface Result<V> {
      * @return result
      * @throws T if thrown from the function
      */
-    <W, T extends Throwable> Result<W> andThen(final FailableFunction<V, Result<W>, T> func) throws T;
+    <W, T extends Throwable> Result<W, E> andThen(final FailableFunction<V, Result<W, E>, T> func) throws T;
 
     /**
      * Computes a return value from this result by calling one of the two given callbacks depending on whether this
@@ -186,23 +189,25 @@ public sealed interface Result<V> {
      * @throws T if thrown from the callbacks
      */
     <R, T extends Throwable> R match(FailableFunction<V, R, T> success,
-        FailableBiFunction<String, Throwable, R, T> failure) throws T;
+        FailableFunction<E, R, T> failure) throws T;
 
     /**
      * Successful result containing a value.
      *
      * @param <V2> type of the result value
+     * @param <E2> type of the failure (ignored here)
      * @param value result value
      */
-    public record Success<V2>(V2 value) implements Result<V2> {
+    public record Success<V2, E2>(V2 value) implements Result<V2, E2> {
         @Override
         public <R, T extends Throwable> R match(final FailableFunction<V2, R, T> success,
-                final FailableBiFunction<String, Throwable, R, T> failure) throws T {
+            final FailableFunction<E2, R, T> failure) throws T {
             return success.apply(value);
         }
 
         @Override
-        public <W, T extends Throwable> Result<W> andThen(final FailableFunction<V2, Result<W>, T> func) throws T {
+        public <W, T extends Throwable> Result<W, E2> andThen(final FailableFunction<V2, Result<W, E2>, T> func)
+                throws T {
             return func.apply(value);
         }
     }
@@ -211,18 +216,18 @@ public sealed interface Result<V> {
      * Failure result containing information about what failed.
      *
      * @param <V2> type of the result value (ignored here)
-     * @param message error message
-     * @param cause thrown exception or error, may be {@code} null
+     * @param <E2> type of the failure
+     * @param value the failure object
      */
-    public record Failure<V2>(String message, Throwable cause) implements Result<V2> {
+    public record Failure<V2, E2>(E2 value) implements Result<V2, E2> {
         @Override
-        public <R, E extends Throwable> R match(final FailableFunction<V2, R, E> success,
-                final FailableBiFunction<String, Throwable, R, E> failure) throws E {
-            return failure.apply(message, cause);
+        public <R, T extends Throwable> R match(final FailableFunction<V2, R, T> success,
+                final FailableFunction<E2, R, T> failure) throws T {
+            return failure.apply(value);
         }
 
         @Override
-        public <W, T extends Throwable> Result<W> andThen(final FailableFunction<V2, Result<W>, T> func) {
+        public <W, T extends Throwable> Result<W, E2> andThen(final FailableFunction<V2, Result<W, E2>, T> func) {
             return coerceResultType();
         }
 
@@ -232,11 +237,12 @@ public sealed interface Result<V> {
          * @param <W> new result type
          * @return this failure with changed type
          */
-        public <W> Failure<W> coerceResultType() {
+        public <W> Failure<W, E2> coerceResultType() {
             @SuppressWarnings("unchecked")
-            final var cast = (Failure<W>)this;
+            final var cast = (Failure<W, E2>)this;
             return cast;
         }
     }
+
 }
 

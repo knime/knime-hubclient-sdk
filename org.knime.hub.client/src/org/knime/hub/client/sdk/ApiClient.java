@@ -51,12 +51,15 @@ package org.knime.hub.client.sdk;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -64,6 +67,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -71,6 +75,7 @@ import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.hub.client.sdk.ent.RFC9457;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,6 +99,7 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status.Family;
+import jakarta.ws.rs.core.Response.StatusType;
 
 /**
  * API client used to make REST requests.
@@ -105,6 +111,8 @@ public class ApiClient implements AutoCloseable {
     private static final String HTTP_CONNECTION_TIMEOUT_PROP = "http.connection.timeout";
     private static final String HTTP_RECEIVE_TIMEOUT_PROP = "http.receive.timeout";
     private static final String HTTP_AUTOREDIRECT_PROP = "http.autoredirect";
+
+    private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
 
     /**
      * HTTP request method
@@ -357,9 +365,10 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
-         * Set the read timeout.
+         * Sets the read timeout.
          *
-         * @param readTimeout
+         * @param readTimeout the read timeout for a request
+         *
          * @return {@link ApiRequest}
          */
         public ApiRequest withReadTimeout(final Duration readTimeout) {
@@ -514,8 +523,9 @@ public class ApiClient implements AutoCloseable {
          * @param returnType        The {@link GenericType} which should be returned
          *
          * @return {@link ApiResponse}
-         * @throws CouldNotAuthorizeException
-         * @throws IOException
+         *
+         * @throws CouldNotAuthorizeException if the request couldn't be authorized
+         * @throws IOException if an I/O error occurred
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final GenericType<R> returnType) throws CouldNotAuthorizeException, IOException {
@@ -524,7 +534,10 @@ public class ApiClient implements AutoCloseable {
             // Retrieve the API response
             final var t0 = System.currentTimeMillis();
             final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, body, m_auth)) {
+            @SuppressWarnings("resource") // Is closed afterwards since it's needed in method calls
+            Response response = null;
+            try {
+                response = getAPIResponse(uri, method, body, m_auth);
                 final var responseHeaders = response.getHeaders();
 
                 // Get the status info and set the response content-type to
@@ -549,27 +562,21 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), Result.success(response.readEntity(returnType)));
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
-                    // TODO JSON error handling
-                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
-                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForResponse(response, responseContentType, responseStatusInfo));
                 } else if (Family.REDIRECTION == responseStatusFamily) {
-                    String message;
-                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                        message = "Redirect failed (firewall?): '%s'".formatted(location);
-                    } else {
-                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                                null, responseStatusInfo::getReasonPhrase);
-                    }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
                 } else {
                     return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
+                if (response != null) {
+                    response.close();
+                }
                 logDuration(uri, t0, System.currentTimeMillis());
             }
         }
@@ -585,9 +592,9 @@ public class ApiClient implements AutoCloseable {
          * @param contentHandler    The {@link DownloadContentHandler}.
          *
          * @return {@link ApiResponse}
-         * @throws IOException
-         * @throws CancelationException
-         * @throws CouldNotAuthorizeException
+         * @throws IOException if an I/O error occurs during the request
+         * @throws CancelationException if the user cancelled the process
+         * @throws CouldNotAuthorizeException if the request is unauthorized
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final DownloadContentHandler<R> contentHandler)
@@ -596,15 +603,19 @@ public class ApiClient implements AutoCloseable {
 
             // Retrieve the API response
             final var uri = buildUrl(path);
-            try(final var response = getAPIResponse(uri, method, body, m_auth)) {
+            @SuppressWarnings("resource") // Is closed afterwards since it's needed in method calls
+            Response response = null;
+            try {
+                response = getAPIResponse(uri, method, body, m_auth);
                 final var responseHeaders = response.getHeaders();
 
                 // Get the status info and set the response content-type to
                 // null in case the response does not have any content.
                 final var responseStatusInfo = response.getStatusInfo();
                 String responseContentType = null;
-                if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                    responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).toString();
+                final List<Object> contentTypeHeaders = responseHeaders.get(HttpHeaders.CONTENT_TYPE);
+                if (contentTypeHeaders != null && !contentTypeHeaders.isEmpty()) {
+                    responseContentType = contentTypeHeaders.get(0).toString();
                 }
 
                 R responseEntity = null;
@@ -628,27 +639,21 @@ public class ApiClient implements AutoCloseable {
                     }
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
-                    // TODO JSON error handling
-                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
-                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForResponse(response, responseContentType, responseStatusInfo));
                 } else if (Family.REDIRECTION == responseStatusFamily) {
-                    String message;
-                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                        message = "Redirect failed (firewall?): '%s'".formatted(location);
-                    } else {
-                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                                null, responseStatusInfo::getReasonPhrase);
-                    }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
                 } else {
                     return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
+                if (response != null) {
+                    response.close();
+                }
                 logDuration(uri, t0, System.currentTimeMillis());
             }
         }
@@ -663,8 +668,8 @@ public class ApiClient implements AutoCloseable {
          * @param numBytes number of bytes to be written
          *
          * @return {@link ApiResponse}
-         * @throws IOException if an error occurs during transmission
-         * @throws CouldNotAuthorizeException if a Hub call could not be authenticated
+         * @throws IOException if an I/O error occurred during the request
+         * @throws CouldNotAuthorizeException if the request is unauthorized
          */
         public ApiResponse<Void> invokeAPI(final IPath path, final Method method, final @Owning InputStream data,
             final long numBytes) throws IOException, CouldNotAuthorizeException {
@@ -681,6 +686,11 @@ public class ApiClient implements AutoCloseable {
                 // Get the status info and set the response content-type to
                 // null in case the response does not have any content.
                 final var responseStatusInfo = response.getStatusInfo();
+                String responseContentType = null;
+                final List<Object> contentTypeHeaders = responseHeaders.get(HttpHeaders.CONTENT_TYPE);
+                if (contentTypeHeaders != null && !contentTypeHeaders.isEmpty()) {
+                    responseContentType = contentTypeHeaders.get(0).toString();
+                }
 
                 final var responseStatusFamily = responseStatusInfo.getFamily();
                 final var responseStatusCode = responseStatusInfo.getStatusCode();
@@ -691,28 +701,73 @@ public class ApiClient implements AutoCloseable {
                             Optional.ofNullable(responseEtag), Result.success(null));
                 } else if(Family.CLIENT_ERROR == responseStatusFamily ||
                         Family.SERVER_ERROR == responseStatusFamily) {
-                    // TODO JSON error handling
-                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
-                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForResponse(response, responseContentType, responseStatusInfo));
                 } else if (Family.REDIRECTION == responseStatusFamily) {
-                    String message;
-                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                        message = "Redirect failed (firewall?): '%s'".formatted(location);
-                    } else {
-                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                                null, responseStatusInfo::getReasonPhrase);
-                    }
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                            responseStatusMessage, Optional.ofNullable(responseEtag),
+                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
                 } else {
                     return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
                             Optional.ofNullable(responseEtag), null);
                 }
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
+            }
+        }
+
+        <R> Result<R, FailureValue> createFailureForURLConnection(final HttpURLConnection connection,
+            final String contentType, final StatusType responseStatusInfo) throws IOException {
+            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
+                // Create a problem JSON failure
+                RFC9457 rfc9457;
+                try (final var errStream = connection.getErrorStream()) {
+                    rfc9457 = (RFC9457) m_objectMapper.readerFor(RFC9457.class).readValue(errStream);
+                }
+                return Result.failure(new FailureValue(Optional.empty(), Optional.ofNullable(rfc9457)));
+            } else {
+                // Create a exception failure value
+                String message;
+                try (final var errStream = connection.getErrorStream()) {
+                    message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
+                        : responseStatusInfo.getReasonPhrase();
+                }
+                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
+            }
+        }
+
+        private static <R> Result<R, FailureValue> createFailureForResponse(final Response response,
+            final String contentType, final StatusType responseStatusInfo) {
+            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
+                // Create a problem JSON failure
+                return Result.failure(new FailureValue(Optional.empty(),
+                    Optional.ofNullable(response.hasEntity() ? response.readEntity(RFC9457.class) : null)));
+            } else {
+                // Create a exception failure value
+                final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                    response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
+                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
+            }
+        }
+
+        private static <R> Result<R, FailureValue> createFailureForRedirect(final Response response,
+            final String contentType, final StatusType responseStatusInfo) {
+            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
+                // Create a problem JSON failure
+                return Result.failure(new FailureValue(Optional.empty(),
+                    Optional.ofNullable(response.hasEntity() ? response.readEntity(RFC9457.class) : null)));
+            } else {
+                // Create a exception failure value
+                String message;
+                if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                    message = "Redirect failed (firewall?): '%s'".formatted(location);
+                } else {
+                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                            null, responseStatusInfo::getReasonPhrase);
+                }
+                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
             }
         }
 

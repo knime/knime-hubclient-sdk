@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,74 +41,26 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Apr 22, 2025 (magnus): created
  */
-
 package org.knime.hub.client.sdk;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.function.UnaryOperator;
 
-import org.knime.core.util.exception.HttpExceptionUtils;
-import org.knime.core.util.exception.ResourceAccessException;
-
-import jakarta.ws.rs.core.EntityTag;
+import org.apache.commons.lang3.tuple.Pair;
+import org.knime.hub.client.sdk.ent.RFC9457;
 
 /**
- * API response class which combines response details from {@link ApiClient} and
- * response entities from the API class.
- *
- * @param headers       the response headers
- * @param statusCode    the response status code
- * @param statusMessage the response status message
- * @param etag          the response etag
- * @param result        {@link Result} the response result
- * @param <R>           the response type
+ * Record describing the supported request failure values.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ *
+ * @param exceptionFailure failure containing an error message and {@link Throwable} cause
+ * @param jsonFailure failure containing the problem JSON
  */
-public record ApiResponse<R> (
-        Map<String, List<Object>> headers,
-        int statusCode,
-        String statusMessage,
-        Optional<EntityTag> etag,
-        Result<R, FailureValue> result) {
-
-    /**
-     * Checks that the given response signals success (via a 2XX HTTP status code).
-     *
-     * @return the response body
-     * @throws ResourceAccessException if the request was unsuccessful
-     */
-    public R checkSuccessful() throws ResourceAccessException {
-        return checkSuccessful(msg -> msg);
-    }
-
-    /**
-     * Checks that the given response signals success (via a 2XX HTTP status code).
-     *
-     * @param messageCallback callback for modifying the error message, receiving the message from the response
-     * @return the response body
-     * @throws ResourceAccessException if the request was unsuccessful
-     */
-    public R checkSuccessful(final UnaryOperator<String> messageCallback) throws ResourceAccessException {
-        if (result instanceof Result.Success<R, FailureValue> success) {
-            return success.value();
-        }
-        final var failure = (Result.Failure<R, FailureValue>)result;
-        final var exceptionFailureOpt = failure.value().exceptionFailure();
-        final var jsonFailureOpt = failure.value().jsonFailure();
-        String message = null;
-        if (exceptionFailureOpt.isPresent()) {
-            message = exceptionFailureOpt.get().getLeft();
-        } else if (jsonFailureOpt.isPresent()) {
-            message = jsonFailureOpt.get().getTitle();
-        }
-        throw HttpExceptionUtils.wrapException(statusCode, messageCallback.apply(message));
-    }
-}
+public record FailureValue (
+    Optional<Pair<String, Throwable>> exceptionFailure,
+    Optional<RFC9457> jsonFailure) {}
