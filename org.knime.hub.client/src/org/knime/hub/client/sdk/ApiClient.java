@@ -145,6 +145,8 @@ public class ApiClient implements AutoCloseable {
 
     private final Authenticator m_auth;
 
+    private final String m_userAgent;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(ApiClient.class);
 
     /**
@@ -153,13 +155,15 @@ public class ApiClient implements AutoCloseable {
      *
      * @param baseURI base URL of the server.
      * @param auth the {@link Authenticator}
+     * @param userAgent the value for the user-agent header set for every request
      * @param connectionTimeout the time (in ms) it takes until the connection gets a timeout
      * @param readTimeout the time (in ms) it takes until the read process gets a timeout
      */
-    public ApiClient(final URI baseURI, final Authenticator auth,
+    public ApiClient(final URI baseURI, final Authenticator auth, final String userAgent,
             final Duration connectionTimeout, final Duration readTimeout) {
-        // Set base path
+        // Set base path and user agent
         m_baseURI = baseURI;
+        m_userAgent = userAgent;
 
         // Set authentication
         m_auth = auth;
@@ -429,6 +433,10 @@ public class ApiClient implements AutoCloseable {
                 throws CouldNotAuthorizeException {
 
             m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
+            m_headerParams.remove(HttpHeaders.USER_AGENT);
+            if (m_userAgent != null) {
+                m_headerParams.put(HttpHeaders.USER_AGENT, m_userAgent);
+            }
 
             // Update accept header and set content-type header
             // which got possibly modified through the additional headers

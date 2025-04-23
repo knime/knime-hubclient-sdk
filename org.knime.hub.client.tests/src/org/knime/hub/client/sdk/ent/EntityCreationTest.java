@@ -99,7 +99,7 @@ class EntityCreationTest {
     private static final long EXPECTED_SIZE = 1337L;
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
-    private static final ObjectMapper MAPPER = new ApiClient(null, null, Duration.ofSeconds(0),
+    private static final ObjectMapper MAPPER = new ApiClient(null, null, "junit-test", Duration.ofSeconds(0),
 	        Duration.ofSeconds(0)).getObjectMapper();
 
 	private static <T> T load(final String filename, final Class<T> clazz) throws IOException, URISyntaxException {

@@ -152,7 +152,7 @@ class HubClientAPITest {
 	    final var authMock = Mockito.mock(Authenticator.class);
 	    authToken = UUID.randomUUID().toString();
 	    when(authMock.getAuthorization()).thenReturn(authToken);
-        apiClient = new ApiClient(serverAdress, authMock, Duration.ofSeconds(0), Duration.ofSeconds(0));
+        apiClient = new ApiClient(serverAdress, authMock, "junit-test", Duration.ofSeconds(0), Duration.ofSeconds(0));
         mapper = apiClient.getObjectMapper();
 	    hubClientAPIMock = new HubClientAPI(apiClient);
 
