@@ -37,7 +37,6 @@ import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
@@ -102,8 +101,6 @@ public class CatalogServiceClient {
 
     /** Relation that provides the items edit control */
     public static final String EDIT = "edit";
-
-    private static final String COULD_NOT_AUTHORIZE = "Could not authorize Hub REST call: ";
 
     /** Media type for a KNIME Workflow */
     public static final MediaType KNIME_WORKFLOW_MEDIA_TYPE =
@@ -170,9 +167,10 @@ public class CatalogServiceClient {
      * @return mapping from relative path to file upload instructions, or {@link Optional#empty()} if the
      *     parent workflow group has changed
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
     public Optional<UploadStarted> initiateUpload(final ItemID parentId,
-            final UploadManifest manifest, final EntityTag eTag) throws IOException {
+            final UploadManifest manifest, final EntityTag eTag) throws IOException, CouldNotAuthorizeException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         if (eTag != null) {
             additionalHeaders.put(HttpHeaders.IF_MATCH, ETAG_DELEGATE.toString(eTag));
@@ -186,8 +184,6 @@ public class CatalogServiceClient {
             } else {
                 return Optional.ofNullable(response.checkSuccessful());
             }
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -198,14 +194,13 @@ public class CatalogServiceClient {
      * @param partNumber part number of the next part (must be one larger than the last requested one)
      * @return target of the new upload part
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
     public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
-            throws IOException {
+            throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
             return response.checkSuccessful();
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -215,13 +210,12 @@ public class CatalogServiceClient {
      * @param uploadId upload ID
      * @return state of the upload
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public UploadStatus pollUploadState(final String uploadId) throws IOException {
+    public UploadStatus pollUploadState(final String uploadId) throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.pollUploadStatus(uploadId, m_additionalHeaders);
             return response.checkSuccessful();
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -231,9 +225,10 @@ public class CatalogServiceClient {
      * @param uploadId upload ID
      * @param artifactETags mapping from upload part number to entity tag received when uploading
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
     public void reportUploadFinished(final String uploadId, final Map<Integer, EntityTag> artifactETags)
-        throws IOException {
+        throws IOException, CouldNotAuthorizeException {
         final Map<Integer, String> artifactETagMap = artifactETags.entrySet().stream() //
             .sorted(Comparator.comparingInt(Entry::getKey)) //
             .collect(Collectors.toMap(Entry::getKey, e -> ETAG_DELEGATE.toString(e.getValue()), (a, b) -> a,
@@ -243,8 +238,6 @@ public class CatalogServiceClient {
             final var response =
                     m_catalogClient.reportUploadFinished(uploadId, artifactETagMap, m_additionalHeaders);
             response.checkSuccessful();
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -253,13 +246,12 @@ public class CatalogServiceClient {
      *
      * @param uploadId upload ID
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public void cancelUpload(final String uploadId) throws IOException {
+    public void cancelUpload(final String uploadId) throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.cancelUpload(uploadId, m_additionalHeaders);
             response.checkSuccessful();
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -275,10 +267,11 @@ public class CatalogServiceClient {
      *     {@code ifNoneMatch} was non-{@code null} and the HTTP response was {@code 304 Not Modified} or
      *     {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
      * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
     public Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
-            final EntityTag ifMatch) throws IOException {
+            final EntityTag ifMatch) throws IOException, CouldNotAuthorizeException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         additionalHeaders.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
         if (ifNoneMatch != null) {
@@ -310,8 +303,6 @@ public class CatalogServiceClient {
             }
             final RepositoryItem item = response.checkSuccessful();
             return Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null)));
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 
@@ -326,9 +317,11 @@ public class CatalogServiceClient {
      *
      * @throws IOException if an I/O error occurred while downloading
      * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if the request could not be authorized
      */
     public <R> R downloadItem(final ItemID id, final RepositoryItemType itemType,
-            final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
+        final DownloadContentHandler<R> contentHandler)
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             MediaType accept = MediaType.WILDCARD_TYPE;
             if (RepositoryItemType.WORKFLOW_GROUP == itemType) {
@@ -337,10 +330,8 @@ public class CatalogServiceClient {
                 accept = KNIME_WORKFLOW_MEDIA_TYPE;
             }
             final var response =
-                m_catalogClient.downloadItemById(id.id(), null, accept, contentHandler, m_additionalHeaders);
+                m_catalogClient.downloadItemById(id.id(), null, accept, m_additionalHeaders, contentHandler);
             return response.checkSuccessful();
-        } catch (CouldNotAuthorizeException e) {
-            throw new ResourceAccessException(COULD_NOT_AUTHORIZE + e.getMessage(), e);
         }
     }
 

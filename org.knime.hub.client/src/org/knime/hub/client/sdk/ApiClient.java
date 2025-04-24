@@ -479,15 +479,11 @@ public class ApiClient implements AutoCloseable {
                         requestBody != null ? Entity.entity(requestBody, DEFAULT_CONTENT_TYPE) : null).invoke();
                     case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
                 };
-            } catch (ResponseProcessingException e) {
-                throw new IOException("Response processing failed", e.getCause());
             } catch (ProcessingException e) {
+                final var message =
+                    e instanceof ResponseProcessingException ? "Response processing failed" : "Processing failed";
                 final var cause = e.getCause();
-                if (cause instanceof IOException ioexception) {
-                    throw ioexception;
-                }
-                // Handle additional kinds of processing exceptions here
-                throw new IOException("Processing failed", cause);
+                throw cause instanceof IOException ioe ? ioe : new IOException(message, cause);
             }
         }
 

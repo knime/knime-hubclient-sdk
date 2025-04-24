@@ -39,10 +39,11 @@ import java.util.function.DoubleConsumer;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.function.FailableSupplier;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
@@ -234,9 +235,10 @@ class AbstractHubTransfer {
      * @return pair containing the deep repository item and its entity tag
      * @throws ResourceAccessException
      * @throws CancelationException
+     * @throws CouldNotAuthorizeException
      */
     TaggedRepositoryItem deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws IOException, CancelationException {
+            throws IOException, CancelationException, CouldNotAuthorizeException {
         return runInCommonPool(cancelChecker, () -> {
             final var itemAndETag = m_catalogClient //
                 .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
@@ -254,9 +256,10 @@ class AbstractHubTransfer {
      * @return pair containing the deep repository item and its entity tag if successful
      * @throws ResourceAccessException
      * @throws CancelationException
+     * @throws CouldNotAuthorizeException
      */
     Optional<TaggedRepositoryItem> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws IOException, CancelationException {
+            throws IOException, CancelationException, CouldNotAuthorizeException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
                 final var itemAndETag = m_catalogClient //
@@ -272,20 +275,15 @@ class AbstractHubTransfer {
         });
     }
 
-    private static <T> T runInCommonPool(final BooleanSupplier cancelChecker,
-            final FailableSupplier<T, IOException> job)
-            throws IOException, CancelationException {
-        return waitForCancellable(ForkJoinPool.commonPool().submit(job::get),
-            cancelChecker, throwable -> {
-            if (throwable instanceof RuntimeException rte) {
-                throw rte;
-            } else if (throwable instanceof CancelationException ce) {
-                throw ce;
-            } else {
-                // the only declared exception
-                throw (ResourceAccessException)throwable;
-            }
-        });
+    private interface CommonPoolJob<T> {
+        T run() throws CouldNotAuthorizeException, IOException;
+    }
+
+    @SuppressWarnings("java:S1130") // exceptions are in fact thrown (sneakily)
+    private static <T> T runInCommonPool(final BooleanSupplier cancelChecker, final CommonPoolJob<T> job)
+            throws CouldNotAuthorizeException, IOException, CancelationException {
+        return waitForCancellable(ForkJoinPool.commonPool().submit(job::run),
+            cancelChecker, throwable -> { throw ExceptionUtils.asRuntimeException(throwable); });
     }
 
 }

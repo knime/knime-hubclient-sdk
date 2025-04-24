@@ -75,6 +75,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
@@ -365,9 +366,9 @@ class HubClientAPITest {
     }
 
 	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse,
-			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) {
+			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) throws ResourceAccessException {
 	    // Create the actual JSON node response object.
-	    var responseEntity = actualApiResponse.result().toOptional().get();
+	    var responseEntity = actualApiResponse.checkSuccessful();
         JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);
 
         // Compare the JSON properties queried using the expected JSON paths.

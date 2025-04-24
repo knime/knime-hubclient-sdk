@@ -326,8 +326,8 @@ public final class CatalogClient {
      * @param version Optional version of the item to retrieve, {@code null} is synonymous with
      *            {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param responseType The type of the response body (required).
-     * @param contentHandler The content handler to out source the given input stream (required).
      * @param additionalHeaders Map of additional headers
+     * @param contentHandler The content handler to out source the given input stream (required).
      * @return {@link ApiResponse}
      *
      * @throws IOException if the operation had an I/O error
@@ -335,8 +335,8 @@ public final class CatalogClient {
      * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version,
-        final MediaType responseType, final DownloadContentHandler<R> contentHandler,
-        final Map<String, String> additionalHeaders)
+        final MediaType responseType, final Map<String, String> additionalHeaders,
+        final DownloadContentHandler<R> contentHandler)
         throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
@@ -759,8 +759,8 @@ public final class CatalogClient {
      *
      * @param path The absolute path to the repository item. (required)
      * @param contentType The content type of the request body (required).
-     * @param contentHandler The content handler to out source the input stream to a provided output stream (required).
      * @param additionalHeaders Map of additional headers
+     * @param contentHandler The content handler to out source the input stream to a provided output stream (required).
      * @return {@link ApiResponse}
      *
      * @throws CouldNotAuthorizeException if the authorization fails
@@ -768,7 +768,7 @@ public final class CatalogClient {
      * @throws CancelationException if the operation was canceled
      */
     public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
-        final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
+        final Map<String, String> additionalHeaders, final UploadContentHandler<R> contentHandler)
         throws IOException, CancelationException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(contentType);
@@ -905,10 +905,11 @@ public final class CatalogClient {
      *
      * @return {@link AsyncHubUploadStream}
      * @throws IOException if an I/O error occurred during the upload
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
     public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
-        throws IOException {
+        throws IOException, CouldNotAuthorizeException {
         return AsyncHubUploadStream.builder().withCatalogClient(this)
             .withItemName(itemName).withParentId(parentId)
             .withParentETag(parentEtag).isWorkflowLike(isWorkflowLike).withHeaders(additionalHeaders).build();

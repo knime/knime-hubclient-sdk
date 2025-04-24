@@ -48,6 +48,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.proxy.URLConnectionFactory;
 import org.knime.hub.client.sdk.CancelationException;
@@ -84,8 +85,9 @@ public final class FilePartUploader {
          * @param partNo part number
          * @return fetched upload target specification
          * @throws IOException if an error occurs while fetching
+         * @throws CouldNotAuthorizeException
          */
-        UploadTarget fetch(int partNo) throws IOException;
+        UploadTarget fetch(int partNo) throws IOException, CouldNotAuthorizeException;
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartUploader.class);
@@ -183,7 +185,7 @@ public final class FilePartUploader {
 
     private Pair<Integer, EntityTag> uploadTempFileJob(final String path, final Integer partNum,
             final UploadTargetFetcher targetFetcher, final Path file, final long fileSize, final String md5Hash,
-            final LeafExecMonitor monitor) throws IOException, CancelationException {
+            final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
         try {
             var retriesRemaining = m_numRetries;
             for (var attempt = 0;; attempt++) {
@@ -212,7 +214,7 @@ public final class FilePartUploader {
 
     private Pair<Integer, EntityTag> uploadDataChunkJob(final String path, final Integer partNum,
         final UploadTargetFetcher targetFetcher, final byte[] dataChunk, final String md5Hash,
-        final LeafExecMonitor monitor) throws IOException, CancelationException {
+        final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
         final var fileChunkSize = dataChunk.length;
         var retriesRemaining = m_numRetries;
         for (var attempt = 0;; attempt++) {
@@ -248,7 +250,7 @@ public final class FilePartUploader {
 
     private Pair<Integer, EntityTag> uploadDataFilePartJob(final String path, final int partNum,
             final UploadTargetFetcher targetFetcher, final Path dataFile, final long start, final long length,
-            final LeafExecMonitor monitor) throws IOException, CancelationException {
+            final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
         final String md5Hash = SEND_CONTENT_MD5 ? calculateHash(dataFile, start, length) : null;
         var retriesRemaining = m_numRetries;
         for (var attempt = 0;; attempt++) {
@@ -294,7 +296,8 @@ public final class FilePartUploader {
 
     private EntityTag uploadArtifactPart(final String path, final int partNumber, final int attempt, // NOSONAR
             final UploadTargetFetcher targetFetcher, final InputStream artifactStream, final long numBytes,
-            final String md5Hash, final LeafExecMonitor monitor) throws IOException, CancelationException {
+            final String md5Hash, final LeafExecMonitor monitor)
+            throws IOException, CancelationException, CouldNotAuthorizeException {
         LOGGER.atDebug().log("Starting attempt {} of the upload of part {} of '{}' ({} bytes)", //
             attempt + 1, partNumber, path, numBytes);
 

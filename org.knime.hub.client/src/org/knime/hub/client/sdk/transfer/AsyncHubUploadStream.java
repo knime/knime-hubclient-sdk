@@ -61,6 +61,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.api.CatalogClient;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
@@ -247,8 +248,9 @@ public final class AsyncHubUploadStream extends OutputStream {
          * @return an {@link AsyncHubUploadStream} or null if the precondition check with the parentEtag failed
          *
          * @throws IOException if an I/O error occurred during the upload
+         * @throws CouldNotAuthorizeException if the authenticator has lost connection
          */
-        public @Owning AsyncHubUploadStream build() throws IOException {
+        public @Owning AsyncHubUploadStream build() throws IOException, CouldNotAuthorizeException {
             CheckUtils.checkArgumentNotNull(m_hubClient);
             CheckUtils.checkArgumentNotNull(m_parentId);
             CheckUtils.checkArgumentNotNull(m_itemName);
@@ -315,8 +317,9 @@ public final class AsyncHubUploadStream extends OutputStream {
      * Cancels the upload process.
      *
      * @throws IOException if an I/O error occurred during cancellation
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
-    public void cancel() throws IOException {
+    public void cancel() throws IOException, CouldNotAuthorizeException {
         if (m_chunkingOutputStream != null) {
             // discard the (in-memory) chunking stream, thereby closing the outer one without triggering an upload
             m_chunkingOutputStream = null;
@@ -337,7 +340,7 @@ public final class AsyncHubUploadStream extends OutputStream {
     private IOException cancelAfter(final IOException ioe) throws IOException {
         try {
             cancel();
-        } catch (final IOException inner) {
+        } catch (final IOException | CouldNotAuthorizeException inner) {
             ioe.addSuppressed(inner);
         }
         throw ioe;
@@ -381,10 +384,12 @@ public final class AsyncHubUploadStream extends OutputStream {
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Upload of '%s' has been interrupted while waiting for Hub".formatted(m_itemName));
+        } catch (final CouldNotAuthorizeException ex) {
+            throw new IOException("Lost connection to Hub while closing upload of '%s'".formatted(m_itemName), ex);
         }
     }
 
-    private void pollUntilCompletion() throws IOException, InterruptedException {
+    private void pollUntilCompletion() throws IOException, InterruptedException, CouldNotAuthorizeException {
         // Wait until the upload status is completed
         final var t0 = System.currentTimeMillis();
         for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {

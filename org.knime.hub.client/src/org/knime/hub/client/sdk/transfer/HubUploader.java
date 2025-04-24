@@ -50,6 +50,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.workflow.WorkflowExporter;
 import org.knime.core.node.workflow.WorkflowExporter.ItemType;
 import org.knime.core.node.workflow.WorkflowExporter.ResourcesToCopy;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
@@ -143,9 +144,10 @@ public final class HubUploader extends AbstractHubTransfer {
      * @return collisions found if the Hub supports multi-part uploads, a {@link Failure} otherwise
      * @throws CancelationException if the upload was canceled
      * @throws IOException if a request to Hub failed
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
     public Result<CollisionReport> checkCollisions(final ItemID parentId, final Map<IPath, ItemType> itemToType,
-            final IProgressMonitor progMon) throws CancelationException, IOException {
+            final IProgressMonitor progMon) throws CancelationException, IOException, CouldNotAuthorizeException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
 
@@ -267,10 +269,11 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param numInitialParts number of initial part upload URLs to request per non-folder item
      * @return mapping from path to item upload instructions, or {@link Optional#empty()} if the parent has changed
      * @throws IOException if a request to Hub failed
+     * @throws CouldNotAuthorizeException
      */
     public Optional<Map<IPath, ItemToUpload>> initiateUpload(final ItemID parentId,
             final Map<IPath, LocalItem> items, final EntityTag parentTag,
-            final int numInitialParts) throws IOException {
+            final int numInitialParts) throws IOException, CouldNotAuthorizeException {
 
         final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
         int partsRemaining = CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
@@ -462,7 +465,7 @@ public final class HubUploader extends AbstractHubTransfer {
             final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
             final Map<String, ResourcesToCopy> workflowResources,
             final BranchingExecMonitor splitter, final ItemUploadInstructions instructions)
-                    throws IOException, CancelationException {
+                    throws IOException, CancelationException, CouldNotAuthorizeException {
         try {
             if (type == ItemType.DATA_FILE) {
                 uploadDataFile(path, osPath, instructions, splitter);
@@ -499,7 +502,7 @@ public final class HubUploader extends AbstractHubTransfer {
     private void uploadWorkflowLike(final String path, final WorkflowExporter<CancelationException> exporter,
             final TempFileSupplier tempFileSupplier, final ResourcesToCopy resources,
             final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
-            throws CancelationException, IOException {
+            throws CancelationException, IOException, CouldNotAuthorizeException {
 
         // remember all temp files so they can be deleted cleaned up `finally` if something went wrong
         final List<Path> tempFiles = new ArrayList<>();
@@ -627,7 +630,7 @@ public final class HubUploader extends AbstractHubTransfer {
     }
 
     private void uploadDataFile(final String path, final Path dataFile, final ItemUploadInstructions instructions,
-            final BranchingExecMonitor splitter) throws IOException, CancelationException {
+            final BranchingExecMonitor splitter) throws IOException, CancelationException, CouldNotAuthorizeException {
 
         final var numBytes = Files.size(dataFile);
         final var partSupplier = new UploadPartSupplier(m_catalogClient, instructions);
@@ -692,7 +695,7 @@ public final class HubUploader extends AbstractHubTransfer {
         }
 
         @Override
-        public UploadTarget fetch(final int partNo) throws IOException {
+        public UploadTarget fetch(final int partNo) throws IOException, CouldNotAuthorizeException {
             // get and remove initial part, a new one will be requested if this one didn't work
             final var initial = m_initialParts.remove(partNo);
             return initial != null ? initial : m_client.requestAdditionalUploadPart(m_uploadId, partNo);
