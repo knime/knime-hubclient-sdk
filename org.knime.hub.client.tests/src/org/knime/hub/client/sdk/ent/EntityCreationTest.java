@@ -65,6 +65,7 @@ import java.util.List;
 import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ent.Billboard.AuthenticationType;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -316,5 +317,76 @@ class EntityCreationTest {
 	    assertEquals("/Users/account:user:c1df863a-0410-4b27-97fc-5ceb3a515176/my-space/my-workflow",
 	            uploadStatus.getTargetCanonicalPath(), "Unexpected target canonicla path");
 	}
+
+	@Test
+	void testCreateBillboardWithoutAuth() throws IOException, URISyntaxException {
+	    final var billboard = load("billboard.json", Billboard.class);
+	    assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
+	    assertTrue(billboard.isEnableResetOnUploadCheckbox().isEmpty(), "Unexpected enabled");
+	    assertTrue(billboard.getOAuthInformation().isEmpty(), "Unexpected OAuth information");
+	    assertTrue(billboard.hasForceResetOnUpload().isEmpty(), "Unexpected enabled");
+	    assertTrue(billboard.getClientExplorerFetchTimeout().isEmpty(), "Unexpected fetch timeout");
+	    assertTrue(billboard.getClientExplorerFetchInterval().isEmpty(), "Unexpected fetch interval");
+
+	    final var masonControls = billboard.getMasonControls();
+	    assertTrue(!masonControls.isEmpty(), "Expected mason controls");
+	    assertTrue(masonControls.containsKey("self"), "Expected self control");
+	    assertEquals("https://api.hub.com/knime/rest", masonControls.get("self").getHref(),
+	        "Unexpected href for self control");
+	    assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
+
+	    assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
+
+	    final var version = billboard.getVersion();
+	    assertEquals(5, version.getMajor(), "Unexpected major version");
+	    assertEquals(0, version.getMinor(), "Unexpected minor version");
+	    assertTrue(version.getQualifier().isBlank(), "Unexpected qualifier");
+	    assertEquals(0, version.getRevision(), "Unexpected revision");
+	}
+
+	@Test
+    void testCreateBillboardWithAuth() throws IOException, URISyntaxException {
+        final var billboard = load("billboardWithAuth.json", Billboard.class);
+        assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
+
+        assertTrue(billboard.isEnableResetOnUploadCheckbox().isPresent(), "Expected enbaled reset on upload checkbox");
+        assertTrue(billboard.isEnableResetOnUploadCheckbox().get(), "Unexpected disabled");
+
+        final var oAuthInfo = billboard.getOAuthInformation();
+        assertTrue(billboard.getOAuthInformation().isPresent(), "Expected OAuth information");
+        assertTrue(oAuthInfo.get().getTokenEndpoint().isPresent(), "Expected token endpoint");
+        assertEquals("https://auth.hub.com/auth/realms/knime/protocol/openid-connect/token",
+            oAuthInfo.get().getTokenEndpoint().get().toString(), "Unexpected token endpoint");
+        assertTrue(oAuthInfo.get().getClientId().isPresent(), "Expected client ID");
+        assertEquals("analytics-platform", oAuthInfo.get().getClientId().get(), "Unexpected client ID");
+        assertTrue(oAuthInfo.get().getAuthorizationEndpoint().isPresent(), "Expected authorization endpoint");
+        assertEquals("https://auth.hub.com/auth/realms/knime/protocol/openid-connect/auth",
+            oAuthInfo.get().getAuthorizationEndpoint().get().toString(), "Unexpected authorization endpoint");
+
+        assertTrue(billboard.hasForceResetOnUpload().isPresent(), "Expected force reset on upload");
+        assertTrue(billboard.hasForceResetOnUpload().get(), "Unexpected disabled");
+
+        assertTrue(billboard.getClientExplorerFetchTimeout().isPresent(), "Expected fetch timeout");
+        assertEquals(billboard.getClientExplorerFetchTimeout().get(),
+            Duration.ofMinutes(3), "Unexpected fetch timeout");
+        assertTrue(billboard.getClientExplorerFetchInterval().isPresent(), "Expected fetch interval");
+        assertEquals(billboard.getClientExplorerFetchInterval().get(),
+            Duration.ofSeconds(2), "Unexpected fetch interval");
+
+        final var masonControls = billboard.getMasonControls();
+        assertTrue(!masonControls.isEmpty(), "Expected mason controls");
+        assertTrue(masonControls.containsKey("self"), "Expected self control");
+        assertEquals("https://api.hub.com/knime/rest", masonControls.get("self").getHref(),
+            "Unexpected href for self control");
+        assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
+
+        assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
+
+        final var version = billboard.getVersion();
+        assertEquals(5, version.getMajor(), "Unexpected major version");
+        assertEquals(0, version.getMinor(), "Unexpected minor version");
+        assertTrue(version.getQualifier().isBlank(), "Unexpected qualifier");
+        assertEquals(0, version.getRevision(), "Unexpected revision");
+    }
 
 }

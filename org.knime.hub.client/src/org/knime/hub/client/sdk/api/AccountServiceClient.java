@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,75 +41,69 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Apr 24, 2025 (magnus): created
  */
-
 package org.knime.hub.client.sdk.api;
 
+import java.io.IOException;
+import java.util.Map;
+
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ApiClient.Method;
+import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.ent.Billboard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import jakarta.ws.rs.core.GenericType;
 
 /**
- * Hub Client API for KNIME Hub.
+ * Account Service client for KNIME Hub.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class HubClientAPI implements AutoCloseable {
+public final class AccountServiceClient {
 
-    private final @Owning ApiClient m_apiClient;
+    private static final String BILLBOARD_API_PATH = "knime/rest";
 
-    private final CatalogClient m_catalog;
+    private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
 
-    private final AccountServiceClient m_accountService;
+    @SuppressWarnings("resource") // Owned by Hub Client API
+    private final @NotOwning ApiClient m_apiClient;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccountServiceClient.class);
 
     /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
+     * Create the {@link CatalogClient} given an {@link ApiClient}
      *
-     * @param apiClient {@link ApiClient}
+     * @param apiClient the {@link ApiClient}
      */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
+    public AccountServiceClient(final @NotOwning ApiClient apiClient) {
         m_apiClient = apiClient;
-        m_catalog = new CatalogClient(m_apiClient);
-        m_accountService = new AccountServiceClient(m_apiClient);
     }
 
     /**
-     * Retrieves the associated {@link ApiClient}.
+     * Retrieves the billboard information of the hub instance.
      *
-     * @return {@link ApiClient}
-     */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
-    }
-
-    /**
-     * Retrieves the catalog client
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
      *
-     * @return {@link CatalogClient}
+     * @throws CouldNotAuthorizeException if authorization fails
+     * @throws IOException if an I/O error occurred
      */
-    public CatalogClient catalog() {
-        return m_catalog;
-    }
+    public ApiResponse<Billboard> getBillboard(final Map<String, String> additionalHeaders)
+            throws CouldNotAuthorizeException, IOException {
 
-    /**
-     * Retrieves the account service client
-     *
-     * @return {@link AccountServiceClient}
-     */
-    public AccountServiceClient account() {
-        return m_accountService;
-    }
+        final var requestPath = IPath.forPosix(BILLBOARD_API_PATH);
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void close() {
-        m_apiClient.close();
+        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.GET,
+            null, BILLBOARD);
     }
 
 }

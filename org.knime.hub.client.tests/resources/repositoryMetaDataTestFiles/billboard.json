@@ -1,0 +1,15 @@
+{
+	"mountId": "KNIME-Hub",
+	"@controls": {
+		"self": {
+			"href": "https://api.hub.com/knime/rest",
+			"method": "GET"
+		}
+	},
+	"preferredAuthType": "OAuth",
+	"version": {
+		"major": 5,
+		"minor": 0,
+		"revision": 0
+	}
+}
