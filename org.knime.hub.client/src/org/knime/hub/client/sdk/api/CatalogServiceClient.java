@@ -68,12 +68,16 @@ import org.knime.hub.client.sdk.ApiClient.UploadContentHandler;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
+import org.knime.hub.client.sdk.ent.DownloadStatus;
+import org.knime.hub.client.sdk.ent.PreparedDownload;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.knime.hub.client.sdk.transfer.ArtifactDownloadStream;
 import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,13 +97,15 @@ public final class CatalogServiceClient {
     /* API paths */
     private static final String REPOSITORY_API_PATH = "repository";
     private static final String UPLOAD_API_PATH = "uploads";
+    private static final String DOWNLOAD_API_PATH = "downloads";
 
     /* Path pieces */
     private static final String PATH_PIECE_USERS = "Users";
     private static final String PATH_PIECE_DATA = ":data";
-    private static final String PATH_PIECE_UPLOAD_MANIFEST = "manifest";
-    private static final String PATH_PIECE_UPLOAD_STATUS = "status";
-    private static final String PATH_PIECE_UPLOAD_PARTS = "parts";
+    private static final String PATH_PIECE_MANIFEST = "manifest";
+    private static final String PATH_PIECE_STATUS = "status";
+    private static final String PATH_PIECE_PARTS = "parts";
+    private static final String PATH_PIECE_ARTIFACT = "artifact";
 
     /* Query parameters */
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
@@ -118,6 +124,8 @@ public final class CatalogServiceClient {
     private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<UploadStatus>() {};
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
+    private static final GenericType<PreparedDownload> PREPARED_DONWLOAD = new GenericType<PreparedDownload>() {};
+    private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<DownloadStatus>() {};
 
     /* Item version query parameter "special" values */
     private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
@@ -828,7 +836,7 @@ public final class CatalogServiceClient {
 
         CheckUtils.checkArgumentNotNull(parentId);
 
-        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_UPLOAD_MANIFEST);
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_MANIFEST);
 
         return m_apiClient.createApiRequest()
                 .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
@@ -850,7 +858,7 @@ public final class CatalogServiceClient {
         final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
-        final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_STATUS);
+        final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_STATUS);
 
         return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.GET, null,
             UPLOAD_STATUS);
@@ -895,7 +903,7 @@ public final class CatalogServiceClient {
         CheckUtils.checkArgumentNotNull(uploadId);
         CheckUtils.checkArgumentNotNull(partNumber);
 
-        final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_UPLOAD_PARTS);
+        final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_PARTS);
 
         return m_apiClient.createApiRequest()
                 .withHeaders(additionalHeaders)
@@ -923,6 +931,72 @@ public final class CatalogServiceClient {
         return AsyncHubUploadStream.builder().withCatalogClient(this)
             .withItemName(itemName).withParentId(parentId)
             .withParentETag(parentEtag).isWorkflowLike(isWorkflowLike).withHeaders(additionalHeaders).build();
+    }
+
+    /**
+     * Creates an artifact download stream from a hub. This downloads single repository items.
+     *
+     * @param itemId the ID of the repository item to download
+     * @param version the {@link ItemVersion} of the repository item
+     * @param itemType the {@link RepositoryItemType} of the item to download
+     * @param additionalHeaders additional headers for the download process
+     *
+     * @return {@link ArtifactDownloadStream}
+     * @throws IOException if an I/O error occurred during the download
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws CancelationException if the download got cancelled
+     */
+    public @Owning ArtifactDownloadStream createArtifactDownloadStream(final String itemId, final ItemVersion version,
+        final RepositoryItemType itemType, final Map<String, String> additionalHeaders)
+        throws IOException, CouldNotAuthorizeException, CancelationException {
+        return ArtifactDownloadStream.builder().withCatalogClient(this)
+            .withItemId(itemId)
+            .withItemVersion(version)
+            .withHeaders(additionalHeaders).build();
+    }
+
+    /**
+     * Prepares the download of the repository item with the given ID. If the repository item is a workflow group,
+     * space, or account root, it will be downloadable as a single archive.
+     *
+     * @param id The ID of the repository item whose download to prepare.
+     * @param version Optional version of the item to retrieve, {@code null} is synonymous with
+     *        {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
+     * @param additionalHeaders additional header parameters
+     * @return {@link ApiResponse}
+     * @throws IOException if an I/O error occurred during the request
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     */
+    public ApiResponse<PreparedDownload> preparedDownload(final String id, final ItemVersion version,
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_ARTIFACT);
+
+        return m_apiClient.createApiRequest()
+                .withHeaders(additionalHeaders)
+                .withQueryParam(getQueryParameter(version).orElse(null))
+                .invokeAPI(requestPath, Method.GET, null, PREPARED_DONWLOAD);
+    }
+
+    /**
+     * Retrieves the status of the download with the given ID.
+     *
+     * @param id The ID of the repository item whose download to prepare.
+     * @param additionalHeaders additional header parameters
+     * @return {@link ApiResponse}
+     * @throws IOException if an I/O error occurred during the request
+     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     */
+    public ApiResponse<DownloadStatus> pollDownloadStatus(final String id,
+        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(DOWNLOAD_API_PATH).append(id).append(PATH_PIECE_STATUS);
+
+        return m_apiClient.createApiRequest()
+                .withHeaders(additionalHeaders)
+                .invokeAPI(requestPath, Method.GET, null, DONWLOAD_STATUS);
     }
 
     /**

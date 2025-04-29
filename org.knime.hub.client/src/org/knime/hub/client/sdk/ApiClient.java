@@ -225,6 +225,7 @@ public class ApiClient implements AutoCloseable {
         private final Map<String, String> m_cookieParams = new HashMap<>();
         private MediaType m_contentType;
         private String m_headerAccept;
+        private boolean m_useAuthenticator = true;
 
         private Duration m_requestReadTimeout;
 
@@ -369,6 +370,18 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
+         * Decides if the given {@link Authenticator} should be used for the requests. If called the
+         * {@link Authenticator} will not be used as authorization header. It's then still possible to set
+         * authorization headers as additional header parameters.
+         *
+         * @return {@link ApiRequest}
+         */
+        public ApiRequest withoutAuthenticator() {
+            m_useAuthenticator = false;
+            return this;
+        }
+
+        /**
          * Build full URL by concatenating base path, the given sub path and query
          * parameters.
          *
@@ -388,6 +401,26 @@ public class ApiClient implements AutoCloseable {
             }
 
             try {
+                return uriBuilder.build();
+            } catch (URISyntaxException e) {
+                throw new IllegalStateException("Unexpected URI syntax violation", e);
+            }
+        }
+
+        /**
+         * Build full URL by concatenating the given URL with query parameters.
+         *
+         * @param url the request URL
+         * @return The full URL
+         * @throws UnsupportedEncodingException
+         * @throws URISyntaxException
+         */
+        private URI buildUrl(final URL url) {
+            try {
+                var uriBuilder = new URIBuilder(url.toURI());
+                for (var entry : m_queryParams.entrySet()) {
+                    uriBuilder.addParameter(entry.getKey(), entry.getValue());
+                }
                 return uriBuilder.build();
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unexpected URI syntax violation", e);
@@ -436,6 +469,10 @@ public class ApiClient implements AutoCloseable {
             m_headerParams.remove(HttpHeaders.USER_AGENT);
             if (m_userAgent != null) {
                 m_headerParams.put(HttpHeaders.USER_AGENT, m_userAgent);
+            }
+
+            if (m_useAuthenticator) {
+                m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
             }
 
             // Update accept header and set content-type header
@@ -510,9 +547,8 @@ public class ApiClient implements AutoCloseable {
          * Invoke API by sending HTTP request with the given options.
          *
          * @param path              The sub-path of the HTTP URL.
-         * @param method            The request method, one of "GET", "POST",
-         * @param body              The request body object - if it is not binary, otherwise
-         *                          null.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
          * @param returnType        The {@link GenericType} which should be returned
          *
          * @return {@link ApiResponse}
@@ -578,15 +614,78 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
+         * Invoke API by sending HTTP request with the given options.
+         *
+         * @param url               The HTTP request URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         *
+         * @return {@link ApiResponse} containing a {@link Response}
+         * @throws CouldNotAuthorizeException
+         * @throws IOException
+         */
+        @SuppressWarnings("resource") // receiving code has responsibility to close the response
+        public @Owning ApiResponse<Response> invokeAPI(final URL url, final Method method, final Object body)
+                throws CouldNotAuthorizeException, IOException {
+            final var uri = buildUrl(url);
+            final var response = getAPIResponse(uri, method, body, m_auth);
+            final var responseHeaders = response.getHeaders();
+
+            // Get the status info and set the response content-type to
+            // null in case the response does not have any content.
+            final var responseStatusInfo = response.getStatusInfo();
+            String responseContentType = null;
+            if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
+                responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).get(0).toString();
+            }
+
+            final var responseStatusFamily = responseStatusInfo.getFamily();
+            final var responseStatusCode = responseStatusInfo.getStatusCode();
+            final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
+            final var responseEtag = response.getEntityTag();
+            if (Family.SUCCESSFUL == responseStatusFamily) {
+                if (responseContentType == null) {
+                    response.close();
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                        Optional.ofNullable(responseEtag), Result.success(null));
+                }
+                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                    Optional.ofNullable(responseEtag), Result.success(response));
+            } else if (Family.CLIENT_ERROR == responseStatusFamily || Family.SERVER_ERROR == responseStatusFamily) {
+                // TODO JSON error handling
+                final var message =
+                    StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
+                        responseStatusInfo::getReasonPhrase);
+                response.close();
+                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                    Optional.ofNullable(responseEtag), Result.failure(message, null));
+            } else if (Family.REDIRECTION == responseStatusFamily) {
+                String message;
+                if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                    message = "Redirect failed (firewall?): '%s'".formatted(location);
+                } else {
+                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
+                        responseStatusInfo::getReasonPhrase);
+                }
+                response.close();
+                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                    Optional.ofNullable(responseEtag), Result.failure(message, null));
+            } else {
+                response.close();
+                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                    Optional.ofNullable(responseEtag), null);
+            }
+        }
+
+        /**
          * Invoke API by sending HTTP request with the given options. This method
          * handles binary response downloads.
          * @param <R>
          *
          * @param path              The sub-path of the HTTP URL.
-         * @param method            The request method, one of "GET", "POST", "PUT" and
-         *                          "DELETE".
-         * @param body              The request body object - if it is not binary,
-         *                          otherwise null.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
          * @param contentHandler    The {@link DownloadContentHandler}.
          *
          * @return {@link ApiResponse}
@@ -597,10 +696,35 @@ public class ApiClient implements AutoCloseable {
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final DownloadContentHandler<R> contentHandler)
                         throws IOException, CancelationException, CouldNotAuthorizeException {
+            return invokeAPIWithURI(buildUrl(path), method, body, contentHandler);
+        }
 
+        /**
+         * Invoke API by sending HTTP request with the given options. This method handles binary response downloads
+         * given a download request URL.
+         *
+         * @param <R>
+         * @param url               The HTTP request URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         * @param contentHandler    The {@link DownloadContentHandler}.
+         *
+         * @return {@link ApiResponse}
+         * @throws IOException
+         * @throws CancelationException
+         * @throws CouldNotAuthorizeException
+         */
+        public <R> ApiResponse<R> invokeAPI(final URL url, final Method method, final Object body,
+                final DownloadContentHandler<R> contentHandler)
+                        throws IOException, CancelationException, CouldNotAuthorizeException {
+            return invokeAPIWithURI(buildUrl(url), method, body, contentHandler);
+        }
+
+        private <R> ApiResponse<R> invokeAPIWithURI(final URI uri, final Method method, final Object body,
+            final DownloadContentHandler<R> contentHandler)
+                    throws CouldNotAuthorizeException, IOException, CancelationException {
             // Retrieve the API response
             final var t0 = System.currentTimeMillis();
-            final var uri = buildUrl(path);
             try(final var response = getAPIResponse(uri, method, body, m_auth)) {
                 final var responseHeaders = response.getHeaders();
 
@@ -656,24 +780,20 @@ public class ApiClient implements AutoCloseable {
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
-
         }
 
         /**
-         * Invoke API by sending HTTP request with the given options. This method
-         * handles uploads of zip files (binary request bodies).
+         * Invoke API by sending HTTP request with the given options.
+         * This method handles uploads of binary request bodies.
          *
          * @param <R>
-         *
          * @param path              The sub-path of the HTTP URL.
-         * @param method            The request method, one of "GET", "POST", "PUT" and
-         *                          "DELETE".
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
          * @param contentHandler    The {@link UploadContentHandler}.
          *
          * @return {@link ApiResponse}
          * @throws IOException
-         * @throws CancelationException if the invocation was canceled through the
-         *                                    content handler
+         * @throws CancelationException if the invocation was canceled through the content handler
          * @throws CouldNotAuthorizeException
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method,

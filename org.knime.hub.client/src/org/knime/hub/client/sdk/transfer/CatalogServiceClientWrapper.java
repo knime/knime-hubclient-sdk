@@ -22,6 +22,7 @@ package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -33,15 +34,20 @@ import java.util.stream.Collectors;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
+import org.knime.hub.client.sdk.ApiClient.Method;
+import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.DownloadStatus;
+import org.knime.hub.client.sdk.ent.PreparedDownload;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.UploadManifest;
@@ -52,6 +58,7 @@ import org.knime.hub.client.sdk.ent.UploadTarget;
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
@@ -69,13 +76,19 @@ final class CatalogServiceClientWrapper {
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
     private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
+    /** Timeout for download status polls */
+    static final Duration DOWNLOAD_STATUS_POLL_TIMEOUT = Duration.ofSeconds(5);
+
     private static final String KNIME_SERVER_NAMESPACE = "knime";
 
     /** Maximum number of pre-fetched upload URLs per upload. */
     static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
     /** Relation that points to the endpoint for initiating an async upload flow. */
-    static final String INITIATE_UPLOAD =  "%s:initiate-upload".formatted(KNIME_SERVER_NAMESPACE);
+    static final String INITIATE_UPLOAD = "%s:initiate-upload".formatted(KNIME_SERVER_NAMESPACE);
+
+    /** Relation that points to the endpoint for initiating an artifact download. */
+    static final String INITIATE_DOWNLOAD = "%s:download-artifact".formatted(KNIME_SERVER_NAMESPACE);
 
     /** Relation that provides the items download control. */
     static final String DOWNLOAD = "%s:download".formatted(KNIME_SERVER_NAMESPACE);
@@ -301,6 +314,92 @@ final class CatalogServiceClientWrapper {
             }
             final var response =
                 m_catalogClient.downloadItemById(id.id(), null, accept, m_additionalHeaders, contentHandler);
+            return response.checkSuccessful();
+        }
+    }
+
+    /**
+     * Downloads an item from a given request URL.
+     *
+     * @param <R> type of the result value
+     * @param url the download request URL
+     * @param itemType the type of the item which should be downloaded
+     * @param contentHandler callback consuming the response data
+     * @return value returned by the callback
+     *
+     * @throws IOException if an I/O error occurred while downloading
+     * @throws CancelationException if the operation was canceled
+     * @throws CouldNotAuthorizeException if the request could not be authorized
+     */
+    <R> ApiResponse<R> downloadItemFromRequestURL(final URL url, final RepositoryItemType itemType,
+        final DownloadContentHandler<R> contentHandler)
+                throws IOException, CancelationException, CouldNotAuthorizeException {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            MediaType accept = MediaType.WILDCARD_TYPE;
+            if (RepositoryItemType.WORKFLOW_GROUP == itemType) {
+                accept = KNIME_WORKFLOW_GROUP_MEDIA_TYPE;
+            } else if (RepositoryItemType.WORKFLOW == itemType || RepositoryItemType.COMPONENT == itemType) {
+                accept = KNIME_WORKFLOW_MEDIA_TYPE;
+            }
+            return m_catalogClient.getApiClient().createApiRequest() //
+                .withAcceptHeaders(accept) //
+                .withHeaders(m_additionalHeaders) //
+                .withoutAuthenticator() //
+                .invokeAPI(url, Method.GET, null, contentHandler);
+        }
+    }
+
+    /**
+     * Retrieves the {@link Response} of the given download request URL.
+     *
+     * @param url the download request URL
+     * @return {@link Response}
+     *
+     * @throws IOException if an I/O error occurred while downloading
+     * @throws CouldNotAuthorizeException if the request could not be authorized
+     */
+    @Owning Response downloadItemResponse(final URL url) throws IOException, CouldNotAuthorizeException {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_catalogClient.getApiClient().createApiRequest() //
+                //.withAcceptHeaders(accept) //
+                .withHeaders(m_additionalHeaders) //
+                .withoutAuthenticator() //
+                .invokeAPI(url, Method.GET, null);
+
+            return response.checkSuccessful();
+        }
+    }
+
+    /**
+     * Prepares the artifact download for a repository item.
+     *
+     * @param id the id of the item which should be downloaded
+     * @param version the {@link ItemVersion}
+     * @return {@link PreparedDownload}
+     *
+     * @throws IOException if an I/O error occurred while downloading
+     * @throws CouldNotAuthorizeException if the request could not be authorized
+     */
+    PreparedDownload prepareItemDownlaod(final ItemID id, final ItemVersion version)
+        throws IOException, CouldNotAuthorizeException {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response =
+                m_catalogClient.preparedDownload(id.id(), version, m_additionalHeaders);
+            return response.checkSuccessful();
+        }
+    }
+
+    /**
+     * Poll the current status of the download with the given ID.
+     *
+     * @param downloadId the download ID
+     * @return state of the download
+     * @throws IOException if an I/O error occurred
+     * @throws CouldNotAuthorizeException if the request could not be authorized
+     */
+    DownloadStatus pollDownloadState(final String downloadId) throws IOException, CouldNotAuthorizeException {
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = m_catalogClient.pollDownloadStatus(downloadId, m_additionalHeaders);
             return response.checkSuccessful();
         }
     }
