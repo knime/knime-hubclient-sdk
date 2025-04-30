@@ -49,13 +49,13 @@
 package org.knime.hub.client.sdk.testing;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
 import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
 
 /**
@@ -73,18 +73,15 @@ public class TestUtil {
      *
      * @param relativePath a relative path
      * @return the resolved absolute path
+     * @throws IOException
      */
-    public static Path resolvePath(final IPath relativePath) {
-        var myself = FrameworkUtil.getBundle(HubClientAPI.class);
-        try {
-            final var fileUrl = FileLocator.toFileURL(FileLocator.find(myself, relativePath, null));
-            // for the tests we assume that we don't have to deal with
-            // - non-encoded characters (literal space) in the path
-            // - UNC paths
-            return Paths.get(fileUrl.toURI());
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException("Could not resolve resource: %s".formatted(relativePath), e);
+    public static URL resolveToURL(final IPath relativePath) throws IOException {
+        Bundle bundle = FrameworkUtil.getBundle(HubClientAPI.class);
+        if (bundle != null) {
+            return FileLocator.toFileURL(FileLocator.find(bundle, relativePath, null));
         }
-    }
 
+        // allow for local OSGi-free testing
+        return Path.of(relativePath.toOSString()).toUri().toURL();
+    }
 }

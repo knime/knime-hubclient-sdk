@@ -49,12 +49,16 @@
 package org.knime.hub.client.sdk.ent;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -86,6 +90,8 @@ public final class RFC9457 {
 
     private static final String JSON_PROPERTY_CODE = "code";
     private final String m_code;
+
+    private final Map<String, Object> m_additionalProperties = new HashMap<>();
 
     /**
      * Problem JSON error according to standard RFC9457.
@@ -179,6 +185,27 @@ public final class RFC9457 {
         return Optional.ofNullable(m_code);
     }
 
+    /**
+     * Catch-all setter for additional information in the problem object.
+     *
+     * @param key additional object key
+     * @param value additional object value
+     */
+    @JsonAnySetter
+    public void add(final String key, final Object value) {
+        m_additionalProperties.put(key, value);
+    }
+
+    /**
+     * Additional information in the problem object.
+     *
+     * @return map containing all additional entries in the JSON object representing the problem
+     */
+    @JsonAnyGetter
+    public Map<String, Object> getAdditionalProperties() {
+        return Collections.unmodifiableMap(m_additionalProperties);
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
@@ -193,12 +220,13 @@ public final class RFC9457 {
                 && Objects.equals(this.m_title, rfc9457.m_title)
                 && Objects.equals(this.m_instance, rfc9457.m_instance)
                 && Objects.equals(this.m_details, rfc9457.m_details)
-                && Objects.equals(this.m_code, rfc9457.m_code);
+                && Objects.equals(this.m_code, rfc9457.m_code)
+                && Objects.equals(this.m_additionalProperties, rfc9457.m_additionalProperties);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_type, m_status, m_title, m_instance, m_details, m_code);
+        return Objects.hash(m_type, m_status, m_title, m_instance, m_details, m_code, m_additionalProperties);
     }
 
     @Override
@@ -209,5 +237,4 @@ public final class RFC9457 {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
-
 }

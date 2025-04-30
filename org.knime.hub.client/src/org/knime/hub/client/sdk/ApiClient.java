@@ -191,8 +191,7 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.register(GZipResponseFilter.class);
 
         // Add object mapper for deserialization
-        final var jsonProvider = new JacksonJsonProvider(m_objectMapper);
-        clientBuilder.register(jsonProvider);
+        clientBuilder.register(new JacksonJsonProvider(m_objectMapper));
 
         // Enable automatic redirects (e.g. for download)
         clientBuilder.property(HTTP_AUTOREDIRECT_PROP, true);

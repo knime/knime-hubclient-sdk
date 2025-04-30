@@ -1,0 +1,13 @@
+{
+  "type": "https://example.net/permission-error",
+  "title": "User does not have permission to see the requested workflow.",
+  "details": [
+    "User '4711' does not have permission 'read-item' on resource 'blub'."
+  ],
+  "instance": "/workflows/blub",
+  "code": "PermissionError",
+  "foo": {
+    "bar": ["blub", "blah"]  
+  },
+  "fuddel": 1
+}

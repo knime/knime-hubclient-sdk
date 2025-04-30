@@ -54,11 +54,10 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -172,13 +171,13 @@ class HubClientAPITest {
 	            .append(TestUtil.TEST_FILE_FOLDER_NAME).append(testFileName);
 
         // Obtain file object from bundle activator class.
-        File file = TestUtil.resolvePath(filePath).toFile();
+        final URL resourceUrl = TestUtil.resolveToURL(filePath);
 
-        try (InputStream is = new FileInputStream(file);) {
+        try (final InputStream is = resourceUrl.openStream()) {
             // Create a json node from the resource.
             JsonNode jsonNode = mapper.readTree(is);
 
-            // Create query paramter string.
+            // Create query parameter string.
             String queryParamString = StringUtils.EMPTY;
             if (!queryParams.isEmpty()) {
                 var queryParamPairs = queryParams.keySet().stream()

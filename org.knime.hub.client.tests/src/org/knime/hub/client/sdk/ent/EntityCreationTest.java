@@ -56,11 +56,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
@@ -71,11 +72,9 @@ import org.knime.hub.client.sdk.testing.TestUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Tests creation via Jackson deserialization of the entities in
- * {@link org.knime.hub.client.sdk.ent}.
+ * Tests creation via Jackson deserialization of the entities in {@link org.knime.hub.client.sdk.ent}.
  *
- * This class is in another package on purpose to test from outside package
- * scope.
+ * This class is in another package on purpose to test from outside package scope.
  *
  * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
@@ -100,17 +99,17 @@ class EntityCreationTest {
     private static final long EXPECTED_SIZE = 1337L;
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
-    private static final ObjectMapper MAPPER = new ApiClient(null, null, "junit-test", Duration.ofSeconds(0),
-            Duration.ofSeconds(0)).getObjectMapper();
+    private static final ObjectMapper MAPPER =
+        new ApiClient(null, null, "junit-test", Duration.ofSeconds(0), Duration.ofSeconds(0)).getObjectMapper();
 
     private static <T> T load(final String filename, final Class<T> clazz) throws IOException, URISyntaxException {
         // Path to the file inside test file folder.
-        final var filePath = IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME)
-                .append(TestUtil.TEST_FILE_FOLDER_NAME).append(filename);
+        final var filePath =
+            IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append(TestUtil.TEST_FILE_FOLDER_NAME).append(filename);
 
         // Obtain path object from bundle activator class.
-        final var path = TestUtil.resolvePath(filePath);
-        return MAPPER.readValue(Files.readString(path), clazz);
+        final var url = TestUtil.resolveToURL(filePath);
+        return MAPPER.readValue(url, clazz);
     }
 
     @Test
@@ -131,8 +130,8 @@ class EntityCreationTest {
         assertEquals(EXPECTED_COMPONENT_ID, componentWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, componentWithDetails.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, componentWithDetails.getDescription().get(), "Unexpected description");
-        assertEquals(EXPECTED_SPACE_ID,
-                componentWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
+        assertEquals(EXPECTED_SPACE_ID, componentWithDetails.getDetails().get().getSpace().getSpaceId(),
+            "Unexpected space Id");
         assertFalse(componentWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertEquals(EXPECTED_SIZE, componentWithDetails.getSize(), "Unexpected size");
     }
@@ -156,8 +155,8 @@ class EntityCreationTest {
         assertEquals(EXPECTED_OWNER, data.getOwner(), "Unexpected owner");
         assertTrue(data.getDescription().isEmpty(), "Unexpected description");
         assertTrue(data.getDetails().isEmpty(), "Unexpected details");
-        assertEquals(EXPECTED_SPACE_ID,
-                dataWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
+        assertEquals(EXPECTED_SPACE_ID, dataWithDetails.getDetails().get().getSpace().getSpaceId(),
+            "Unexpected space Id");
         assertEquals(EXPECTED_SIZE, data.getSize(), "Unexpected size");
     }
 
@@ -179,8 +178,8 @@ class EntityCreationTest {
         assertEquals(EXPECTED_WORKFLOW_ID, workflowWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowWithDetails.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, workflowWithDetails.getDescription().get(), "Unexpected description");
-        assertEquals(EXPECTED_SPACE_ID,
-                workflowWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
+        assertEquals(EXPECTED_SPACE_ID, workflowWithDetails.getDetails().get().getSpace().getSpaceId(),
+            "Unexpected space Id");
         assertFalse(workflowWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertEquals(EXPECTED_SIZE, workflowWithDetails.getSize(), "Unexpected size");
     }
@@ -208,14 +207,14 @@ class EntityCreationTest {
         assertFalse(workflowGroup.getChildren().isEmpty(), "Children are missing");
 
         final var workflowGroupWithDetails = load("workflowGroupWithDetails.json", WorkflowGroup.class);
-        assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP,
-                workflowGroupWithDetails.getType(), "Unexpected type");
+        assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroupWithDetails.getType(),
+            "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroupWithDetails.getPath(), "Unexpected path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_ID, workflowGroupWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowGroupWithDetails.getOwner(), "Unexpected owner");
         assertTrue(workflowGroupWithDetails.getDescription().isEmpty(), "Unexpected description");
-        assertEquals(EXPECTED_SPACE_ID,
-                workflowGroupWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
+        assertEquals(EXPECTED_SPACE_ID, workflowGroupWithDetails.getDetails().get().getSpace().getSpaceId(),
+            "Unexpected space Id");
         assertFalse(workflowGroupWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertFalse(workflowGroupWithDetails.getChildren().isEmpty(), "Children are missing");
     }
@@ -243,15 +242,15 @@ class EntityCreationTest {
         assertTrue(items.containsKey("/my-group/my-empty-group"), "Expected key");
 
         final var itemUploadRequest1 = items.get("/my-workflow");
-        assertEquals("application/vnd.knime.workflow+zip",
-                itemUploadRequest1.getItemContentType(), "Unexpected item content type");
+        assertEquals("application/vnd.knime.workflow+zip", itemUploadRequest1.getItemContentType(),
+            "Unexpected item content type");
         assertNull(itemUploadRequest1.getInitialPartCount(), "Unexpected initial part count");
         final var itemUploadRequest2 = items.get("/my-group/my-data-file");
         assertEquals("text/plain", itemUploadRequest2.getItemContentType(), "Unexpected item content type");
-        assertEquals(3,  itemUploadRequest2.getInitialPartCount(), "Unexpected part count");
+        assertEquals(3, itemUploadRequest2.getInitialPartCount(), "Unexpected part count");
         final var itemUploadRequest3 = items.get("/my-group/my-empty-group");
-        assertEquals("application/vnd.knime.workflow-group",
-                itemUploadRequest3.getItemContentType(), "Unexpected item content type");
+        assertEquals("application/vnd.knime.workflow-group", itemUploadRequest3.getItemContentType(),
+            "Unexpected item content type");
         assertNull(itemUploadRequest3.getInitialPartCount(), "Unexpected initial part count");
     }
 
@@ -267,15 +266,15 @@ class EntityCreationTest {
 
         final var itemUploadInstructions1 = items.get("/my-workflow");
         assertEquals("d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0",
-                itemUploadInstructions1.getUploadId(), "Unexpected upload ID");
+            itemUploadInstructions1.getUploadId(), "Unexpected upload ID");
         final var uploadParts1 = itemUploadInstructions1.getParts();
         assertTrue(uploadParts1.isEmpty(), "Unexpected upload parts");
 
         final var itemUploadInstructions2 = items.get("/my-group/my-data-file");
         assertEquals("7227362d-c1ae-452c-a53c-cf0d609caef4~874d4805-f51f-4c83-81c1-10919e3dee48",
-                itemUploadInstructions2.getUploadId(), "Unexpected upload ID");
+            itemUploadInstructions2.getUploadId(), "Unexpected upload ID");
         final var uploadParts2 = itemUploadInstructions2.getParts().get();
-        assertEquals(3,  uploadParts2.size(), "Unexpected number of upload parts");
+        assertEquals(3, uploadParts2.size(), "Unexpected number of upload parts");
         assertTrue(uploadParts2.containsKey(1), "Expected key");
         assertTrue(uploadParts2.containsKey(2), "Expected key");
         assertTrue(uploadParts2.containsKey(3), "Expected key");
@@ -283,18 +282,18 @@ class EntityCreationTest {
         expectedHeaders.put("Host", List.of("example.com"));
         final var uploadTargetPart21 = uploadParts2.get(1);
         assertEquals("PUT", uploadTargetPart21.getMethod(), "Unexpected method");
-        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."),
-                uploadTargetPart21.getUrl(), "Unexpected url");
+        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."), uploadTargetPart21.getUrl(),
+            "Unexpected url");
         assertEquals(expectedHeaders, uploadTargetPart21.getHeader(), "Unexpected header");
         final var uploadTargetPart22 = uploadParts2.get(2);
         assertEquals("PUT", uploadTargetPart22.getMethod(), "Unexpected method");
-        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."),
-                uploadTargetPart22.getUrl(), "Unexpected url");
+        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."), uploadTargetPart22.getUrl(),
+            "Unexpected url");
         assertEquals(expectedHeaders, uploadTargetPart22.getHeader(), "Unexpected header");
         final var uploadTargetPart23 = uploadParts2.get(3);
         assertEquals("PUT", uploadTargetPart23.getMethod(), "Unexpected method");
-        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."),
-                uploadTargetPart23.getUrl(), "Unexpected url");
+        assertEquals(new URL("https://example.com/foo?X-Amz-Algorithm=..."), uploadTargetPart23.getUrl(),
+            "Unexpected url");
         assertEquals(expectedHeaders, uploadTargetPart23.getHeader(), "Unexpected header");
 
         final var itemUploadInstructions3 = items.get("/my-group/my-empty-group");
@@ -306,16 +305,16 @@ class EntityCreationTest {
     void testCreateUploadStatus() throws IOException, URISyntaxException {
         final var uploadStatus = load("uploadStatus.json", UploadStatus.class);
         assertEquals("d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0",
-                uploadStatus.getUploadId(), "Unexpected upload ID");
-        assertEquals("account:user:c1df863a-0410-4b27-97fc-5ceb3a515176",
-                uploadStatus.getInitiatorAccountId(), "Unexpected initiator account ID");
+            uploadStatus.getUploadId(), "Unexpected upload ID");
+        assertEquals("account:user:c1df863a-0410-4b27-97fc-5ceb3a515176", uploadStatus.getInitiatorAccountId(),
+            "Unexpected initiator account ID");
         assertEquals("PREPARED", uploadStatus.getStatus().toString(), "Unexpected status");
-        assertEquals("Waiting for item to be fully uploaded.",
-                uploadStatus.getStatusMessage(), "Unexpected status message");
-        assertEquals(Instant.parse("2023-08-22T09:11:02+00:00"),
-                uploadStatus.getLastUpdated(), "Unexpected last updated");
+        assertEquals("Waiting for item to be fully uploaded.", uploadStatus.getStatusMessage(),
+            "Unexpected status message");
+        assertEquals(Instant.parse("2023-08-22T09:11:02+00:00"), uploadStatus.getLastUpdated(),
+            "Unexpected last updated");
         assertEquals("/Users/account:user:c1df863a-0410-4b27-97fc-5ceb3a515176/my-space/my-workflow",
-                uploadStatus.getTargetCanonicalPath(), "Unexpected target canonicla path");
+            uploadStatus.getTargetCanonicalPath(), "Unexpected target canonical path");
     }
 
     @Test
@@ -414,12 +413,36 @@ class EntityCreationTest {
 
     @Test
     void testCreateRFC9457ErrorResponse() throws IOException, URISyntaxException {
-        final var rfc9457 = load("rfc9457.json", RFC9457.class);
-        assertTrue(rfc9457.getType().isEmpty(), "Unexpected type");
-        assertTrue(rfc9457.getStatus().isEmpty(), "Unexpected status");
-        assertEquals("Item '*k9uLSSInH1xt2UHo' does not exist.", rfc9457.getTitle(), "Unexpected title");
-        assertTrue(rfc9457.getInstance().isEmpty(), "Unexpected instance");
-        assertTrue(rfc9457.getDetails().isEmpty(), "Unexpected dteails");
-        assertTrue(rfc9457.getCode().isEmpty(), "Unexpected code");
+        final var basic = load("rfc9457.json", RFC9457.class);
+        assertEquals(Optional.empty(), basic.getType(), "Unexpected type");
+        assertEquals(Optional.empty(), basic.getStatus(), "Unexpected status");
+        assertEquals("Item '*k9uLSSInH1xt2UHo' does not exist.", basic.getTitle(), "Unexpected title");
+        assertEquals(Optional.empty(), basic.getInstance(), "Unexpected instance");
+        assertEquals(List.of(), basic.getDetails(), "Unexpected details");
+        assertEquals(Optional.empty(), basic.getCode(), "Unexpected code");
+        assertEquals(Map.of(), basic.getAdditionalProperties(), "Unexpected additional properties");
+
+        final var additional = load("rfc9457AdditionalProps.json", RFC9457.class);
+        assertEquals(Optional.of("https://example.com/probs/out-of-credit"), additional.getType(), "Unexpected type");
+        assertEquals(Optional.empty(), additional.getStatus(), "Unexpected status");
+        assertEquals("You do not have enough credit.", additional.getTitle(), "Unexpected title");
+        assertEquals(Optional.of("/account/12345/msgs/abc"), additional.getInstance(), "Unexpected instance");
+        assertEquals(List.of(), additional.getDetails(), "Unexpected details");
+        assertEquals(Optional.empty(), additional.getCode(), "Unexpected code");
+        final var additionalProps = Map.of("balance", 30, "accounts", List.of("/account/12345", "/account/67890"),
+            "detail", "Your current balance is 30, but that costs 50.");
+        assertEquals(additionalProps, additional.getAdditionalProperties(), "Unexpected additional properties");
+
+        final var withCode = load("rfc9457WithCode.json", RFC9457.class);
+        assertEquals(Optional.of("https://example.net/permission-error"), withCode.getType(), "Unexpected type");
+        assertEquals(Optional.empty(), withCode.getStatus(), "Unexpected status");
+        assertEquals("User does not have permission to see the requested workflow.", withCode.getTitle(),
+            "Unexpected title");
+        assertEquals(Optional.of("/workflows/blub"), withCode.getInstance(), "Unexpected instance");
+        assertEquals(List.of("User '4711' does not have permission 'read-item' on resource 'blub'."),
+            withCode.getDetails(), "Unexpected details");
+        assertEquals(Optional.of("PermissionError"), withCode.getCode(), "Unexpected code");
+        assertEquals(Map.of("foo", Map.of("bar", List.of("blub", "blah")), "fuddel", 1),
+            withCode.getAdditionalProperties(), "Unexpected additional properties");
     }
 }
