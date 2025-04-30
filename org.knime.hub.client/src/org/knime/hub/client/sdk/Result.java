@@ -35,8 +35,7 @@ import org.apache.commons.lang3.function.FailableFunction;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Result of an operation, either a {@link Success} containing a value or a {@link Failure} containing a message
- * and/or a {@link Throwable}.
+ * Result of an operation, either a {@link Success} containing a value or a {@link Failure} containing a failure object.
  *
  * @param <V> type of the result's value
  * @param <E> type of the result's failure
@@ -109,44 +108,52 @@ public sealed interface Result<V, E> {
      * @param <E> failure type
      * @return pair of a list of successes and a list of failures
      */
-    static <V, E> Collector<Result<V, E>, ?, Pair<List<V>, List<Failure<Void, E>>>> partitioningCollector() {
-        return new Collector<Result<V, E>, Pair<List<V>, List<Failure<Void, E>>>, // NOSONAR
-                Pair<List<V>, List<Failure<Void, E>>>>() {
-            @Override
-            public Supplier<Pair<List<V>, List<Failure<Void, E>>>> supplier() {
-                return () -> Pair.of(new ArrayList<>(), new ArrayList<>());
-            }
+    static <V, E> Collector<Result<V, E>, ?, Pair<List<V>, List<E>>> partitioningCollector() {
+        return new PartitioningCollector<>();
+    }
 
-            @Override
-            public BiConsumer<Pair<List<V>, List<Failure<Void, E>>>, Result<V, E>> accumulator() {
-                return (partial, result) -> {
-                    if (result instanceof Success<V, E> success) {
-                        partial.getLeft().add(success.value);
-                    } else {
-                        partial.getRight().add(((Failure<V, E>) result).coerceResultType());
-                    }
-                };
-            }
+    /**
+     * Collector for sorting a stream of {@link Result}s into one list of successes and a second list of failures.
+     * @param <V> type of the results' values
+     * @param <E> type of the results' failures
+     */
+    final class PartitioningCollector<V, E>
+        implements Collector<Result<V, E>, Pair<List<V>, List<E>>, Pair<List<V>, List<E>>> {
 
-            @Override
-            public BinaryOperator<Pair<List<V>, List<Failure<Void, E>>>> combiner() {
-                return (left, right) -> {
-                    left.getLeft().addAll(right.getLeft());
-                    left.getRight().addAll(right.getRight());
-                    return left;
-                };
-            }
+        @Override
+        public Supplier<Pair<List<V>, List<E>>> supplier() {
+            return () -> Pair.of(new ArrayList<>(), new ArrayList<>());
+        }
 
-            @Override
-            public Function<Pair<List<V>, List<Failure<Void, E>>>, Pair<List<V>, List<Failure<Void, E>>>> finisher() {
-                return Function.identity();
-            }
+        @Override
+        public BiConsumer<Pair<List<V>, List<E>>, Result<V, E>> accumulator() {
+            return (partial, result) -> {
+                if (result instanceof Success<V, ?> success) {
+                    partial.getLeft().add(success.value);
+                } else {
+                    partial.getRight().add(((Failure<?, E>)result).failure);
+                }
+            };
+        }
 
-            @Override
-            public Set<Characteristics> characteristics() {
-                return EnumSet.of(Characteristics.IDENTITY_FINISH);
-            }
-        };
+        @Override
+        public BinaryOperator<Pair<List<V>, List<E>>> combiner() {
+            return (left, right) -> {
+                left.getLeft().addAll(right.getLeft());
+                left.getRight().addAll(right.getRight());
+                return left;
+            };
+        }
+
+        @Override
+        public Function<Pair<List<V>, List<E>>, Pair<List<V>, List<E>>> finisher() {
+            return Function.identity();
+        }
+
+        @Override
+        public Set<Characteristics> characteristics() {
+            return EnumSet.of(Characteristics.IDENTITY_FINISH);
+        }
     }
 
     /**
@@ -188,8 +195,16 @@ public sealed interface Result<V, E> {
      * @return value returned by the called callback
      * @throws T if thrown from the callbacks
      */
-    <R, T extends Throwable> R match(FailableFunction<V, R, T> success,
-        FailableFunction<E, R, T> failure) throws T;
+    <R, T extends Throwable> R match(FailableFunction<V, R, T> success, FailableFunction<E, R, T> failure) throws T;
+
+    /**
+     * Returns this result (which must be a failure) as {@link Failure} with inferred result type.
+     *
+     * @param <R2> result type (ignored)
+     * @return the failure
+     * @throws IllegalStateException if this result is a {@link Success}
+     */
+    <R2> Failure<R2, E> asFailure();
 
     /**
      * Successful result containing a value.
@@ -199,6 +214,7 @@ public sealed interface Result<V, E> {
      * @param value result value
      */
     public record Success<V2, E2>(V2 value) implements Result<V2, E2> {
+
         @Override
         public <R, T extends Throwable> R match(final FailableFunction<V2, R, T> success,
             final FailableFunction<E2, R, T> failure) throws T {
@@ -210,6 +226,11 @@ public sealed interface Result<V, E> {
                 throws T {
             return func.apply(value);
         }
+
+        @Override
+        public <R2> Failure<R2, E2> asFailure() {
+            throw new IllegalStateException("Not a failure");
+        }
     }
 
     /**
@@ -217,32 +238,27 @@ public sealed interface Result<V, E> {
      *
      * @param <V2> type of the result value (ignored here)
      * @param <E2> type of the failure
-     * @param value the failure object
+     * @param failure the failure object
      */
-    public record Failure<V2, E2>(E2 value) implements Result<V2, E2> {
+    public record Failure<V2, E2>(E2 failure) implements Result<V2, E2> {
+
         @Override
-        public <R, T extends Throwable> R match(final FailableFunction<V2, R, T> success,
-                final FailableFunction<E2, R, T> failure) throws T {
-            return failure.apply(value);
+        public <R, T extends Throwable> R match(final FailableFunction<V2, R, T> successFunc,
+                final FailableFunction<E2, R, T> failureFunc) throws T {
+            return failureFunc.apply(failure);
         }
 
         @Override
         public <W, T extends Throwable> Result<W, E2> andThen(final FailableFunction<V2, Result<W, E2>, T> func) {
-            return coerceResultType();
+            return asFailure();
         }
 
-        /**
-         * Casts this failure to a failure with a different result type. This is always safe because there is no result.
-         *
-         * @param <W> new result type
-         * @return this failure with changed type
-         */
-        public <W> Failure<W, E2> coerceResultType() {
+        @Override
+        public <W> Failure<W, E2> asFailure() {
             @SuppressWarnings("unchecked")
             final var cast = (Failure<W, E2>)this;
             return cast;
         }
     }
-
 }
 

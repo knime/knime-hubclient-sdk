@@ -44,58 +44,60 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Apr 24, 2025 (magnus): created
+ *   10 May 2025 (leonard.woerteler): created
  */
-package org.knime.hub.client.sdk.api;
+package org.knime.hub.client.sdk;
 
 import java.io.IOException;
-import java.util.Map;
 
-import org.eclipse.core.runtime.IPath;
-import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.hub.client.sdk.ApiClient;
-import org.knime.hub.client.sdk.ApiClient.Method;
-import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.ent.Billboard;
-
-import jakarta.ws.rs.core.GenericType;
-import jakarta.ws.rs.core.MediaType;
+import org.knime.hub.client.sdk.Result.Failure;
 
 /**
- * Account Service client for KNIME Hub.
+ * Exception containing a {@link Result.Failure} from the Hub Client SDK.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public final class AccountServiceClient {
+@SuppressWarnings({ "serial", "java:S1948" }) // serialization
+public class HubFailureIOException extends IOException {
 
-    private static final String BILLBOARD_API_PATH = "knime/rest";
-
-    private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
-
-    private final @NotOwning ApiClient m_apiClient;
+    private final FailureValue m_failure;
 
     /**
-     * Create the {@link AccountServiceClient} given an {@link ApiClient}
+     * Constructor.
      *
-     * @param apiClient the {@link ApiClient}
+     * @param failure the wrapped failure
      */
-    public AccountServiceClient(final @NotOwning ApiClient apiClient) {
-        m_apiClient = apiClient;
+    public HubFailureIOException(final FailureValue failure) {
+        this(failure.title(), failure);
     }
 
     /**
-     * Retrieves the billboard information of the hub instance.
+     * Constructor with custom message.
      *
-     * @param additionalHeaders Map of additional headers
-     * @return {@link ApiResponse}
-     *
-     * @throws IOException if an I/O error occurred
+     * @param message custom message
+     * @param failure the wrapped failure
      */
-    public ApiResponse<Billboard> getBillboard(final Map<String, String> additionalHeaders) throws IOException {
-        final var requestPath = IPath.forPosix(BILLBOARD_API_PATH);
-        return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
-            .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.GET, null, BILLBOARD);
+    public HubFailureIOException(final String message, final FailureValue failure) {
+        super(message, failure.cause());
+        m_failure = failure;
+    }
+
+    /**
+     * Returns the wrapped failure value.
+     *
+     * @return failure value
+     */
+    public FailureValue getValue() {
+        return m_failure;
+    }
+
+    /**
+     * Returns a {@link Result.Failure} containing this exception's wrapped failure value.
+     *
+     * @param <R> result type (ignored)
+     * @return the failure
+     */
+    public <R> Failure<R, FailureValue> asFailure() {
+        return Result.failure(m_failure);
     }
 }

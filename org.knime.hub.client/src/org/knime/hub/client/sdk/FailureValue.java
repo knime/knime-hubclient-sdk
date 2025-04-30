@@ -48,19 +48,130 @@
  */
 package org.knime.hub.client.sdk;
 
-import java.util.Optional;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.List;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.knime.hub.client.sdk.ent.RFC9457;
+import org.apache.commons.lang3.StringUtils;
+import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
+
+import jakarta.ws.rs.ProcessingException;
+import jakarta.ws.rs.client.ResponseProcessingException;
 
 /**
  * Record describing the supported request failure values.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  *
- * @param exceptionFailure failure containing an error message and {@link Throwable} cause
- * @param jsonFailure failure containing the problem JSON
+ * @param type failure type
+ * @param status HTTP status, {@code -1} if not applicable
+ * @param title error title for the failure category
+ * @param details list of details (user-oriented explanation/hint)
+ * @param cause throwable cause of the failure, {@code null} if not applicable
  */
-public record FailureValue (
-    Optional<Pair<String, Throwable>> exceptionFailure,
-    Optional<RFC9457> jsonFailure) {}
+public record FailureValue ( //
+    FailureType type,
+    int status,
+    String title, //
+    List<String> details, //
+    Throwable cause) {
+
+    /**
+     * Creates a failure value from an {@code application/problem+json} Hub response.
+     *
+     * @param type failure type
+     * @param status HTTP status
+     * @param problem problem description
+     * @return failure value
+     */
+    public static FailureValue fromRFC9457(final FailureType type, final int status, final ProblemDescription problem) {
+        return new FailureValue(type, status, problem.getTitle(), problem.getDetails(), null);
+    }
+
+    /**
+     * Creates a failure value with the given type and title.
+     *
+     * @param type failure type
+     * @param title problem title
+     * @return failure value
+     */
+    public static FailureValue withTitle(final FailureType type, final String title) {
+        return new FailureValue(type, -1, title, List.of(), null);
+    }
+
+    /**
+     * Creates a failure value for an unexpected {@link Throwable}.
+     *
+     * @param title problem title
+     * @param thrw throwable cause
+     * @return failure value
+     */
+    public static FailureValue fromUnexpectedThrowable(final String title, final Throwable thrw) {
+        return new FailureValue(FailureType.UNEXPECTED_ERROR, -1, title, List.of(), thrw);
+    }
+
+    /**
+     * Creates a failure value for an expected {@link Throwable}.
+     *
+     * @param type failure type
+     * @param title problem title
+     * @param thrw throwable cause
+     * @return failure value
+     */
+    public static FailureValue fromThrowable(final FailureType type, final String title, final Throwable thrw) {
+        return new FailureValue(type, -1, title, List.of(), thrw);
+    }
+
+    /**
+     * Creates a failure value for a connectivity-related {@link Throwable}.
+     *
+     * @param thrw throwable cause
+     * @return failure value
+     */
+    public static FailureValue forConnectivityProblem(final Throwable thrw) {
+        final var message = thrw.getMessage();
+        final var title = "Network connectivity problem" + (StringUtils.isBlank(message) ? "" : (": " + message));
+        return new FailureValue(FailureType.NETWORK_CONNECTIVITY_ERROR, -1, title, List.of(), thrw);
+    }
+
+    /**
+     * Creates a failure value for a non-successful HTTP request.
+     *
+     * @param type failure type
+     * @param status HTTP status
+     * @param title failure title
+     * @return failure value
+     */
+    public static FailureValue fromHTTP(final FailureType type, final int status, final String title) {
+        return new FailureValue(type, status, title, List.of(), null);
+    }
+
+    /**
+     * Creates a failure value for a logged-out authenticator.
+     *
+     * @param cnae cause
+     * @return failure value
+     */
+    public static FailureValue fromAuthFailure(final CouldNotAuthorizeException cnae) {
+        return new FailureValue(FailureType.COULD_NOT_AUTHORIZE, -1, "Network connectivity problem", List.of(), cnae);
+    }
+
+    /**
+     * Creates a failure value for problem processing an HTTP request or response.
+     *
+     * @param e processing exception
+     * @return failure value
+     */
+    public static FailureValue fromProcessingException(final ProcessingException e) {
+        final var cause = e.getCause();
+        if (cause instanceof SocketException || cause instanceof SocketTimeoutException) {
+            return forConnectivityProblem(cause);
+        }
+
+        final var prefix =
+            "Error while processing " + (e instanceof ResponseProcessingException ? "response" : "request");
+        final var message = StringUtils.getIfBlank(e.getMessage(), cause::getMessage);
+        return fromUnexpectedThrowable(prefix + (StringUtils.isBlank(message) ? "" : (": " + message)), e.getCause());
+    }
+}

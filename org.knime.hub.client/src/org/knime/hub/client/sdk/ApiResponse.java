@@ -53,8 +53,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
-import org.knime.core.util.exception.HttpExceptionUtils;
-import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.Result.Success;
 
 import jakarta.ws.rs.core.EntityTag;
 
@@ -66,11 +65,12 @@ import jakarta.ws.rs.core.EntityTag;
  * @param statusCode    the response status code
  * @param statusMessage the response status message
  * @param etag          the response etag
- * @param result        {@link Result} the response result
+ * @param result        {@link Result} the response result, only a {@link Success} in case of 2XX response codes
  * @param <R>           the response type
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
+@SuppressWarnings("java:S1105") // curly brace location, seems to be buggy
 public record ApiResponse<R> (
         Map<String, List<Object>> headers,
         int statusCode,
@@ -82,9 +82,9 @@ public record ApiResponse<R> (
      * Checks that the given response signals success (via a 2XX HTTP status code).
      *
      * @return the response body
-     * @throws ResourceAccessException if the request was unsuccessful
+     * @throws HubFailureIOException if the request was unsuccessful
      */
-    public R checkSuccessful() throws ResourceAccessException {
+    public R checkSuccessful() throws HubFailureIOException {
         return checkSuccessful(msg -> msg);
     }
 
@@ -93,21 +93,13 @@ public record ApiResponse<R> (
      *
      * @param messageCallback callback for modifying the error message, receiving the message from the response
      * @return the response body
-     * @throws ResourceAccessException if the request was unsuccessful
+     * @throws HubFailureIOException if the request was unsuccessful
      */
-    public R checkSuccessful(final UnaryOperator<String> messageCallback) throws ResourceAccessException {
+    public R checkSuccessful(final UnaryOperator<String> messageCallback) throws HubFailureIOException {
         if (result instanceof Result.Success<R, FailureValue> success) {
             return success.value();
         }
-        final var failure = (Result.Failure<R, FailureValue>)result;
-        final var exceptionFailureOpt = failure.value().exceptionFailure();
-        final var jsonFailureOpt = failure.value().jsonFailure();
-        String message = null;
-        if (exceptionFailureOpt.isPresent()) {
-            message = exceptionFailureOpt.get().getLeft();
-        } else if (jsonFailureOpt.isPresent()) {
-            message = jsonFailureOpt.get().getTitle();
-        }
-        throw HttpExceptionUtils.wrapException(statusCode, messageCallback.apply(message));
+        final var failure = result.asFailure().failure();
+        throw new HubFailureIOException(messageCallback.apply(failure.title()), failure);
     }
 }

@@ -51,23 +51,18 @@ package org.knime.hub.client.sdk;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -75,7 +70,7 @@ import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.hub.client.sdk.ent.RFC9457;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,14 +87,11 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.Invocation;
-import jakarta.ws.rs.client.ResponseProcessingException;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.Response.Status.Family;
-import jakarta.ws.rs.core.Response.StatusType;
 
 /**
  * API client used to make REST requests.
@@ -112,7 +104,8 @@ public class ApiClient implements AutoCloseable {
     private static final String HTTP_RECEIVE_TIMEOUT_PROP = "http.receive.timeout";
     private static final String HTTP_AUTOREDIRECT_PROP = "http.autoredirect";
 
-    private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
+    /** Media type for an RFC 9457 problem description. */
+    public static final MediaType APPLICATION_PROBLEM_JSON_TYPE = MediaType.valueOf("application/problem+json");
 
     /**
      * HTTP request method
@@ -411,15 +404,12 @@ public class ApiClient implements AutoCloseable {
          * @param contentType the content type
          * @param authNames   the valid authentication names
          * @return the {@link Response} of the Hub API
-         * @throws UnsupportedEncodingException
-         * @throws URISyntaxException
-         * @throws CouldNotAuthorizeException
-         * @throws IOException
+         * @throws HubFailureIOException
          */
-        private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody,
-            final Authenticator auth) throws CouldNotAuthorizeException, IOException {
+        private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody)
+            throws HubFailureIOException {
             // Build the invocation builder which makes the request
-            var builder = createInvocationBuilder(uri, auth, requestBody);
+            var builder = createInvocationBuilder(uri, requestBody);
 
             // Execute the request and retrieve the response
             return executeHttpRequest(builder, method, requestBody);
@@ -429,17 +419,23 @@ public class ApiClient implements AutoCloseable {
          * Creates the {@link Invocation.Builder} for the HTTP request.
          *
          * @param uri the request URL
-         * @param auth the {@link Authenticator}
          * @param body the request body
          *
          * @return the {@link Invocation.Builder}
          *
-         * @throws CouldNotAuthorizeException
+         * @throws HubFailureIOException
          */
-        private Invocation.Builder createInvocationBuilder(final URI uri, final Authenticator auth, final Object body)
-                throws CouldNotAuthorizeException {
+        private Invocation.Builder createInvocationBuilder(final URI uri, final Object body)
+            throws HubFailureIOException {
 
-            m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
+            try {
+                m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
+            } catch (final ProcessingException pe) {
+                throw new HubFailureIOException(FailureValue.fromProcessingException(pe));
+            } catch (CouldNotAuthorizeException cnae) {
+                throw new HubFailureIOException(FailureValue.fromAuthFailure(cnae));
+            }
+
             m_headerParams.remove(HttpHeaders.USER_AGENT);
             if (m_userAgent != null) {
                 m_headerParams.put(HttpHeaders.USER_AGENT, m_userAgent);
@@ -471,13 +467,9 @@ public class ApiClient implements AutoCloseable {
                 m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
-            for (final Entry<String, String> keyValue : m_headerParams.entrySet()) {
-                builder.header(keyValue.getKey(), keyValue.getValue());
-            }
-
-            for (final Entry<String, String> keyValue : m_cookieParams.entrySet()) {
-                builder.cookie(keyValue.getKey(), keyValue.getValue());
-            }
+            // Set headers and cookies
+            m_headerParams.forEach(builder::header);
+            m_cookieParams.forEach(builder::cookie);
 
             return builder;
         }
@@ -489,11 +481,10 @@ public class ApiClient implements AutoCloseable {
          * @param method      the request method
          * @param requestBody the request body
          * @return the {@link Response}
-         * @throws IOException
          */
         @SuppressWarnings("java:S1166")
         private Response executeHttpRequest(final Invocation.Builder builder, final Method method,
-            final Object requestBody) throws IOException {
+            final Object requestBody) throws HubFailureIOException {
             try {
                 return switch (method) {
                     case POST, PUT, PATCH -> builder
@@ -502,10 +493,7 @@ public class ApiClient implements AutoCloseable {
                     case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
                 };
             } catch (ProcessingException e) {
-                final var message =
-                    e instanceof ResponseProcessingException ? "Response processing failed" : "Processing failed";
-                final var cause = e.getCause();
-                throw cause instanceof IOException ioe ? ioe : new IOException(message, cause);
+                throw new HubFailureIOException(FailureValue.fromProcessingException(e));
             }
         }
 
@@ -519,63 +507,49 @@ public class ApiClient implements AutoCloseable {
          * @param path              The sub-path of the HTTP URL.
          * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
          * @param body              The request body object - if it is not binary, otherwise null.
-         * @param returnType        The {@link GenericType} which should be returned
          *
          * @return {@link ApiResponse}
          *
-         * @throws CouldNotAuthorizeException if the request couldn't be authorized
-         * @throws IOException if an I/O error occurred
+         * @throws HubFailureIOException if the request failed before a response was received
+         */
+        public ApiResponse<Void> invokeAPI(final IPath path, final Method method, final Object body)
+            throws HubFailureIOException {
+            return invokeAPI(path, method, body, (GenericType<Void>)null);
+        }
+
+        /**
+         * Invoke API by sending HTTP request with the given options.
+         *
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         * @param returnType        The {@link GenericType} which should be returned, {@code null} ignores the response
+         *
+         * @return {@link ApiResponse}
+         *
+         * @throws HubFailureIOException if the request failed before a response was received
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
-                final GenericType<R> returnType) throws CouldNotAuthorizeException, IOException {
-            CheckUtils.checkNotNull(returnType, "Missing return type for '%s' '%s'".formatted(method, path));
+                final GenericType<R> returnType) throws HubFailureIOException {
 
             // Retrieve the API response
             final var t0 = System.currentTimeMillis();
             final var uri = buildUrl(path);
-            @SuppressWarnings("resource") // Is closed afterwards since it's needed in method calls
-            Response response = null;
-            try {
-                response = getAPIResponse(uri, method, body, m_auth);
-                final var responseHeaders = response.getHeaders();
+            try (final var response = getAPIResponse(uri, method, body)) {
 
-                // Get the status info and set the response content-type to
-                // null in case the response does not have any content.
-                final var responseStatusInfo = response.getStatusInfo();
-                String responseContentType = null;
-                if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                    responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).get(0).toString();
-                }
+                final var httpStatus = response.getStatusInfo();
+                final  Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+                    case SUCCESSFUL -> returnType == null ? Result.success(null)
+                        : readEntity(method, uri, returnType, response);
+                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
+                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
+                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
+                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
+                };
 
-                R responseEntity = null;
-                final var responseStatusFamily = responseStatusInfo.getFamily();
-                final var responseStatusCode = responseStatusInfo.getStatusCode();
-                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-                final var responseEtag = response.getEntityTag();
-                if (Family.SUCCESSFUL == responseStatusFamily) {
-                    if (responseContentType == null) {
-                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
-                    }
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                            Optional.ofNullable(responseEtag), Result.success(response.readEntity(returnType)));
-                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
-                        Family.SERVER_ERROR == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForResponse(response, responseContentType, responseStatusInfo));
-                } else if (Family.REDIRECTION == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
-                } else {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                            Optional.ofNullable(responseEtag), null);
-                }
+                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
+                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
             } finally {
-                if (response != null) {
-                    response.close();
-                }
                 logDuration(uri, t0, System.currentTimeMillis());
             }
         }
@@ -593,66 +567,27 @@ public class ApiClient implements AutoCloseable {
          * @return {@link ApiResponse}
          * @throws IOException if an I/O error occurs during the request
          * @throws CancelationException if the user cancelled the process
-         * @throws CouldNotAuthorizeException if the request is unauthorized
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
-                final DownloadContentHandler<R> contentHandler)
-                        throws IOException, CancelationException, CouldNotAuthorizeException {
+            final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
             final var t0 = System.currentTimeMillis();
 
             // Retrieve the API response
             final var uri = buildUrl(path);
-            @SuppressWarnings("resource") // Is closed afterwards since it's needed in method calls
-            Response response = null;
-            try {
-                response = getAPIResponse(uri, method, body, m_auth);
-                final var responseHeaders = response.getHeaders();
+            try (final var response = getAPIResponse(uri, method, body)) {
 
-                // Get the status info and set the response content-type to
-                // null in case the response does not have any content.
-                final var responseStatusInfo = response.getStatusInfo();
-                String responseContentType = null;
-                final List<Object> contentTypeHeaders = responseHeaders.get(HttpHeaders.CONTENT_TYPE);
-                if (contentTypeHeaders != null && !contentTypeHeaders.isEmpty()) {
-                    responseContentType = contentTypeHeaders.get(0).toString();
-                }
+                final var httpStatus = response.getStatusInfo();
+                final Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+                    case SUCCESSFUL -> downloadContent(method, uri, response, contentHandler);
+                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
+                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
+                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
+                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
+                };
 
-                R responseEntity = null;
-                final var responseStatusFamily = responseStatusInfo.getFamily();
-                final var responseStatusCode = responseStatusInfo.getStatusCode();
-                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-                final var responseEtag = response.getEntityTag();
-                if (Family.SUCCESSFUL == responseStatusFamily) {
-                    if (responseContentType == null) {
-                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
-                    }
-
-                    // Read the content from the response input stream
-                    final var length = response.getLength();
-                    try (final var inStream = response.readEntity(InputStream.class)) {
-                        responseEntity = contentHandler.handleDownload(inStream,
-                            length < 0 ? OptionalLong.empty() : OptionalLong.of(length));
-                        return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                                Optional.ofNullable(responseEtag), Result.success(responseEntity));
-                    }
-                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
-                        Family.SERVER_ERROR == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForResponse(response, responseContentType, responseStatusInfo));
-                } else if (Family.REDIRECTION == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
-                } else {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                            Optional.ofNullable(responseEtag), null);
-                }
+                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
+                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
             } finally {
-                if (response != null) {
-                    response.close();
-                }
                 logDuration(uri, t0, System.currentTimeMillis());
             }
         }
@@ -665,13 +600,13 @@ public class ApiClient implements AutoCloseable {
          * @param method The request method, one of "GET", "POST", "PUT" and "DELETE".
          * @param data input stream for the data to be uploaded
          * @param numBytes number of bytes to be written
+         * @param returnType the {@link GenericType} of the entity to be returned, {@code null} ignores the response
          *
          * @return {@link ApiResponse}
          * @throws IOException if an I/O error occurred during the request
-         * @throws CouldNotAuthorizeException if the request is unauthorized
          */
-        public ApiResponse<Void> invokeAPI(final IPath path, final Method method, final @Owning InputStream data,
-            final long numBytes) throws IOException, CouldNotAuthorizeException {
+        public <T> ApiResponse<T> invokeAPI(final IPath path, final Method method, final @Owning InputStream data,
+            final long numBytes, final GenericType<T> returnType) throws IOException {
             if (numBytes >= 0) {
                 m_headerParams.put(HttpHeaders.CONTENT_LENGTH, Long.toString(numBytes));
             }
@@ -679,95 +614,99 @@ public class ApiClient implements AutoCloseable {
             // Retrieve the API response
             final var t0 = System.currentTimeMillis();
             final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, data, m_auth)) {
-                final var responseHeaders = response.getHeaders();
+            try (final var response = getAPIResponse(uri, method, data)) {
 
-                // Get the status info and set the response content-type to
-                // null in case the response does not have any content.
-                final var responseStatusInfo = response.getStatusInfo();
-                String responseContentType = null;
-                final List<Object> contentTypeHeaders = responseHeaders.get(HttpHeaders.CONTENT_TYPE);
-                if (contentTypeHeaders != null && !contentTypeHeaders.isEmpty()) {
-                    responseContentType = contentTypeHeaders.get(0).toString();
-                }
+                final var httpStatus = response.getStatusInfo();
+                final Result<T, FailureValue> result = switch (httpStatus.getFamily()) {
+                    case SUCCESSFUL -> returnType == null ? Result.success(null)
+                        : readEntity(method, uri, returnType, response);
+                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
+                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
+                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
+                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
+                };
 
-                final var responseStatusFamily = responseStatusInfo.getFamily();
-                final var responseStatusCode = responseStatusInfo.getStatusCode();
-                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-                final var responseEtag = response.getEntityTag();
-                if (Family.SUCCESSFUL == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                            Optional.ofNullable(responseEtag), Result.success(null));
-                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
-                        Family.SERVER_ERROR == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForResponse(response, responseContentType, responseStatusInfo));
-                } else if (Family.REDIRECTION == responseStatusFamily) {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, Optional.ofNullable(responseEtag),
-                            createFailureForRedirect(response, responseContentType, responseStatusInfo));
-                } else {
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                            Optional.ofNullable(responseEtag), null);
-                }
+                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
+                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
         }
 
-        <R> Result<R, FailureValue> createFailureForURLConnection(final HttpURLConnection connection,
-            final String contentType, final StatusType responseStatusInfo) throws IOException {
-            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
-                // Create a problem JSON failure
-                RFC9457 rfc9457;
-                try (final var errStream = connection.getErrorStream()) {
-                    rfc9457 = (RFC9457) m_objectMapper.readerFor(RFC9457.class).readValue(errStream);
-                }
-                return Result.failure(new FailureValue(Optional.empty(), Optional.ofNullable(rfc9457)));
-            } else {
-                // Create a exception failure value
-                String message;
-                try (final var errStream = connection.getErrorStream()) {
-                    message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
-                        : responseStatusInfo.getReasonPhrase();
-                }
-                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
+        private static <R> Result<R, FailureValue> readEntity(final Method method, final URI uri,
+            final GenericType<R> returnType, final @NotOwning Response response) {
+            if (!response.hasEntity()) {
+                throw new IllegalStateException("Hub response with missing body: %s %s".formatted(method, uri));
+            }
+
+            try {
+                return Result.success(response.readEntity(returnType));
+            } catch (final ProcessingException pe) {
+                return Result.failure(FailureValue.fromProcessingException(pe));
             }
         }
 
-        private static <R> Result<R, FailureValue> createFailureForResponse(final Response response,
-            final String contentType, final StatusType responseStatusInfo) {
-            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
-                // Create a problem JSON failure
-                return Result.failure(new FailureValue(Optional.empty(),
-                    Optional.ofNullable(response.hasEntity() ? response.readEntity(RFC9457.class) : null)));
-            } else {
-                // Create a exception failure value
-                final var message = StringUtils.getIfBlank(response.hasEntity() ?
-                    response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
-                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
+        private static <R> Result<R, FailureValue> downloadContent(final Method method, final URI uri,
+            final @NotOwning Response response, final DownloadContentHandler<R> contentHandler)
+            throws IOException, CancelationException {
+            if (!response.hasEntity()) {
+                throw new IllegalStateException("Hub response with missing body: %s %s".formatted(method, uri));
+            }
+
+            try (final var inStream = response.readEntity(InputStream.class)) {
+                final var length = response.getLength();
+                final var contentLength = length < 0 ? OptionalLong.empty() : OptionalLong.of(length);
+                return Result.success(contentHandler.handleDownload(inStream, contentLength));
             }
         }
 
-        private static <R> Result<R, FailureValue> createFailureForRedirect(final Response response,
-            final String contentType, final StatusType responseStatusInfo) {
-            if (contentType != null && contentType.contains(APPLICATION_PROBLEM_JSON)) {
-                // Create a problem JSON failure
-                return Result.failure(new FailureValue(Optional.empty(),
-                    Optional.ofNullable(response.hasEntity() ? response.readEntity(RFC9457.class) : null)));
-            } else {
-                // Create a exception failure value
-                String message;
-                if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                    message = "Redirect failed (firewall?): '%s'".formatted(location);
-                } else {
-                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                            null, responseStatusInfo::getReasonPhrase);
+        private static <R> Result<R, FailureValue> createFailureForResponse(final Response response) {
+            final var contentType = response.getMediaType();
+            final var responseStatusInfo = response.getStatusInfo();
+            final var statusCode = responseStatusInfo.getStatusCode();
+            if (contentType != null && contentType.isCompatible(APPLICATION_PROBLEM_JSON_TYPE)
+                    && response.hasEntity()) {
+                try {
+                    final var problemDesc = response.readEntity(ProblemDescription.class);
+                    return Result
+                        .failure(FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc));
+                } catch (final ProcessingException pe) {
+                    LOGGER.atError() //
+                        .setCause(pe) //
+                        .addArgument(responseStatusInfo.getStatusCode()) //
+                        .addArgument(responseStatusInfo.getReasonPhrase()) //
+                        .log("Hub request failed: {} {}");
+                    return Result.failure(
+                        FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
+                            "Hub request failed: " + responseStatusInfo.getReasonPhrase()));
                 }
-                return Result.failure(new FailureValue(Optional.of(Pair.of(message, null)), Optional.empty()));
             }
+
+            // Create a exception failure value
+            final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
+            if (statusCode >= 500 && LOGGER.isErrorEnabled()) {
+                LOGGER.atError() //
+                    .setCause(new IOException()) //
+                    .addArgument(statusCode) //
+                    .addArgument(message) //
+                    .log("Hub request failed: {} {}");
+            }
+            return Result.failure(
+                FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode, "Hub request failed: " + message));
+        }
+
+        private static <R> Result<R, FailureValue> createFailureForRedirect(final Response response) {
+            // A redirect is not a failure response, so we don't expect `application/problem+json` here
+            final String message;
+            if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                message = "Redirect failed (firewall?): '%s'".formatted(location);
+            } else {
+                message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                    null, () -> response.getStatusInfo().getReasonPhrase());
+            }
+            return Result.failure(FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message));
         }
 
         private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {

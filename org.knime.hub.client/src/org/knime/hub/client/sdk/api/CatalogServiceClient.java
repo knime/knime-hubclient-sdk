@@ -59,7 +59,6 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.CurrentState;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
@@ -68,6 +67,7 @@ import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.ent.DownloadStatus;
 import org.knime.hub.client.sdk.ent.PreparedDownload;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
@@ -94,6 +94,8 @@ import jakarta.ws.rs.core.MediaType;
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
 public final class CatalogServiceClient {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogServiceClient.class);
+
     /* API paths */
     private static final String REPOSITORY_API_PATH = "repository";
     private static final String UPLOAD_API_PATH = "uploads";
@@ -119,12 +121,11 @@ public final class CatalogServiceClient {
     private static final String QUERY_PARAM_PART_NUMBER = "partNumber";
 
     /* Return Types */
-    private static final GenericType<Void> VOID = new GenericType<Void>() {};
     private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<RepositoryItem>() {};
     private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<UploadStatus>() {};
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
-    private static final GenericType<PreparedDownload> PREPARED_DONWLOAD = new GenericType<PreparedDownload>() {};
+    private static final GenericType<PreparedDownload> PREPARED_DOWNLOAD = new GenericType<PreparedDownload>() {};
     private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<DownloadStatus>() {};
 
     /* Item version query parameter "special" values */
@@ -132,8 +133,6 @@ public final class CatalogServiceClient {
     private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
 
     private final @NotOwning ApiClient m_apiClient;
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogServiceClient.class);
 
     /**
      * Create the {@link CatalogServiceClient} given an {@link ApiClient}
@@ -168,21 +167,22 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
         final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
-        return m_apiClient.createApiRequest()
-                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
-                .withHeaders(additionalHeaders).invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -199,19 +199,19 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
-        return m_apiClient.createApiRequest()
-                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
-                .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, spaceRequestBody, REPOSITORY_ITEM);
     }
 
     /**
@@ -224,18 +224,19 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteItemByPath(final IPath path, final boolean softDelete,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
-            .invokeAPI(requestPath, Method.DELETE, null, VOID);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null) //
+            .invokeAPI(requestPath, Method.DELETE, null);
     }
 
     /**
@@ -248,21 +249,22 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteItemByCanonicalPath(final String accountId, final IPath subPath,
         final boolean softDelete, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+                throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
-            .invokeAPI(requestPath, Method.DELETE, null, VOID);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null) //
+            .invokeAPI(requestPath, Method.DELETE, null);
     }
 
     /**
@@ -275,18 +277,19 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Void> deleteItemById(final String id, final boolean softDelete,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
 
-        return m_apiClient.createApiRequest()
-            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null)
-            .withHeaders(additionalHeaders).invokeAPI(requestPath, Method.DELETE, null, VOID);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withQueryParam(QUERY_PARAM_SOFT_DELETE, softDelete ? Boolean.toString(softDelete) : null) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.DELETE, null);
     }
 
     /**
@@ -305,12 +308,11 @@ public final class CatalogServiceClient {
      *
      * @throws IOException if the operation had an I/O error
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemByCanonicalPath(final String accountId, final IPath subPath,
         final ItemVersion version, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-                throws IOException, CancelationException, CouldNotAuthorizeException {
+                throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(accountId);
@@ -320,7 +322,7 @@ public final class CatalogServiceClient {
             .append(subPath + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(responseType) //
+            .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
@@ -344,12 +346,11 @@ public final class CatalogServiceClient {
      *
      * @throws IOException if the operation had an I/O error
      * @throws CancelationException if the operation was canceled
-     * @throws CouldNotAuthorizeException if authorization fails
      */
     public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version,
         final MediaType responseType, final Map<String, String> additionalHeaders,
         final DownloadContentHandler<R> contentHandler)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
+        throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(id);
@@ -357,7 +358,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(responseType) //
+            .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
@@ -376,14 +377,13 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      * @throws CancelationException if the operation was canceled
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
         final Map<String, String> additionalHeaders)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
+        throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(path);
@@ -391,8 +391,8 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(responseType) //
-            .withHeaders(additionalHeaders)
+            .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
             .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
@@ -415,22 +415,23 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
         final ItemVersion version, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
         final var requestPath =
             IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId).append(subPath);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -451,19 +452,20 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByPath(final IPath path, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -487,19 +489,20 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> getRepositoryItemById(final String id, final String details,
         final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
 
-        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders)
-            .withQueryParam(getQueryParameter(version).orElse(null))
-            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces))
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
 
@@ -526,12 +529,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -540,9 +542,12 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -559,12 +564,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveByCanonicalPath(final String accountId, final IPath subPath,
         final String fromRepository, final MediaType contentType, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -573,9 +577,12 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -593,12 +600,11 @@ public final class CatalogServiceClient {
      * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      */
-    public ApiResponse<Void> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
+    public ApiResponse<RepositoryItem> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
         final MediaType contentType, final Map<String, String> additionalHeaders, final InputStream dataToTransfer,
-        final long contentLength) throws IOException, CouldNotAuthorizeException {
+        final long contentLength) throws IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -607,9 +613,10 @@ public final class CatalogServiceClient {
             .append(subPath + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength, REPOSITORY_ITEM);
     }
 
     /**
@@ -625,12 +632,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+                throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -638,6 +644,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
@@ -658,12 +665,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+                throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -671,6 +677,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
@@ -692,21 +699,21 @@ public final class CatalogServiceClient {
      * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      */
-    public ApiResponse<Void> uploadItemById(final String id, final MediaType contentType,
+    public ApiResponse<RepositoryItem> uploadItemById(final String id, final MediaType contentType,
         final Map<String, String> additionalHeaders, final InputStream dataToTransfer, final long contentLength)
-        throws IOException, CouldNotAuthorizeException {
+        throws IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength, REPOSITORY_ITEM);
     }
 
     /**
@@ -721,12 +728,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -734,6 +740,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
@@ -753,12 +760,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+                throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
         CheckUtils.checkArgumentNotNull(fromRepository);
@@ -766,6 +772,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
@@ -786,21 +793,21 @@ public final class CatalogServiceClient {
      * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
      */
-    public ApiResponse<Void> uploadItemByPath(final IPath path, final MediaType contentType,
+    public ApiResponse<RepositoryItem> uploadItemByPath(final IPath path, final MediaType contentType,
         final Map<String, String> additionalHeaders, final @Owning InputStream dataToTransfer, final long contentLength)
-        throws IOException, CouldNotAuthorizeException {
+        throws IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(contentType) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength, REPOSITORY_ITEM);
     }
 
     /**
@@ -810,18 +817,18 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Void> cancelUpload(final String uploadId, final Map<String, String> additionalHeaders)
-        throws CouldNotAuthorizeException, IOException {
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.DELETE, null, VOID);
+            .invokeAPI(requestPath, Method.DELETE, null);
     }
 
     /**
@@ -835,12 +842,11 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+                throws HubFailureIOException {
         LOGGER.atDebug() //
             .addArgument(() -> requestBody.getItems().size()) //
             .log("Initiating upload of {} items");
@@ -850,6 +856,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_MANIFEST);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .withReadTimeout(readTimeout) //
@@ -863,16 +870,16 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<UploadStatus> pollUploadStatus(final String uploadId,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_STATUS);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.GET, null, UPLOAD_STATUS);
     }
@@ -885,19 +892,19 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Void> reportUploadFinished(final String uploadId, final Map<Integer, String> requestBody,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(uploadId);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.POST, requestBody, VOID);
+            .invokeAPI(requestPath, Method.POST, requestBody);
     }
 
     /**
@@ -908,17 +915,17 @@ public final class CatalogServiceClient {
      * @param additionalHeaders Map of additional parameters
      * @return {@link ApiResponse}
      *
-     * @throws CouldNotAuthorizeException if the authorization fails
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<UploadTarget> requestPartUpload(final String uploadId, final Integer partNumber,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(uploadId);
         CheckUtils.checkArgumentNotNull(partNumber);
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_PARTS);
 
         return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber)) //
             .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
@@ -935,15 +942,13 @@ public final class CatalogServiceClient {
      * @param additionalHeaders additional header parameters
      *
      * @return {@link AsyncHubUploadStream}
-     * @throws IOException if an I/O error occurred during the upload
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws HubFailureIOException if an I/O error occurred during the upload
      */
     public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
-        throws IOException, CouldNotAuthorizeException {
-        return AsyncHubUploadStream.builder().withCatalogClient(this)
-            .withItemName(itemName).withParentId(parentId)
-            .withParentETag(parentEtag).isWorkflowLike(isWorkflowLike).withHeaders(additionalHeaders).build();
+        throws HubFailureIOException {
+        return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike,
+            null);
     }
 
     /**
@@ -955,10 +960,11 @@ public final class CatalogServiceClient {
      *
      * @return {@link ArtifactDownloadStream}
      * @throws IOException if an I/O error occurred during the download
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws CancelationException if creating the download was canceled
      */
     public @Owning ArtifactDownloadStream createArtifactDownloadStream(final ItemID itemId, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws IOException, CouldNotAuthorizeException {
+        final Map<String, String> additionalHeaders)
+        throws IOException, CancelationException {
         return ArtifactDownloadStream.create(this, additionalHeaders, itemId, version);
     }
 
@@ -971,19 +977,19 @@ public final class CatalogServiceClient {
      *        {@link CurrentState#getInstance() current-state}. (optional, default to current-state)
      * @param additionalHeaders additional header parameters
      * @return {@link ApiResponse}
-     * @throws IOException if an I/O error occurred during the request
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws HubFailureIOException if an I/O error occurred during the request
      */
-    public ApiResponse<PreparedDownload> preparedDownload(final String id, final ItemVersion version,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+    public ApiResponse<PreparedDownload> prepareDownload(final String id, final ItemVersion version,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_ARTIFACT);
 
-        return m_apiClient.createApiRequest()
-                .withHeaders(additionalHeaders)
-                .withQueryParam(getQueryParameter(version).orElse(null))
-                .invokeAPI(requestPath, Method.GET, null, PREPARED_DONWLOAD);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .invokeAPI(requestPath, Method.GET, null, PREPARED_DOWNLOAD);
     }
 
     /**
@@ -992,18 +998,18 @@ public final class CatalogServiceClient {
      * @param id The ID of the repository item whose download to prepare.
      * @param additionalHeaders additional header parameters
      * @return {@link ApiResponse}
-     * @throws IOException if an I/O error occurred during the request
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws HubFailureIOException if an I/O error occurred during the request
      */
     public ApiResponse<DownloadStatus> pollDownloadStatus(final String id,
-        final Map<String, String> additionalHeaders) throws CouldNotAuthorizeException, IOException {
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(DOWNLOAD_API_PATH).append(id).append(PATH_PIECE_STATUS);
 
-        return m_apiClient.createApiRequest()
-                .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.GET, null, DONWLOAD_STATUS);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.GET, null, DONWLOAD_STATUS);
     }
 
     /**

@@ -52,19 +52,26 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.time.Duration;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
-import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.exception.HttpExceptionUtils;
-import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
+import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureType;
+import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
+import org.knime.hub.client.sdk.ent.DownloadStatus;
+import org.knime.hub.client.sdk.transfer.AbstractHubTransfer.PollingCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +88,9 @@ public final class ArtifactDownloadStream extends FilterInputStream {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArtifactDownloadStream.class);
 
+    /** Timeout for download status polls */
+    private static final Duration DOWNLOAD_STATUS_POLL_TIMEOUT = Duration.ofSeconds(5);
+
     private @Owning Response m_response;
     private final long m_contentLength;
     private final Map<String, List<Object>> m_responseHeaders;
@@ -88,17 +98,17 @@ public final class ArtifactDownloadStream extends FilterInputStream {
     /**
      * Opens an {@link ArtifactDownloadStream} for the given artifact in the given version.
      * @param catalogClient catalog client for initiating the stream
-     * @param headers headers for Hub API calls
+     * @param clientHeaders headers for Hub API calls
      * @param itemId ID of the item to download
      * @param version version of the item to download
      *
      * @return the opened stream
-     * @throws IOException if the download stream couldn't be opened
-     * @throws CouldNotAuthorizeException if a call to a Hub API could not be authorized
+     * @throws HubFailureIOException if the download stream couldn't be opened
+     * @throws CancelationException if the user cancelled the operation while waiting for the download to be ready
      */
     public static @Owning ArtifactDownloadStream create(final CatalogServiceClient catalogClient,
-        final Map<String, String> headers, final ItemID itemId, final ItemVersion version)
-        throws IOException, CouldNotAuthorizeException {
+        final Map<String, String> clientHeaders, final ItemID itemId, final ItemVersion version)
+        throws HubFailureIOException, CancelationException {
         CheckUtils.checkArgumentNotNull(catalogClient);
         CheckUtils.checkArgumentNotNull(itemId);
 
@@ -109,28 +119,12 @@ public final class ArtifactDownloadStream extends FilterInputStream {
 
         final String downloadId;
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var response = catalogClient.preparedDownload(itemId.id(), version, headers);
-            downloadId = response.checkSuccessful().getDownloadId();
+            final var response = catalogClient.prepareDownload(itemId.id(), version, clientHeaders);
+            downloadId = response.result().orElseThrow(HubFailureIOException::new).getDownloadId();
         }
 
-        final URL downloadUrl;
-        try {
-            // poll the download status until it's ready
-            downloadUrl = CatalogServiceUtils.awaitDownloadReady(catalogClient, headers, downloadId, state -> {
-                if (LOGGER.isDebugEnabled()) {
-                    LOGGER.atDebug() //
-                        .addArgument(itemId.id()) //
-                        .addArgument(state.getStatus()) //
-                        .addArgument(state.getStatusMessage()) //
-                        .setMessage("Polling state of download item with ID '{}': {}, '{}'") //
-                        .log();
-                }
-            });
-        } catch (final InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(
-                "Download of item with ID: '%s' has been interrupted while waiting for Hub".formatted(itemId.id()));
-        }
+        // poll the download status until it's ready
+        final var downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadId);
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
@@ -138,17 +132,66 @@ public final class ArtifactDownloadStream extends FilterInputStream {
         }
     }
 
+    private static URL awaitDownloadReady(final CatalogServiceClient catalogClient,
+        final Map<String, String> clientHeaders, final ItemID itemId, final String downloadId)
+        throws HubFailureIOException, CancelationException {
+
+        final Set<DownloadStatus.StatusEnum> endStates = EnumSet.of(DownloadStatus.StatusEnum.READY,
+            DownloadStatus.StatusEnum.ABORTED, DownloadStatus.StatusEnum.FAILED);
+
+        final var poller = new PollingCallable<DownloadStatus>() {
+            @Override
+            public ApiResponse<DownloadStatus> poll() throws HubFailureIOException {
+                return catalogClient.pollDownloadStatus(downloadId, clientHeaders);
+            }
+
+            @Override
+            public boolean accept(final DownloadStatus state) {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.atDebug() //
+                    .addArgument(itemId.id()) //
+                    .addArgument(state.getStatus()) //
+                    .addArgument(state.getStatusMessage()) //
+                    .setMessage("Polling state of download item with ID '{}': {}, '{}'") //
+                    .log();
+                }
+                return endStates.contains(state.getStatus());
+            }
+        };
+
+        final DownloadStatus finalState;
+        try {
+            finalState = AbstractHubTransfer.poll(DOWNLOAD_STATUS_POLL_TIMEOUT.toMillis(), poller) //
+                .orElseThrow(HubFailureIOException::new);
+        } catch (final InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new CancelationException(
+                "Download of item with ID: '%s' has been interrupted while waiting for Hub".formatted(itemId.id()), ex);
+        }
+
+        return switch (finalState.getStatus()) {
+            case ABORTED -> throw new CancelationException();
+            case FAILED -> throw new HubFailureIOException(FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_PREP_FAILED,
+                "Item with ID %s could not be downloaded: %s".formatted(itemId.id(), finalState.getStatusMessage())));
+            case PREPARING, ZIPPING -> throw new IllegalStateException(
+                "Stopped polling download early even though no timeout was provided");
+            case READY -> finalState.getDownloadUrl() //
+                .orElseThrow(() -> new IllegalStateException("Missing download URL in Hub response"));
+        };
+    }
+
     private static @Owning ArtifactDownloadStream openDownloadStream(final @Owning Response response)
-            throws ResourceAccessException {
+        throws HubFailureIOException {
         final StatusType statusInfo = response.getStatusInfo();
         if (statusInfo.getFamily() != Family.SUCCESSFUL) {
             try (response) {
                 var reason = Optional.ofNullable(statusInfo.getReasonPhrase()) //
-                        .orElse(statusInfo.toEnum().getReasonPhrase());
+                    .orElse(statusInfo.toEnum().getReasonPhrase());
                 final String errContent = response.hasEntity() ? response.readEntity(String.class) : "";
-                throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
-                    "Could not open download stream to %s: %s".formatted(response,
-                        errContent.isBlank() ? reason : (reason + ": " + errContent)));
+                final String message = "Could not open download stream to %s: %s".formatted(response,
+                    errContent.isBlank() ? reason : (reason + ": " + errContent));
+                throw new HubFailureIOException(FailureValue.fromHTTP(FailureType.DOWNLOAD_STREAM_OPEN_FAILED,
+                    statusInfo.getStatusCode(), message));
             }
         }
         return new ArtifactDownloadStream(response);

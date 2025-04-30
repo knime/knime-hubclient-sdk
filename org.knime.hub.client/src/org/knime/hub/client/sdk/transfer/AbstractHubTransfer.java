@@ -26,9 +26,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TimerTask;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
@@ -40,35 +42,41 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
-import java.util.function.DoubleConsumer;
 import java.util.function.LongSupplier;
 import java.util.function.ObjDoubleConsumer;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
+import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.KNIMETimer;
+import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.core.util.hub.ItemVersion;
+import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
-import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.transfer.CatalogServiceUtils.TaggedRepositoryItem;
+import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response.Status;
+import jakarta.ws.rs.ext.RuntimeDelegate;
+import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
 
 /**
  * Common functionality for Hub upload and download clients.
@@ -77,26 +85,57 @@ import jakarta.ws.rs.core.HttpHeaders;
  */
 class AbstractHubTransfer {
 
-    static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
+    /** Media type for a KNIME Workflow. */
+    static final MediaType KNIME_WORKFLOW_TYPE = new MediaType("application", "vnd.knime.workflow");
+
+    /** Media type for a KNIME Workflow (KNWF). */
+    static final MediaType KNIME_WORKFLOW_TYPE_ZIP = new MediaType("application", "vnd.knime.workflow+zip");
+
+    /** Media type for a KNIME Workflow Group. */
+    static final MediaType KNIME_WORKFLOW_GROUP_TYPE = new MediaType("application", "vnd.knime.workflow-group");
+
+    /** Media type for a zipped KNIME Workflow Group (KNAR). */
+    static final MediaType KNIME_WORKFLOW_GROUP_TYPE_ZIP = new MediaType("application", "vnd.knime.workflow-group+zip");
+
+    /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
+    static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
+
+    private static final String KNIME_SERVER_NAMESPACE = "knime";
+
+    /** Relation that points to the endpoint for initiating an async upload flow. */
+    static final String INITIATE_UPLOAD = "%s:initiate-upload".formatted(KNIME_SERVER_NAMESPACE);
+
+    /** Relation that points to the endpoint for initiating an artifact download. */
+    static final String INITIATE_DOWNLOAD = "%s:download-artifact".formatted(KNIME_SERVER_NAMESPACE);
+
+    /** Relation that provides the items download control. */
+    static final String DOWNLOAD = "%s:download".formatted(KNIME_SERVER_NAMESPACE);
+
+    /** Relation that provides the items upload control. */
+    static final String UPLOAD = "%s:upload".formatted(KNIME_SERVER_NAMESPACE);
+
+    /** Relation that provides the items edit control. */
+    static final String EDIT = "edit";
+
+    static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
+        RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
     /**
      * Handler for {@link Throwable}s thrown by a {@link Future} in
      * {@link #waitForCancellable(Future, BooleanSupplier, ErrorHandler)}.
      *
      * @param <T> result type if the throwable can be handled
-     * @param <E> declared exception
      */
     @FunctionalInterface
-    interface ErrorHandler<T, E extends Exception> {
+    interface ErrorHandler<T> {
         /**
          * Handle the throwable thrown by a {@link Future}.
          *
          * @param throwable from the {@link Future}
          * @return result to be returned
-         * @throws E custom declared exception
          * @throws CancelationException if the process got cancelled
          */
-        T handle(Throwable throwable) throws E, CancelationException;
+        Result<T, FailureValue> handle(Throwable throwable) throws CancelationException;
     }
 
     static final int MAX_PATH_LENGTH_IN_MESSAGE = 64;
@@ -116,15 +155,11 @@ class AbstractHubTransfer {
     final CatalogServiceClient m_catalogClient;
     final Map<String, String> m_clientHeaders;
 
-    private static boolean m_useProblemJSON;
-
     /**
      * @param hubClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
     AbstractHubTransfer(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
-        final String acceptHeader = additionalHeaders.get(HttpHeaders.ACCEPT);
-        m_useProblemJSON = acceptHeader != null && acceptHeader.contains(APPLICATION_PROBLEM_JSON);
         m_catalogClient = hubClient.catalog();
         m_clientHeaders = additionalHeaders;
     }
@@ -141,11 +176,12 @@ class AbstractHubTransfer {
         final ProgressPoller poller, final ObjDoubleConsumer<ProgressStatus> reporter) {
         final var unitsOfWork = 1_000;
         progMon.beginTask(beginTaskMessage, unitsOfWork);
-        final var splitter = new AtomicReference<BranchingExecMonitor>();
+        final var splitterRef = new AtomicReference<BranchingExecMonitor>();
         final var prevWorked = new AtomicInteger();
         final var statusRef = new AtomicReference<ProgressStatus>();
-        final DoubleConsumer progress = p -> {
-            final var status = splitter.get().getStatus();
+
+        final var splitter = new BranchingExecMonitor(progMon::isCanceled, p -> {
+            final var status = splitterRef.get().getStatus();
             final var previous = prevWorked.get();
             final var newWorked = (int)(status.totalProgress() * unitsOfWork);
             if (newWorked > previous) {
@@ -153,11 +189,11 @@ class AbstractHubTransfer {
                 prevWorked.set(newWorked);
             }
             statusRef.set(status);
-        };
-        final var execMonitor = new BranchingExecMonitor(progMon::isCanceled, progress);
-        splitter.set(execMonitor);
+        });
+        splitterRef.set(splitter);
 
-        poller.setPollerTask(new Updater(execMonitor::getBytesTransferred, 1_500) {
+        // update the progress continually, with a transfer rate window size of 1.5 seconds
+        poller.setPollerTask(new Updater(splitter::getBytesTransferred, 1_500) {
             @Override
             protected void update(final double bytesPerSecond) {
                 final var status = statusRef.get();
@@ -166,7 +202,7 @@ class AbstractHubTransfer {
                 }
             }
         });
-        return execMonitor;
+        return splitter;
     }
 
     private abstract static class Updater implements Runnable {
@@ -305,11 +341,9 @@ class AbstractHubTransfer {
      * @param cancelChecker for checking whether the user requested cancellation
      * @param errorHandler error handler for handling errors/exceptions in the {@link Future}'s execution
      * @return result
-     * @throws E exception which is thrown in case of {@link ExecutionException}
      */
-    static <T, E extends Exception> T waitForCancellable(final Future<T> task,
-        final BooleanSupplier cancelChecker,
-        final ErrorHandler<T, E> errorHandler) throws E, CancelationException {
+    static <T> Result<T, FailureValue> waitForCancellable(final Future<Result<T, FailureValue>> task,
+        final BooleanSupplier cancelChecker, final ErrorHandler<T> errorHandler) throws CancelationException {
         try {
             while (true) {
                 if (cancelChecker.getAsBoolean()) {
@@ -336,6 +370,77 @@ class AbstractHubTransfer {
     }
 
     /**
+     * Repository item with associated {@code null}-able etag.
+     *
+     * @param item non-{@code null} repository item
+     * @param etag entity tag
+     */
+    public record TaggedRepositoryItem(RepositoryItem item, EntityTag etag) {
+        /**
+         * Constructor.
+         *
+         * @param item non-{@code null} item
+         * @param etag {@code null}-able etag
+         */
+        public TaggedRepositoryItem {
+            CheckUtils.checkNotNull(item);
+        }
+    }
+
+    /**
+     * Fetches a repository item from the catalog.
+     *
+     * @param itemIDOrPath either an item ID or a path to an item in the catalog
+     * @param queryParams query parameters, may be {@code null}
+     * @param version item version, may be {@code null}
+     * @param ifNoneMatch entity tag for the {@code If-None-Match: <ETag>} header, may be null
+     * @param ifMatch entity tag for the {@code If-Match: <ETag>} header, may be null
+     * @return pair of fetched repository item and corresponding entity tag, or {@link Optional#empty()} if
+     *         {@code ifNoneMatch} was non-{@code null} and the HTTP response was {@code 304 Not Modified} or
+     *         {@code ifMatch} was non-{@code null} and the HTTP response was {@code 412 Precondition Failed}
+     * @throws IOException if an I/O error occurred
+     */
+    static Result<Optional<TaggedRepositoryItem>, FailureValue> fetchRepositoryItem(
+        final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders,
+        final String itemIDOrPath, final Map<String, String> queryParams, final ItemVersion version,
+        final EntityTag ifNoneMatch, final EntityTag ifMatch) throws HubFailureIOException {
+
+        Map<String, String> headers = new HashMap<>(additionalHeaders);
+        headers.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
+        if (ifNoneMatch != null) {
+            headers.put(HttpHeaders.IF_NONE_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(ifNoneMatch));
+        }
+        if (ifMatch != null) {
+            headers.put(HttpHeaders.IF_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(ifMatch));
+        }
+
+        Map<String, String> nonNullQueryParams = new HashMap<>();
+        if (queryParams != null) {
+            nonNullQueryParams.putAll(queryParams);
+        }
+
+        final var detailsParam = nonNullQueryParams.get("details");
+        final var deepParam = Boolean.valueOf(nonNullQueryParams.get("deep"));
+        final var spaceDetailsParam = Boolean.valueOf(nonNullQueryParams.get("spaceDetails"));
+        final var contribSpacesParam = nonNullQueryParams.get("contribSpaces");
+
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = itemIDOrPath.startsWith("*")
+                ? catalogClient.getRepositoryItemById(itemIDOrPath, detailsParam, deepParam, spaceDetailsParam,
+                    contribSpacesParam, version, headers)
+                : catalogClient.getRepositoryItemByPath(IPath.forPosix(itemIDOrPath), detailsParam, deepParam,
+                    spaceDetailsParam, contribSpacesParam, version, headers);
+            if ((ifNoneMatch != null && response.statusCode() == Status.NOT_MODIFIED.getStatusCode())
+                || (ifMatch != null && response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode())) {
+                return Result.success(Optional.empty());
+            }
+
+            return response.result() //
+                .map(item -> Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null))));
+        }
+    }
+
+    /**
      * Deep-lists the subtree of the repository rooted at the parent item of the item with the given ID.
      *
      * @param itemId item ID of one child of the root item
@@ -345,14 +450,24 @@ class AbstractHubTransfer {
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    TaggedRepositoryItem deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
-        return runInCommonPool(cancelChecker, () -> {
-            final var itemAndETag = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders,
-                itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
+    Result<TaggedRepositoryItem, FailureValue> deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
+        throws CancelationException {
+        return runInCommonPool(cancelChecker, () -> { // NOSONAR
+            final var pathResult = fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                itemId.id(), Map.of("details", "none"), null, null, null);
+            if (!(pathResult instanceof Success<Optional<TaggedRepositoryItem>, ?> pathSuccess)) {
+                return pathResult.asFailure();
+            }
+
+            final var itemAndETag = pathSuccess.value().orElseThrow(); // no ETag was given, so `empty()` would be a bug
             final var parentPath = IPath.forPosix(itemAndETag.item().getPath()).removeLastSegments(1);
-            return CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders, parentPath.toString(),
-                Map.of("deep", "true"), null, null, null).orElseThrow();
+            final var deepResult = fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                parentPath.toString(), Map.of("deep", "true"), null, null, null);
+            if (!(deepResult instanceof Success<Optional<TaggedRepositoryItem>, ?> deepSuccess)) {
+                return deepResult.asFailure();
+            }
+
+            return Result.success(deepSuccess.value().orElseThrow());
         });
     }
 
@@ -362,22 +477,31 @@ class AbstractHubTransfer {
      * @param itemId root item ID
      * @param cancelChecker for checking cancellation
      * @return pair containing the deep repository item and its entity tag if successful
-     * @throws ResourceAccessException
      * @throws CancelationException
      * @throws CouldNotAuthorizeException
      */
-    Optional<TaggedRepositoryItem> deepListItem(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws IOException, CancelationException, CouldNotAuthorizeException {
+    Result<TaggedRepositoryItem, FailureValue> deepListItem(final ItemID itemId,
+        final BooleanSupplier cancelChecker) throws CancelationException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
-                final var itemAndETag = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders,
-                    itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
-                final RepositoryItem repoItem = itemAndETag.item();
+                final var pathResult = fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                    itemId.id(), Map.of("details", "none"), null, null, null);
+                if (!(pathResult instanceof Success<Optional<TaggedRepositoryItem>, ?> pathSuccess)) {
+                    return pathResult.asFailure();
+                }
+
+                final var itemAndETag = pathSuccess.value().orElseThrow();
+                final String itemPath = itemAndETag.item().getPath();
                 final EntityTag eTag = itemAndETag.etag();
-                final Optional<TaggedRepositoryItem> deep = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient,
-                    m_clientHeaders, repoItem.getPath(), Map.of("deep", "true"), null, null, eTag);
+                final var deepResult = fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                    itemPath, Map.of("deep", "true"), null, null, eTag);
+                if (!(deepResult instanceof Success<Optional<TaggedRepositoryItem>, ?> deepSuccess)) {
+                    return deepResult.asFailure();
+                }
+
+                Optional<TaggedRepositoryItem> deep = deepSuccess.value();
                 if (deep.isPresent()) {
-                    return deep;
+                    return Result.success(deep.get());
                 }
             }
         });
@@ -402,33 +526,95 @@ class AbstractHubTransfer {
         }
     }
 
-    private interface CommonPoolJob<T> {
-        T run() throws CouldNotAuthorizeException, IOException;
+    @FunctionalInterface
+    private interface CommonPoolJob<T> extends Callable<Result<T, FailureValue>> {
+        @Override
+        Result<T, FailureValue> call() throws CouldNotAuthorizeException, HubFailureIOException;
     }
 
-    @SuppressWarnings("java:S1130") // exceptions are in fact thrown (sneakily)
-    private static <T> T runInCommonPool(final BooleanSupplier cancelChecker, final CommonPoolJob<T> job)
-            throws CouldNotAuthorizeException, IOException, CancelationException {
-        return waitForCancellable(ForkJoinPool.commonPool().submit(job::run),
-            cancelChecker, throwable -> { throw ExceptionUtils.asRuntimeException(throwable); });
+    private static <T> Result<T, FailureValue> runInCommonPool(final BooleanSupplier cancelChecker,
+        final CommonPoolJob<T> job) throws CancelationException {
+        return waitForCancellable(ForkJoinPool.commonPool().submit(job), cancelChecker, throwable -> { // NOSONAR
+            // exceptions not `instanceof RuntimeException`s are wrapped in `new RuntimeException(thrw)` by the
+            // framework, unpack those (and *only* those) here
+            var thrw = throwable;
+            while (thrw.getClass() == RuntimeException.class && thrw.getCause() != null) {
+                thrw = thrw.getCause();
+            }
+
+            if (thrw instanceof HubFailureIOException failureEx) {
+                return Result.failure(failureEx.getValue());
+            } else if (thrw instanceof CouldNotAuthorizeException cnae) {
+                return Result.failure(FailureValue.fromAuthFailure(cnae));
+            } else {
+                return Result
+                    .failure(FailureValue.fromUnexpectedThrowable("Unexpected exception: " + thrw.getMessage(), thrw));
+            }
+        });
     }
 
     /**
-     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
-     * a JSON failure otherwise a plain text failure.
+     * Interface for polling calls to Hub.
      *
-     * @param problemJSON {@link RFC9457}
-     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
-     *
-     * @return {@link Result}
+     * @param <T> type of the responses
      */
-    public static <T> Result.Failure<T, FailureValue> newFailureValue(
-        final RFC9457 problemJSON, final Pair<String, Throwable> exceptionFailure) {
-        if (m_useProblemJSON) {
-            return Result.failure(new FailureValue(Optional.empty(), Optional.of(problemJSON)));
-        } else {
-            return Result.failure(new FailureValue(Optional.of(exceptionFailure), Optional.empty()));
-        }
+    interface PollingCallable<T> {
+
+        /**
+         * Hub call that should be made continuusly.
+         *
+         * @return API response
+         * @throws HubFailureIOException if the call failed without a response from Hub
+         */
+        ApiResponse<T> poll() throws HubFailureIOException;
+
+        /**
+         * Whether or not to accept the resunt and stop polling.
+         *
+         * @param result result of the last polling call
+         * @return {@code true} if polling should be stopped, {@code false otherwise}
+         */
+        boolean accept(T result);
     }
 
+    /**
+     * Invokes the given {@link PollingCallable}'s {@link PollingCallable#poll()} continuously until either
+     * {@link PollingCallable#accept(Object)} returns {@code true} or until the timeout has run out.
+     *
+     * @param <T> type of the Hub response
+     * @param timeoutMillis timeout, {@code -1} for no timeout
+     * @param callable polling callable
+     * @return the last response object received from Hub
+     * @throws InterruptedException if the thread was interrupted
+     */
+    static <T> Result<T, FailureValue> poll(final long timeoutMillis, final PollingCallable<T> callable)
+            throws InterruptedException {
+
+        final var t0 = System.currentTimeMillis();
+        for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {
+            final T state;
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                final var response = callable.poll();
+                final Result<T, FailureValue> result = response.result();
+                if (!(result instanceof Success<T, ?> success)) {
+                    return result;
+                }
+                state = success.value();
+            } catch (final HubFailureIOException ex) { // NOSONAR
+                return Result.failure(ex.getValue());
+            }
+
+            if (callable.accept(state)) {
+                return Result.success(state);
+            }
+
+            // Sequence: 200ms, 400ms, 600ms, 800ms and then 1s until the timeout is reached
+            Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
+
+            final long elapsed = System.currentTimeMillis() - t0;
+            if (timeoutMillis >= 0 && elapsed > timeoutMillis) {
+                return Result.success(state);
+            }
+        }
+    }
 }

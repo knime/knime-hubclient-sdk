@@ -51,9 +51,10 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 
 import org.apache.commons.io.FileUtils;
@@ -61,15 +62,16 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.ThreadLocalHTTPAuthenticator;
+import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.MediaType;
@@ -81,7 +83,6 @@ import jakarta.ws.rs.core.MediaType;
  */
 public final class AsyncHubUploadStream extends OutputStream {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncHubUploadStream.class);
     private static final int NUMBER_OF_INITIAL_PARTS = 1;
     private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
     private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
@@ -94,25 +95,66 @@ public final class AsyncHubUploadStream extends OutputStream {
     private final Duration m_timeout;
 
     private final FilePartUploader m_filePartUploader;
-    private final Map<Integer, EntityTag> m_finishedParts = new LinkedHashMap<>();
+    private final SortedMap<Integer, String> m_finishedParts = new TreeMap<>();
 
     private @Owning ChunkingByteOutputStream m_chunkingOutputStream;
-    private Future<Pair<Integer, EntityTag>> m_pendingUpload;
+    private Future<Result<Pair<Integer, EntityTag>, FailureValue>> m_pendingUpload;
     private volatile boolean m_canceled;
 
-    private AsyncHubUploadStream(final AsyncUploadStreamBuilder builder) {
-        m_hubClient = builder.m_hubClient;
-        m_clientHeaders = builder.m_additionalHeaders;
-        m_itemName = builder.m_itemName;
-        m_uploadId = builder.m_uploadInstructions.getUploadId();
-        m_timeout = builder.m_timeout;
+    /**
+     * Creates a new asynchronous upload stream. If a parent {@link EntityTag ETag} is given and the parent workflow
+     * group has a different ETag now, this method returns {@code null}.
+     *
+     * @param catalogClient catalog service client
+     * @param clientHeaders additional headers for the catalog service client
+     * @param parentId ID of the parent group to upload to
+     * @param parentETag ETag of the parent group, may be {@code null}
+     * @param itemName name of the item to upload
+     * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
+     * @param timeout duration of time after which the upload stream aborts the polling for the upload to finish on Hub
+     * @return upload stream of {@code null}, which indicates that the parent workflow group has changed
+     * @throws HubFailureIOException
+     * @throws UnsupportedOperationException if asynchronous uploads are not supported by the connected Hub
+     */
+    public static @Owning AsyncHubUploadStream create(final CatalogServiceClient catalogClient,
+        final Map<String, String> clientHeaders, final String parentId, final EntityTag parentETag,
+        final String itemName, final boolean isWorkflowLike, final Duration timeout) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(catalogClient);
+        CheckUtils.checkArgumentNotNull(parentId);
+        CheckUtils.checkArgumentNotNull(itemName);
+
+        final var mediaType = isWorkflowLike ? AbstractHubTransfer.KNIME_WORKFLOW_TYPE_ZIP.toString()
+            : MediaType.APPLICATION_OCTET_STREAM;
+        final var uploadParts =
+            Math.min(HubUploader.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
+        // Initiate upload request
+        final var manifest = new UploadManifest(Map.of(itemName, new ItemUploadRequest(mediaType, uploadParts)));
+        final var preparedUploadOpt = HubUploader.initiateUpload(catalogClient, clientHeaders,
+            new ItemID(parentId), manifest, parentETag) //
+                .orElseThrow(HubFailureIOException::new);
+        if (preparedUploadOpt.isEmpty()) {
+            return null;
+        }
+
+        // Obtain upload instructions and create supplier for additional upload parts
+        final var itemInstructions = preparedUploadOpt.get().getItems();
+        final var uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(itemName));
+        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, timeout);
+    }
+
+    private AsyncHubUploadStream(final CatalogServiceClient hubClient, final Map<String, String> clientHeaders,
+        final String itemName, final ItemUploadInstructions uploadInstructions, final Duration timeout) {
+        m_hubClient = hubClient;
+        m_clientHeaders = clientHeaders;
+        m_itemName = itemName;
+        m_uploadId = uploadInstructions.getUploadId();
+        m_timeout = Objects.requireNonNullElseGet(timeout, () -> Duration.ofDays(365));
 
         // Create file part uploader to upload separate chunks of data
-        m_filePartUploader =
-            new FilePartUploader(URLConnectionUploader.getInstance(), NUMBER_OF_PART_UPLOAD_RETRIES, false);
+        m_filePartUploader = new FilePartUploader(URLConnectionUploader.INSTANCE, NUMBER_OF_PART_UPLOAD_RETRIES, false);
 
         // Create the supplier which can request additional upload parts
-        final var partSupplier = new UploadPartSupplier(m_hubClient, m_clientHeaders, builder.m_uploadInstructions);
+        final var partSupplier = new UploadPartSupplier(m_hubClient, m_clientHeaders, uploadInstructions);
         final var execMonitor = LeafExecMonitor.nullExecMonitor(() -> m_canceled);
 
         // Create chunking output stream
@@ -127,151 +169,6 @@ public final class AsyncHubUploadStream extends OutputStream {
                     m_filePartUploader.uploadDataChunk(m_itemName, partNumber, partSupplier, chunk, hash, execMonitor);
             }
         };
-    }
-
-    /**
-     * Creates a new {@link AsyncUploadStreamBuilder}
-     *
-     * @return {@link AsyncUploadStreamBuilder}
-     */
-    public static AsyncUploadStreamBuilder builder() {
-        return new AsyncUploadStreamBuilder();
-    }
-
-    /**
-     * Asynchronous upload stream builder
-     *
-     * @author Magnus Gohm, KNIME AG, Konstanz, Germany
-     */
-    public static final class AsyncUploadStreamBuilder {
-
-        private @NotOwning CatalogServiceClient m_hubClient;
-        private Map<String, String> m_additionalHeaders = new HashMap<>();
-
-        private String m_itemName;
-        private boolean m_isWorkflowLike;
-        private String m_parentId;
-        private EntityTag m_parentETag;
-
-        private ItemUploadInstructions m_uploadInstructions;
-        private Duration m_timeout = Duration.ofMillis(Long.MAX_VALUE);
-
-        private AsyncUploadStreamBuilder() {
-        }
-
-        /**
-         * Adds the {@link CatalogServiceClient}, can't be null
-         *
-         * @param catalogClient {@link CatalogServiceClient}
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withCatalogClient(final CatalogServiceClient catalogClient) {
-            m_hubClient = catalogClient;
-            return this;
-        }
-
-        /**
-         * Adds the ID of the parent group, can't be null
-         *
-         * @param id the ID of the parent group
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withParentId(final String id) {
-            m_parentId = id;
-            return this;
-        }
-
-        /**
-         * Adds the {@link EntityTag} of the parent group, can be null
-         *
-         * @param eTag {@link EntityTag}
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withParentETag(final EntityTag eTag) {
-            m_parentETag = eTag;
-            return this;
-        }
-
-        /**
-         * Adds the name of the item which is uploaded, can't be null
-         *
-         * @param itemName the name of the item which is uploaded
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withItemName(final String itemName) {
-            m_itemName = itemName;
-            return this;
-        }
-
-        /**
-         * Determines if the uploaded item is either workflow like (workflow, component) or not (data files).
-         * Workflow groups are not supported.
-         *
-         * @param isWorkflowLike <code>true</code> if the uploaded item is a workflow or component
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder isWorkflowLike(final boolean isWorkflowLike) {
-            m_isWorkflowLike = isWorkflowLike;
-            return this;
-        }
-
-        /**
-         * Adds a timeout to the upload process
-         *
-         * @param timeout {@link Duration}
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withTimeout(final Duration timeout) {
-            if (timeout != null) {
-                m_timeout = timeout;
-            }
-            return this;
-        }
-
-        /**
-         * Adds additional headers to the requests of the upload process
-         *
-         * @param headerMap the map of headers
-         * @return {@link AsyncUploadStreamBuilder}
-         */
-        public AsyncUploadStreamBuilder withHeaders(final Map<String, String> headerMap) {
-            if (headerMap != null) {
-                m_additionalHeaders.putAll(headerMap);
-            }
-            return this;
-        }
-
-        /**
-         * Creates an asynchronous upload stream to the hub.
-         *
-         * @return an {@link AsyncHubUploadStream} or null if the precondition check with the parentEtag failed
-         *
-         * @throws IOException if an I/O error occurred during the upload
-         * @throws CouldNotAuthorizeException if the authenticator has lost connection
-         */
-        public @Owning AsyncHubUploadStream build() throws IOException, CouldNotAuthorizeException {
-            CheckUtils.checkArgumentNotNull(m_hubClient);
-            CheckUtils.checkArgumentNotNull(m_parentId);
-            CheckUtils.checkArgumentNotNull(m_itemName);
-
-            final var mediaType = m_isWorkflowLike ? CatalogServiceUtils.KNIME_WORKFLOW_TYPE_ZIP.toString()
-                : MediaType.APPLICATION_OCTET_STREAM;
-            final var uploadParts =
-                Math.min(CatalogServiceUtils.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
-            // Initiate upload request
-            final var manifest = new UploadManifest(Map.of(m_itemName, new ItemUploadRequest(mediaType, uploadParts)));
-            final var preparedUploadOpt = CatalogServiceUtils.initiateUpload(m_hubClient, m_additionalHeaders,
-                new ItemID(m_parentId), manifest, m_parentETag);
-            if (preparedUploadOpt.isEmpty()) {
-                return null;
-            }
-
-            // Obtain upload instructions and create supplier for additional upload parts
-            final var itemInstructions = preparedUploadOpt.get().getItems();
-            m_uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(m_itemName));
-            return new AsyncHubUploadStream(this);
-        }
-
     }
 
     @Override
@@ -305,18 +202,19 @@ public final class AsyncHubUploadStream extends OutputStream {
         final var pending = m_pendingUpload;
         if (pending != null) {
             m_pendingUpload = null;
-            final Pair<Integer, EntityTag> finishedPart = HubUploader.awaitPartFinished(pending);
-            finishedPart.accept(m_finishedParts::put);
+            final var finishedPart = HubUploader.awaitPartFinished(pending) //
+                .orElseThrow(HubFailureIOException::new);
+            m_finishedParts.put(finishedPart.getKey(),
+                AbstractHubTransfer.ETAG_DELEGATE.toString(finishedPart.getValue()));
         }
     }
 
     /**
      * Cancels the upload process.
      *
-     * @throws IOException if an I/O error occurred during cancellation
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws HubFailureIOException if an I/O error occurred during cancellation
      */
-    public void cancel() throws IOException, CouldNotAuthorizeException {
+    public void cancel() throws HubFailureIOException {
         if (m_chunkingOutputStream != null) {
             // discard the (in-memory) chunking stream, thereby closing the outer one without triggering an upload
             m_chunkingOutputStream = null;
@@ -330,14 +228,18 @@ public final class AsyncHubUploadStream extends OutputStream {
             }
 
             // notify Catalog
-            CatalogServiceUtils.cancelUpload(m_hubClient, m_clientHeaders, m_uploadId);
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                m_hubClient.cancelUpload(m_uploadId, m_clientHeaders) //
+                    .result() //
+                    .orElseThrow(HubFailureIOException::new);
+            }
         }
     }
 
-    private IOException cancelAfter(final IOException ioe) throws IOException {
+    private HubFailureIOException cancelAfter(final IOException ioe) throws IOException {
         try {
             cancel();
-        } catch (final IOException | CouldNotAuthorizeException inner) {
+        } catch (final IOException inner) {
             ioe.addSuppressed(inner);
         }
         throw ioe;
@@ -374,20 +276,15 @@ public final class AsyncHubUploadStream extends OutputStream {
 
         try {
             // report back to catalog
-            CatalogServiceUtils.reportUploadFinished(m_hubClient, m_clientHeaders, m_uploadId, m_finishedParts);
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                m_hubClient.reportUploadFinished(m_uploadId, m_finishedParts, m_clientHeaders).result() //
+                    .orElseThrow(HubFailureIOException::new);
+            }
 
             // wait for the upload to be completed server-side
-            final var finalState = CatalogServiceUtils.awaitUploadProcessed(m_hubClient, m_clientHeaders, m_uploadId,
-                m_timeout.toMillis(), state -> {
-                    if (LOGGER.isDebugEnabled()) {
-                        LOGGER.atDebug() //
-                            .addArgument(m_itemName) //
-                            .addArgument(state.getStatus()) //
-                            .addArgument(state.getStatusMessage()) //
-                            .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
-                            .log();
-                    }
-                });
+            final var finalState = HubUploader.awaitUploadProcessed(m_hubClient, m_clientHeaders, m_itemName,
+                m_uploadId, m_timeout.toMillis()).orElseThrow(HubFailureIOException::new);
+
             switch (finalState.getStatus()) {
                 case ABORTED, FAILED:
                     throw new IOException(finalState.getStatusMessage());
@@ -399,9 +296,6 @@ public final class AsyncHubUploadStream extends OutputStream {
             }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("Upload of '%s' has been interrupted while waiting for Hub".formatted(m_itemName));
-        } catch (final CouldNotAuthorizeException ex) {
-            throw new IOException("Lost connection to Hub while closing upload of '%s'".formatted(m_itemName), ex);
         }
     }
 }

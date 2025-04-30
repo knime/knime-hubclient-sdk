@@ -54,7 +54,6 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Owning;
@@ -84,8 +83,7 @@ class JakartaClientUploader implements StreamingUploader {
     @Override
     public EntityTag performUpload(final URL targetUrl, final String httpMethod,
         final Map<String, List<String>> httpHeaders, final @Owning InputStream contentStream, final long contentLength,
-        final LeafExecMonitor monitor, final UnaryOperator<String> errorMessageCallback)
-        throws CancelationException, IOException {
+        final LeafExecMonitor monitor) throws CancelationException, IOException {
         final var url = targetUrl.toString();
         final var builder = m_invocationBuilderSupplier.apply(url);
         builder.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
@@ -105,15 +103,13 @@ class JakartaClientUploader implements StreamingUploader {
                 return response.getEntityTag();
             }
 
-            final String result = response.hasEntity() ? response.readEntity(String.class) : "";
-            final var message = "(%d %s)%s".formatted(statusInfo.getStatusCode(), statusInfo.getReasonPhrase(),
-                StringUtils.isBlank(result) ? "" : (": " + result));
-            throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(), errorMessageCallback.apply(message));
+            // Create a exception failure value
+            final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                response.readEntity(String.class) : null, statusInfo::getReasonPhrase);
+            throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(), "Failed to upload artifact: " + message);
+
         } catch (final ProcessingException pe) {
-            if (pe.getCause() instanceof IOException ioe) {
-                throw ioe;
-            }
-            throw pe;
+            throw pe.getCause() instanceof IOException ioe ? ioe : new IOException(pe.getMessage(), pe);
         }
     }
 

@@ -68,10 +68,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 /**
  * Implementation of a application/problem+json response mostly compatible with RFC 9457 standard.
  *
- * @author Magnus Gohm, KNIME AG, KOnstanz, Germany
+ * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class RFC9457 {
+public final class ProblemDescription {
 
     private static final String JSON_PROPERTY_TYPE = "type";
     private final String m_type;
@@ -104,7 +104,7 @@ public final class RFC9457 {
      * @param code the code
      */
     @JsonCreator
-    public RFC9457(
+    public ProblemDescription(
             @JsonProperty(value = JSON_PROPERTY_TYPE, required = false) final String type,
             @JsonProperty(value = JSON_PROPERTY_STATUS, required = false) final String status,
             @JsonProperty(value = JSON_PROPERTY_TITLE, required = true) final String title,
@@ -214,14 +214,14 @@ public final class RFC9457 {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var rfc9457 = (RFC9457) o;
-        return Objects.equals(this.m_type, rfc9457.m_type)
-                && Objects.equals(this.m_status, rfc9457.m_status)
-                && Objects.equals(this.m_title, rfc9457.m_title)
-                && Objects.equals(this.m_instance, rfc9457.m_instance)
-                && Objects.equals(this.m_details, rfc9457.m_details)
-                && Objects.equals(this.m_code, rfc9457.m_code)
-                && Objects.equals(this.m_additionalProperties, rfc9457.m_additionalProperties);
+        var other = (ProblemDescription) o;
+        return Objects.equals(this.m_type, other.m_type)
+                && Objects.equals(this.m_status, other.m_status)
+                && Objects.equals(this.m_title, other.m_title)
+                && Objects.equals(this.m_instance, other.m_instance)
+                && Objects.equals(this.m_details, other.m_details)
+                && Objects.equals(this.m_code, other.m_code)
+                && Objects.equals(this.m_additionalProperties, other.m_additionalProperties);
     }
 
     @Override

@@ -21,18 +21,21 @@
 package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -40,9 +43,8 @@ import java.util.function.DoubleSupplier;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.commons.lang3.function.FailableConsumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -54,20 +56,24 @@ import org.knime.core.node.workflow.WorkflowExporter.ResourcesToCopy;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
+import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
+import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
-import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
+import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.ent.WorkflowGroup;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
@@ -79,7 +85,9 @@ import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.AtomicDouble;
 
 import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response.Status;
 
 /**
  * Uploader for sets of items to a Hub.
@@ -88,7 +96,8 @@ import jakarta.ws.rs.core.MediaType;
  */
 public final class HubUploader extends AbstractHubTransfer {
 
-    private static final String FORCE_ASYNC_UPLOAD_HOSTS_FEATURE_FLAG = "knime.hub.force_async_upload_hosts";
+    /** Maximum number of pre-fetched upload URLs per upload. */
+    static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HubUploader.class);
 
@@ -136,7 +145,7 @@ public final class HubUploader extends AbstractHubTransfer {
         final int numPartUploadRetries) {
         super(hubClient, apHeaders);
         m_chunkSize = chunkSize;
-        m_filePartUploader = new FilePartUploader(URLConnectionUploader.getInstance(), numPartUploadRetries, false);
+        m_filePartUploader = new FilePartUploader(URLConnectionUploader.INSTANCE, numPartUploadRetries, false);
     }
 
     /**
@@ -147,29 +156,25 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param progMon to enable cancellation
      * @return collisions found if the Hub supports multi-part uploads, a {@link Failure} otherwise
      * @throws CancelationException if the upload was canceled
-     * @throws IOException if a request to Hub failed
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
      */
-    public Result<CollisionReport, FailureValue> checkCollisions(final ItemID parentId,
-        final Map<IPath, ItemType> itemToType, final IProgressMonitor progMon)
-                throws CancelationException, IOException, CouldNotAuthorizeException {
+    public Result<Optional<CollisionReport>, FailureValue> checkCollisions(final ItemID parentId,
+        final Map<IPath, ItemType> itemToType, final IProgressMonitor progMon) throws CancelationException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
 
-        final var optDeep = deepListItem(parentId, progMon::isCanceled);
-        final var parentGroupAndETag = optDeep.orElseThrow();
+        final var deepRes = deepListItem(parentId, progMon::isCanceled);
+        if (!(deepRes instanceof Success<TaggedRepositoryItem, FailureValue> success)) {
+            return deepRes.asFailure();
+        }
+
+        final var parentGroupAndETag = success.value();
         final var groupItem = parentGroupAndETag.item();
         final var groupItemControls = groupItem.getMasonControls();
-        if (!supportsAsyncUpload(groupItemControls, m_catalogClient.getApiClient().getBaseURI().getHost())) {
-            final var message = "This Hub does not support multi-part uploads";
-            return createFailureValue(
-                new RFC9457(null, null, message, null, List.of(), null),
-                Pair.of(message, null));
+        if (!supportsAsyncUpload(groupItemControls)) {
+            return Result.success(Optional.empty());
         }
-        final WorkflowGroup parentGroup;
-        if (groupItem instanceof WorkflowGroup wfGroup) {
-            parentGroup = wfGroup;
-        } else {
+
+        if (!(groupItem instanceof WorkflowGroup parentGroup)) {
             throw new IllegalArgumentException("Upload target must be a space or folder, '%s' is of type '%s'" //
                 .formatted(groupItem.getPath(), groupItem.getType()));
         }
@@ -190,20 +195,18 @@ public final class HubUploader extends AbstractHubTransfer {
                 collisions.computeIfAbsent(collisionLocation, k -> pathAndCollision.getRight());
             }
         }
-        return Result.success(new CollisionReport(parentGroup, parentGroupAndETag.etag(), collisions, affected));
+        final var collisionReport = new CollisionReport(parentGroup, parentGroupAndETag.etag(), collisions, affected);
+        return Result.success(Optional.of(collisionReport));
     }
 
     /**
      * Verifies that the asynchronous upload is supported on the hub instance.
      *
      * @param spaceParentControls mason controls of the parent group
-     * @param host the name of the host
      * @return <code>true</code> if asynchronous upload flow is supported
      */
-    public static boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls, final String host) {
-        final var overwrittenHosts = List.of(System.getProperty(FORCE_ASYNC_UPLOAD_HOSTS_FEATURE_FLAG, "").split(","));
-        return overwrittenHosts.contains(host)
-                || spaceParentControls.containsKey(CatalogServiceUtils.INITIATE_UPLOAD);
+    public static boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls) {
+        return spaceParentControls.containsKey(INITIATE_UPLOAD);
     }
 
     private static Optional<Pair<IPath, Collision>> checkForCollision(final WorkflowGroup remoteItem, // NOSONAR
@@ -220,7 +223,7 @@ public final class HubUploader extends AbstractHubTransfer {
                     .filter(item -> IPath.forPosix(item.getPath()).lastSegment().equals(name)) //
                     .findAny().orElse(null);
                 if (current == null) {
-                    if (spaceControls.containsKey(CatalogServiceUtils.UPLOAD)) { // NOSONAR
+                    if (spaceControls.containsKey(UPLOAD)) { // NOSONAR
                         // ancestor item doesn't exist but can be created, no conflict
                         return Optional.empty();
                     } else {
@@ -230,18 +233,15 @@ public final class HubUploader extends AbstractHubTransfer {
                 }
             } else {
                 // conflict between a local ancestor folder and a non-folder item on Hub
-                final boolean canUploadToParent =
-                        parent == null || spaceControls.containsKey(CatalogServiceUtils.UPLOAD);
-                return Optional.of(Pair.of(path.uptoSegment(level),
-                    new Collision(false, false, canUploadToParent)));
+                final boolean canUploadToParent = parent == null || spaceControls.containsKey(UPLOAD);
+                return Optional.of(Pair.of(path.uptoSegment(level), new Collision(false, false, canUploadToParent)));
             }
         }
 
         // reached the end, and an item at the path already exists
         final boolean remoteIsFolder = current instanceof WorkflowGroup;
         final boolean localIsFolder = localItemType == ItemType.WORKFLOW_GROUP;
-        final boolean canUploadToParent = parent != null
-                && spaceControls.containsKey(CatalogServiceUtils.UPLOAD);
+        final boolean canUploadToParent = parent != null && spaceControls.containsKey(UPLOAD);
         if (remoteIsFolder && localIsFolder) {
             // copying an empty folder over an existing one is not a conflict
             return Optional.empty();
@@ -251,9 +251,7 @@ public final class HubUploader extends AbstractHubTransfer {
         } else {
             // collision between two leaf items
             return Optional.of(Pair.of(path, //
-                new Collision( //
-                    isTypeCompatible(current.getType(), localItemType), //
-                    spaceControls.containsKey(CatalogServiceUtils.EDIT), //
+                new Collision(isTypeCompatible(current.getType(), localItemType), spaceControls.containsKey(EDIT),
                     canUploadToParent)));
         }
     }
@@ -274,20 +272,19 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param parentTag expected entity tag of the surrounding group, may be {@code null}
      * @param numInitialParts number of initial part upload URLs to request per non-folder item
      * @return mapping from path to item upload instructions, or {@link Optional#empty()} if the parent has changed
-     * @throws IOException if a request to Hub failed
-     * @throws CouldNotAuthorizeException if a Hub API call could not be authorized
+     * @throws HubFailureIOException if a request to Hub failed
      */
     public Optional<Map<IPath, ItemToUpload>> initiateUpload(final ItemID parentId,
             final Map<IPath, LocalItem> items, final EntityTag parentTag,
-            final int numInitialParts) throws IOException, CouldNotAuthorizeException {
+            final int numInitialParts) throws HubFailureIOException {
 
         final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
-        int partsRemaining = CatalogServiceUtils.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
+        int partsRemaining = MAX_NUM_PREFETCHED_UPLOAD_PARTS;
         for (final var entry : items.entrySet()) {
             final var itemType = entry.getValue().type();
             final String mediaType = switch (itemType) {
-                case WORKFLOW_GROUP -> CatalogServiceUtils.KNIME_WORKFLOW_GROUP_TYPE.toString();
-                case WORKFLOW_LIKE -> CatalogServiceUtils.KNIME_WORKFLOW_TYPE_ZIP.toString();
+                case WORKFLOW_GROUP -> KNIME_WORKFLOW_GROUP_TYPE.toString();
+                case WORKFLOW_LIKE -> KNIME_WORKFLOW_TYPE_ZIP.toString();
                 case DATA_FILE -> MediaType.APPLICATION_OCTET_STREAM;
             };
             final var partsHere = itemType == ItemType.WORKFLOW_GROUP ? 0 : Math.min(partsRemaining, numInitialParts);
@@ -295,8 +292,8 @@ public final class HubUploader extends AbstractHubTransfer {
             partsRemaining -= partsHere;
         }
 
-        final Optional<UploadStarted> optInstructions = CatalogServiceUtils.initiateUpload(m_catalogClient,
-            m_clientHeaders, parentId, new UploadManifest(uploadRequests), parentTag);
+        final var optInstructions = initiateUpload(m_catalogClient, m_clientHeaders, parentId,
+            new UploadManifest(uploadRequests), parentTag).orElseThrow(HubFailureIOException::new);
         if (optInstructions.isEmpty()) {
             return Optional.empty();
         }
@@ -327,14 +324,15 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param tempFileSupplier provider for temp files
      * @param progMon progress monitor
      * @return map from item path to upload result, or {@link Optional#empty()} if the upload was aborted
-     * @throws IOException if the upload as a whole failed
+     * @throws HubFailureIOException if the upload as a whole failed
      * @throws CancelationException if the upload was canceled
      */
     public Map<IPath, Result<String, FailureValue>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
             final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
-            final IProgressMonitor progMon) throws IOException, CancelationException {
+            final IProgressMonitor progMon) throws CancelationException, HubFailureIOException {
         try (final var poller = startPoller(Duration.ofMillis(200))) {
-            final var resources = collectFileResources(itemsToUpload, exporter, progMon);
+            final var resources = collectFileResources(itemsToUpload, exporter, progMon) //
+                .orElseThrow(HubFailureIOException::new);
             final var uploadJobs =
                 submitUploadJobs(exporter, tempFileSupplier, itemsToUpload, resources, progMon, poller);
             return awaitUploads(uploadJobs, progMon::isCanceled);
@@ -416,13 +414,14 @@ public final class HubUploader extends AbstractHubTransfer {
                 final var uploadResult = waitForCancellable(future, cancelChecker, throwable -> { // NOSONAR
                     if (throwable instanceof CancelationException cee) {
                         throw cee;
+                    } else if (throwable instanceof CouldNotAuthorizeException cnae) {
+                        return Result.failure(FailureValue.fromAuthFailure(cnae));
                     } else {
                         LOGGER.atDebug().setCause(throwable) //
                             .addArgument(path) //
                             .log("Unexpected exception during upload job for \"{}\"");
-                        return createFailureValue(
-                            new RFC9457(null, null, throwable.getMessage(), null, List.of(), null),
-                            Pair.of(throwable.getMessage(), throwable));
+                        return Result.failure(FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR,
+                            throwable.getMessage(), throwable));
                     }
                 });
                 uploaded.put(path, uploadResult);
@@ -437,9 +436,9 @@ public final class HubUploader extends AbstractHubTransfer {
         return uploaded;
     }
 
-    private static FileResources collectFileResources(final Map<IPath, ItemToUpload> itemsToUpload,
-            final WorkflowExporter<CancelationException> exporter, final IProgressMonitor progMon)
-            throws IOException, CancelationException {
+    private static Result<FileResources, FailureValue> collectFileResources(
+        final Map<IPath, ItemToUpload> itemsToUpload, final WorkflowExporter<CancelationException> exporter,
+        final IProgressMonitor progMon) throws CancelationException {
 
         progMon.setTaskName("Preparing items for upload");
         final Map<String, ResourcesToCopy> workflowResources = new LinkedHashMap<>();
@@ -457,105 +456,206 @@ public final class HubUploader extends AbstractHubTransfer {
             final var type = localItem.type();
 
             final long size;
-            if (type == ItemType.WORKFLOW_GROUP) {
-                size = 0L;
-            } else if (type == ItemType.WORKFLOW_LIKE) {
-                final var resources = exporter.collectResourcesToCopy(Set.of(fsPath), fsPath.getParent());
-                workflowResources.put(pathStr, resources);
-                size = resources.numBytes();
-            } else {
-                size = Files.size(fsPath);
+            try {
+                if (type == ItemType.WORKFLOW_GROUP) {
+                    size = 0L;
+                } else if (type == ItemType.WORKFLOW_LIKE) {
+                    final var resources = exporter.collectResourcesToCopy(Set.of(fsPath), fsPath.getParent());
+                    workflowResources.put(pathStr, resources);
+                    size = resources.numBytes();
+                } else {
+                    size = Files.size(fsPath);
+                }
+            } catch (final IOException ioe) {
+                return Result.failure(FailureValue.fromUnexpectedThrowable("Could not read file size", ioe));
             }
 
             sizes.put(pathStr, size);
             totalSize += size;
         }
 
-        return new FileResources(workflowResources, sizes, totalSize);
+        return Result.success(new FileResources(workflowResources, sizes, totalSize));
     }
 
     private Result<String, FailureValue> uploadItem(final ItemToUpload itemToUpload,
         final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
         final Map<String, ResourcesToCopy> workflowResources, final BranchingExecMonitor splitter)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
+        throws CancelationException {
 
         final var path = itemToUpload.path();
-        final var instructions = itemToUpload.uploadInstructions();
+        final ItemUploadInstructions uploadInstructions = itemToUpload.uploadInstructions();
+
+        final Result<Void, FailureValue> uploadResult;
         if (itemToUpload.localItem().type() == ItemType.DATA_FILE) {
-            uploadDataFile(path, itemToUpload.localItem().fsPath(), instructions, splitter);
+            uploadResult = uploadDataFile(path, itemToUpload.localItem().fsPath(), uploadInstructions, splitter);
         } else {
-            uploadWorkflowLike(path, exporter, tempFileSupplier, workflowResources.get(path), instructions, splitter);
+            uploadResult = uploadWorkflowLike(path, exporter, tempFileSupplier, workflowResources.get(path),
+                uploadInstructions, splitter);
+        }
+
+        if (!uploadResult.successful()) {
+            return uploadResult.asFailure();
         }
 
         try {
-            final var finalState = CatalogServiceUtils.awaitUploadProcessed(m_catalogClient, m_clientHeaders,
-                instructions.getUploadId(), -1, state -> {
-                if (LOGGER.isDebugEnabled()) {
-                    LOGGER.atDebug() //
-                        .addArgument(path) //
-                        .addArgument(state.getStatus()) //
-                        .addArgument(state.getStatusMessage()) //
-                        .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
-                        .log();
-                }
-            });
-            return switch (finalState.getStatus()) {
-                case ABORTED -> createFailureValue(
-                    new RFC9457(null, null, finalState.getStatusMessage(), null, List.of(), null),
-                    Pair.of(finalState.getStatusMessage(), null));
+            final var result =
+                awaitUploadProcessed(m_catalogClient, m_clientHeaders, path, uploadInstructions.getUploadId(), -1);
+            if (!(result instanceof Success<UploadStatus, ?> success)) {
+                return result.asFailure();
+            }
+
+            final UploadStatus finalStatus = success.value();
+            return switch (finalStatus.getStatus()) {
+                case COMPLETED -> Result.success(finalStatus.getStatusMessage());
                 case ANALYSIS_PENDING, PREPARED -> throw new IllegalStateException(
                     "Stopped polling upload early even though no timeout was provided");
-                case COMPLETED -> Result.success(finalState.getStatusMessage());
-                case FAILED -> createFailureValue(
-                    new RFC9457(null, null, finalState.getStatusMessage(), null, List.of(), null),
-                    Pair.of(finalState.getStatusMessage(), null));
+                case ABORTED -> Result
+                    .failure(FailureValue.withTitle(FailureType.UPLOAD_ABORTED_BY_HUB, finalStatus.getStatusMessage()));
+                case FAILED -> Result.failure(
+                    FailureValue.withTitle(FailureType.UPLOAD_PROCESSING_FAILED, finalStatus.getStatusMessage()));
             };
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            final String message = "Upload of '%s' has been aborted".formatted(path);
-            return createFailureValue(new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null));
+            throw new CancelationException(e);
         }
     }
 
-    private void uploadWorkflowLike(final String path, final WorkflowExporter<CancelationException> exporter,
-            final TempFileSupplier tempFileSupplier, final ResourcesToCopy resources,
-            final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
-            throws CancelationException, IOException, CouldNotAuthorizeException {
+    static Result<UploadStatus, FailureValue> awaitUploadProcessed(final CatalogServiceClient catalogClient,
+        final Map<String, String> clientHeaders, final String path, final String uploadId, final long timeoutMillis)
+        throws InterruptedException {
+
+        final Set<UploadStatus.StatusEnum> endStates = EnumSet.of(UploadStatus.StatusEnum.COMPLETED,
+            UploadStatus.StatusEnum.ABORTED, UploadStatus.StatusEnum.FAILED);
+
+        return poll(timeoutMillis, new PollingCallable<UploadStatus>() {
+            @Override
+            public ApiResponse<UploadStatus> poll() throws HubFailureIOException {
+                return catalogClient.pollUploadStatus(uploadId, clientHeaders);
+            }
+
+            @Override
+            public boolean accept(final UploadStatus state) {
+                LOGGER.atDebug() //
+                    .addArgument(path) //
+                    .addArgument(state.getStatus()) //
+                    .addArgument(state.getStatusMessage()) //
+                    .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
+                    .log();
+                return endStates.contains(state.getStatus());
+            }
+        });
+    }
+
+    private Result<Void, FailureValue> uploadWorkflowLike(final String path,
+        final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
+        final ResourcesToCopy resources, final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
+        throws CancelationException {
 
         // remember all temp files so they can be deleted cleaned up `finally` if something went wrong
         final List<Path> tempFiles = new ArrayList<>();
 
-        final Deque<Future<Pair<Integer, EntityTag>>> pendingUploads = new ArrayDeque<>();
-        var success = false;
+        final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads = new ArrayDeque<>();
         try {
             final var partSupplier = new UploadPartSupplier(m_catalogClient, m_clientHeaders, instructions);
             final var currentWriteProgress = new AtomicDouble();
-            final FailableConsumer<Double, CancelationException> updater = progress -> {
-                splitter.checkCanceled();
-                currentWriteProgress.set(progress);
-            };
-
             try (final var outStream = uploadingOutputStream(path, partSupplier, tempFileSupplier,
                 pendingUploads::addLast, tempFiles, currentWriteProgress::get, splitter)) {
-                exporter.exportInto(resources, outStream, updater);
+                exporter.exportInto(resources, outStream, progress -> {
+                    splitter.checkCanceled();
+                    currentWriteProgress.set(progress);
+                });
+            } catch (final HubFailureIOException ex) { // NOSONAR
+                return ex.asFailure();
+            } catch (final IOException ex) {
+                return Result.failure(FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED,
+                    "Upload of '%s' failed: %s".formatted(path, ex.getMessage()), ex));
             }
 
-            // removes finished jobs from `pendingUploads`
-            final Map<Integer, EntityTag> finishedParts = awaitPartsFinished(pendingUploads, splitter.cancelChecker());
-            success = true;
+            final var uploadResult =
+                finishUpload(path, instructions.getUploadId(), pendingUploads, splitter.cancelChecker());
+            if (uploadResult.successful()) {
+                // everything went well, no need to delete the files
+                tempFiles.clear();
+            }
+            return uploadResult;
+        } finally {
+            for (final var tempFile : tempFiles) {
+                FileUtils.deleteQuietly(tempFile.toFile());
+            }
+        }
+    }
 
-            CatalogServiceUtils.reportUploadFinished(m_catalogClient, m_clientHeaders, instructions.getUploadId(),
-                finishedParts);
+    private Result<Void, FailureValue> uploadDataFile(final String path, final Path dataFile,
+        final ItemUploadInstructions instructions, final BranchingExecMonitor splitter) throws CancelationException {
+
+        final long numBytes;
+        try {
+            numBytes = Files.size(dataFile);
+        } catch (final IOException ioe) {
+            return Result.failure( //
+                FailureValue.fromUnexpectedThrowable("Could not read file size: " + ioe.getMessage(), ioe));
+        }
+
+        final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads = new ArrayDeque<>();
+        final var partSupplier = new UploadPartSupplier(m_catalogClient, m_clientHeaders, instructions);
+
+        // do/while because we always want to create at least one chunk
+        long pos = 0;
+        var partNumber = 1;
+        do {
+            final var chunkSize = Math.min(m_chunkSize, numBytes - pos);
+            final var maxProg = numBytes == 0 ? 0 : (1.0 * chunkSize / numBytes);
+            final LeafExecMonitor subMonitor = splitter.createLeafChild(Integer.toString(partNumber), maxProg);
+            final var offsetInFile = pos;
+            final var partNo = partNumber;
+
+            pendingUploads.add(m_filePartUploader.uploadDataFilePart(path, partNo, partSupplier, dataFile,
+                offsetInFile, chunkSize, subMonitor));
+            pos += chunkSize;
+            partNumber++;
+        } while (pos < numBytes);
+
+        return finishUpload(path, instructions.getUploadId(), pendingUploads, splitter.cancelChecker());
+    }
+
+    private Result<Void, FailureValue> finishUpload(final String path, final String uploadId,
+        final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads,
+        final BooleanSupplier cancelChecker) throws CancelationException {
+
+        var success = false;
+        try {
+            // removes finished jobs from `pendingUploads`
+            final Result<SortedMap<Integer, String>, FailureValue> finishedParts =
+                awaitPartsFinished(pendingUploads, cancelChecker);
+            if (!(finishedParts instanceof Success<SortedMap<Integer, String>, ?> partsSuccess)) {
+                return finishedParts.asFailure();
+            }
+
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                final Result<Void, FailureValue> result = m_catalogClient.reportUploadFinished( //
+                    uploadId, partsSuccess.value(), m_clientHeaders).result();
+                success = result.successful();
+                return result;
+            } catch (final HubFailureIOException ex) { // NOSONAR failure is propagated
+                return ex.asFailure();
+            }
         } finally {
             if (!success) {
-                LOGGER.atDebug() //
-                    .addArgument(path) //
-                    .log("Upload of '{}' has failed, cancelling parts and notifying Catalog Service");
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.atDebug() //
+                        .addArgument(path) //
+                        .log("Upload of '{}' has failed, cancelling parts and notifying Catalog Service");
+                }
+
                 // the upload didn't finish successfully, cancel pending part uploads and delete all temp files
                 pendingUploads.forEach(pending -> pending.cancel(true));
-                CatalogServiceUtils.cancelUpload(m_catalogClient, m_clientHeaders, instructions.getUploadId());
-                for (final var tempFile : tempFiles) {
-                    Files.deleteIfExists(tempFile);
+
+                try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                    m_catalogClient.cancelUpload(uploadId, m_clientHeaders);
+                } catch (final HubFailureIOException ex) {
+                    LOGGER.atError() //
+                        .setCause(ex) //
+                        .log("Exception while cancelling Hub upload");
                 }
             }
         }
@@ -571,24 +671,28 @@ public final class HubUploader extends AbstractHubTransfer {
      * @throws IOException if an I/O error occurred during the part upload
      * @throws CancelationException if the part upload was cancelled
      */
-    private static Map<Integer, EntityTag> awaitPartsFinished(
-            final Deque<Future<Pair<Integer, EntityTag>>> pendingUploads, final BooleanSupplier cancelChecker)
-            throws IOException, CancelationException {
-        final Map<Integer, EntityTag> finished = new LinkedHashMap<>();
+    private static Result<SortedMap<Integer, String>, FailureValue> awaitPartsFinished(
+        final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads,
+        final BooleanSupplier cancelChecker) throws CancelationException {
+
+        final SortedMap<Integer, String> finished = new TreeMap<>();
         while (!pendingUploads.isEmpty()) {
-            final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker, throwable -> {
-                if (throwable instanceof IOException ioe) {
-                    throw ioe;
-                } else {
-                    LOGGER.atDebug().setCause(throwable) //
-                        .log("Unexpected exception while uploading file part (to be caught elsewhere)");
-                    throw ExceptionUtils.asRuntimeException(throwable);
-                }
-            });
+            final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker,
+                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
+                    "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
+
+            // only remove after the future has finished, otherwise it can't be cleaned up
             pendingUploads.removeFirst();
-            result.accept(finished::put);
+
+            if (!(result instanceof Success<Pair<Integer,EntityTag>, ?> success)) {
+                return result.asFailure();
+            }
+
+            final var partNoAndETag = success.value();
+            finished.put(partNoAndETag.getLeft(), ETAG_DELEGATE.toString(partNoAndETag.getRight()));
         }
-        return finished;
+
+        return Result.success(finished);
     }
 
     /**
@@ -596,29 +700,53 @@ public final class HubUploader extends AbstractHubTransfer {
      *
      * @param pendingUploads the pending uploads
      * @return finished part with part number as key and entity tag as value
-     *
-     * @throws IOException if an I/O error occurred during the part upload
      */
-    static Pair<Integer, EntityTag> awaitPartFinished(final Future<Pair<Integer, EntityTag>> pendingUpload)
-        throws IOException {
+    static Result<Pair<Integer, EntityTag>, FailureValue>
+        awaitPartFinished(final Future<Result<Pair<Integer, EntityTag>, FailureValue>> pendingUpload) {
         try {
-            return waitForCancellable(pendingUpload, () -> false, throwable -> {
-                if (throwable instanceof IOException ioe) {
-                    throw ioe;
-                } else {
-                    LOGGER.debug("Unexpected exception while uploading data part", throwable);
-                    throw ExceptionUtils.asRuntimeException(throwable);
-                }
-            });
+            return waitForCancellable(pendingUpload, () -> false,
+                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
+                    "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
         } catch (CancelationException ex) {
             // can't be canceled, so this would be a bug
             throw new IllegalStateException("Upload was canceled unexpectedly", ex);
         }
     }
 
-    private @Owning OutputStream uploadingOutputStream(final String path, final UploadPartSupplier partSupplier,
-            final TempFileSupplier tempFileSupplier, final Consumer<Future<Pair<Integer, EntityTag>>> partUploads,
-            final List<Path> chunks, final DoubleSupplier currentWriteProgress, final BranchingExecMonitor splitter) {
+    /**
+     * Request a multi-file upload of the items described in the given map.
+     *
+     * @param parentId ID of the workflow group to upload into
+     * @param manifest upload manifest
+     * @param eTag expected entity tag for the parent group, may be {@code null}
+     * @return mapping from relative path to file upload instructions, or {@link Optional#empty()} if the parent
+     *         workflow group has changed
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    static Result<Optional<UploadStarted>, FailureValue> initiateUpload(final CatalogServiceClient catalogClient,
+        final Map<String, String> additionalHeaders, final ItemID parentId, final UploadManifest manifest,
+        final EntityTag eTag) throws HubFailureIOException {
+
+        final Map<String, String> headers = new HashMap<>(additionalHeaders);
+        if (eTag != null) {
+            headers.put(HttpHeaders.IF_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(eTag));
+        }
+
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response =
+                catalogClient.initiateUpload(parentId.id(), manifest, SLOW_OPERATION_READ_TIMEOUT, headers);
+            if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
+                return Result.success(Optional.empty());
+            } else {
+                return response.result().map(Optional::of);
+            }
+        }
+    }
+
+    private @Owning ChunkingFileOutputStream uploadingOutputStream(final String path,
+        final UploadPartSupplier partSupplier, final TempFileSupplier tempFileSupplier,
+        final Consumer<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> partUploads, final List<Path> chunks,
+        final DoubleSupplier currentWriteProgress, final BranchingExecMonitor splitter) {
 
         return new ChunkingFileOutputStream(m_chunkSize, DigestUtils.getMd5Digest()) {
 
@@ -648,47 +776,6 @@ public final class HubUploader extends AbstractHubTransfer {
         };
     }
 
-    private void uploadDataFile(final String path, final Path dataFile, final ItemUploadInstructions instructions,
-            final BranchingExecMonitor splitter) throws IOException, CancelationException, CouldNotAuthorizeException {
-
-        final var numBytes = Files.size(dataFile);
-        final var partSupplier = new UploadPartSupplier(m_catalogClient, m_clientHeaders, instructions);
-
-        final Deque<Future<Pair<Integer, EntityTag>>> partUploads = new ArrayDeque<>();
-        var success = false;
-        try {
-            // do/while because we always want to create at least one chunk
-            long pos = 0;
-            var partNumber = 1;
-            do {
-                final var chunkSize = Math.min(m_chunkSize, numBytes - pos);
-                final var maxProg = numBytes == 0 ? 0 : (1.0 * chunkSize / numBytes);
-                final LeafExecMonitor subMonitor = splitter.createLeafChild(Integer.toString(partNumber), maxProg);
-                final var offsetInFile = pos;
-                final var partNo = partNumber;
-
-                partUploads.add(m_filePartUploader.uploadDataFilePart(path, partNo, partSupplier, dataFile,
-                    offsetInFile, chunkSize, subMonitor));
-                pos += chunkSize;
-                partNumber++;
-            } while (pos < numBytes);
-
-            final Map<Integer, EntityTag> finishedParts = awaitPartsFinished(partUploads, splitter.cancelChecker());
-            success = true;
-
-            CatalogServiceUtils.reportUploadFinished(m_catalogClient, m_clientHeaders, instructions.getUploadId(),
-                finishedParts);
-        } finally {
-            if (!success) {
-                LOGGER.atDebug() //
-                    .addArgument(path) //
-                    .log("Upload of '{}' has failed, cancelling parts and notifying Hub");
-                partUploads.forEach(pending -> pending.cancel(true));
-                CatalogServiceUtils.cancelUpload(m_catalogClient, m_clientHeaders, instructions.getUploadId());
-            }
-        }
-    }
-
     /**
      * Supplies additional upload parts to the upload process
      *
@@ -707,7 +794,7 @@ public final class HubUploader extends AbstractHubTransfer {
         /**
          * Creates a supplier for additional upload parts
          *
-         * @param client {@link CatalogServiceUtils}
+         * @param client catalog client
          * @param clientHeaders additional headers for the client
          * @param instructions {@link ItemUploadInstructions}
          */
@@ -733,19 +820,4 @@ public final class HubUploader extends AbstractHubTransfer {
             }
         }
     }
-
-    /**
-     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
-     * a JSON failure otherwise a plain text failure.
-     *
-     * @param problemJSON {@link RFC9457}
-     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
-     *
-     * @return {@link Result}
-     */
-    public static <T> Failure<T, FailureValue> createFailureValue(final RFC9457 problemJSON,
-        final Pair<String, Throwable> exceptionFailure) {
-        return newFailureValue(problemJSON, exceptionFailure);
-    }
-
 }

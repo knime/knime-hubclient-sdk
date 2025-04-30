@@ -56,10 +56,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.function.UnaryOperator;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
@@ -77,23 +75,19 @@ import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
 
 final class URLConnectionUploader implements StreamingUploader {
 
-    private static final URLConnectionUploader INSTANCE = new URLConnectionUploader();
-
     private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
         RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
-    private URLConnectionUploader() {
-    }
+    static final StreamingUploader INSTANCE = new URLConnectionUploader();
 
-    public static StreamingUploader getInstance() {
-        return INSTANCE;
+    private URLConnectionUploader() {
     }
 
     @Override
     public EntityTag performUpload(final URL targetUrl, final String httpMethod,
         final Map<String, List<String>> httpHeaders, final @Owning InputStream contentStream, final long contentLength,
-        final LeafExecMonitor monitor, final UnaryOperator<String> errorMessageCallback)
-        throws CancelationException, IOException {
+        final LeafExecMonitor monitor) throws CancelationException, IOException {
+
         HttpURLConnection connection = null;
         try (contentStream) {
             connection = prepareConnection(targetUrl, httpMethod, httpHeaders, contentLength);
@@ -109,10 +103,12 @@ final class URLConnectionUploader implements StreamingUploader {
                     return ETAG_DELEGATE.fromString(connection.getHeaderField(HttpHeaders.ETAG));
                 }
 
-                final String result = readErrorMessage(connection);
-                final var message = "(%d %s)%s".formatted(statusInfo.getStatusCode(), statusInfo.getReasonPhrase(),
-                    StringUtils.isBlank(result) ? "" : (": " + result));
-                throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(), errorMessageCallback.apply(message));
+                try (final var errStream = connection.getErrorStream()) {
+                    final var message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
+                        : statusInfo.getReasonPhrase();
+                    throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
+                        "Failed to upload artifact: " + message);
+                }
             }
         } finally {
             if (connection != null) {
@@ -147,12 +143,6 @@ final class URLConnectionUploader implements StreamingUploader {
             transferred += read;
             monitor.addTransferredBytes(read);
             monitor.setProgress(0.95 * transferred / contentLength);
-        }
-    }
-
-    private static String readErrorMessage(final HttpURLConnection conn) throws IOException {
-        try (final var errStream = conn.getErrorStream()) {
-            return errStream == null ? null : new String(errStream.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

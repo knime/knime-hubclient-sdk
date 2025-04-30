@@ -44,58 +44,51 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Apr 24, 2025 (magnus): created
+ *   10 May 2025 (leonard.woerteler): created
  */
-package org.knime.hub.client.sdk.api;
-
-import java.io.IOException;
-import java.util.Map;
-
-import org.eclipse.core.runtime.IPath;
-import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.hub.client.sdk.ApiClient;
-import org.knime.hub.client.sdk.ApiClient.Method;
-import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.ent.Billboard;
-
-import jakarta.ws.rs.core.GenericType;
-import jakarta.ws.rs.core.MediaType;
+package org.knime.hub.client.sdk;
 
 /**
- * Account Service client for KNIME Hub.
+ * Type of a {@link FailureValue} returned by the SDK.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public final class AccountServiceClient {
+public enum FailureType {
 
-    private static final String BILLBOARD_API_PATH = "knime/rest";
+    /** The requested item is not contained in the parent group. */
+    DOWNLOAD_ITEM_NOT_FOUND,
+    /** The item is not of a downloadable type. */
+    DOWNLOAD_ITEM_UNKNOWN_TYPE,
+    /** The user doesn'T have download permissions on the item. */
+    DOWNLOAD_ITEM_NOT_DOWNLOADABLE,
+    /** The hub failed to prepare the item for download. */
+    DOWNLOAD_ITEM_PREP_FAILED,
+    /** The item could not be imported into the target folder. */
+    DOWNLOAD_ITEM_IMPORT_FAILED,
+    /** THe download stream could not be opened. */
+    DOWNLOAD_STREAM_OPEN_FAILED,
 
-    private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
+    /** A part of the multi-part upload could not be uploaded. */
+    UPLOAD_PART_FAILED,
+    /** The upload was aborted while processing on the Hub side. */
+    UPLOAD_ABORTED_BY_HUB,
+    /** There was a problem processing the uploaded item on the Hub side. */
+    UPLOAD_PROCESSING_FAILED,
+    /** There was a problem zipping and sending a workflow to Hub. */
+    UPLOAD_OF_WORKFLOW_FAILED,
+    /** An uplad part was unreadable while trying to compute an MD5 hash. */
+    UPLOAD_PART_UNREADABLE,
+    /** Upload of a part was aborted after exhausting its retries. */
+    PART_UPLOAD_EXHAUSTED_RETRIES,
 
-    private final @NotOwning ApiClient m_apiClient;
-
-    /**
-     * Create the {@link AccountServiceClient} given an {@link ApiClient}
-     *
-     * @param apiClient the {@link ApiClient}
-     */
-    public AccountServiceClient(final @NotOwning ApiClient apiClient) {
-        m_apiClient = apiClient;
-    }
-
-    /**
-     * Retrieves the billboard information of the hub instance.
-     *
-     * @param additionalHeaders Map of additional headers
-     * @return {@link ApiResponse}
-     *
-     * @throws IOException if an I/O error occurred
-     */
-    public ApiResponse<Billboard> getBillboard(final Map<String, String> additionalHeaders) throws IOException {
-        final var requestPath = IPath.forPosix(BILLBOARD_API_PATH);
-        return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
-            .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.GET, null, BILLBOARD);
-    }
+    /** A Hub REST call returned a non-successful response code. */
+    HUB_FAILURE_RESPONSE,
+    /** There were problems reaching Hub. */
+    NETWORK_CONNECTIVITY_ERROR,
+    /** A redirect failed, potentially because of wrong proxy/firewall settings. */
+    REDIRECT_FAILED,
+    /** The user was logged out of the Hub. */
+    COULD_NOT_AUTHORIZE,
+    /** An unexpected error occurred. */
+    UNEXPECTED_ERROR,
 }

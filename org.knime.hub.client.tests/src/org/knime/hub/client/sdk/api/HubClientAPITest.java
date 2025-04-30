@@ -74,10 +74,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
 import org.knime.hub.client.sdk.testing.TestUtil;
@@ -365,7 +365,7 @@ class HubClientAPITest {
     }
 
 	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse,
-			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) throws ResourceAccessException {
+			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) throws HubFailureIOException {
 	    // Create the actual JSON node response object.
 	    var responseEntity = actualApiResponse.checkSuccessful();
         JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);

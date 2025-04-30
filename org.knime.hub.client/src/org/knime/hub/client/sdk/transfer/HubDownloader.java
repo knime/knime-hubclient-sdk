@@ -21,6 +21,8 @@
 package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -30,12 +32,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
@@ -46,7 +50,9 @@ import org.knime.core.node.util.ClassUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.Result.Success;
@@ -54,7 +60,6 @@ import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Component;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.Data;
-import org.knime.hub.client.sdk.ent.RFC9457;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.Sized;
@@ -126,20 +131,21 @@ public final class HubDownloader extends AbstractHubTransfer {
      * @param progMon progress monitor
      * @return description of all items that have to be downloaded
      * @throws CancelationException if the operation was canceled
-     * @throws IOException if a request to Hub failed
-     * @throws CouldNotAuthorizeException if the authenticator has lost connection
+     * @throws HubFailureIOException if a request to Hub failed
      */
-    public Pair<DownloadResources, Map<IPath, Failure<Void, FailureValue>>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
-            final IProgressMonitor progMon) throws CancelationException, IOException, CouldNotAuthorizeException {
+    public Pair<DownloadResources, Map<IPath, FailureValue>> initiateDownload(final List<ItemID> itemIds, // NOSONAR
+            final IProgressMonitor progMon) throws CancelationException, HubFailureIOException {
         progMon.beginTask("Collecting items to download...", itemIds.size());
         final Map<IPath, Pair<HubItem, Result<DownloadInfo, FailureValue>>> results = new LinkedHashMap<>();
         var optTotalSize = 0L;
         var supportsArtifactDownload = false;
 
-        final Map<IPath, Failure<Void, FailureValue>> notDownloadable = new LinkedHashMap<>();
+        final Map<IPath, FailureValue> notDownloadable = new LinkedHashMap<>();
         if (!itemIds.isEmpty()) {
             // get the common parent (we expect all items to stem from the same group)
-            final var firstParent = deepListParent(itemIds.get(0), progMon::isCanceled).item();
+            final RepositoryItem firstParent = deepListParent(itemIds.get(0), progMon::isCanceled) //
+                .orElseThrow(HubFailureIOException::new) //
+                .item();
 
             // check if artifact download is supported
             supportsArtifactDownload = supportsArtifactDownload(firstParent.getMasonControls());
@@ -147,8 +153,10 @@ public final class HubDownloader extends AbstractHubTransfer {
             final Map<String, RepositoryItem> deepListedItems;
             if (itemIds.size() == 1) {
                 final var itemId = itemIds.get(0);
-                deepListedItems = Map.of(itemId.id(),
-                    deepListItem(itemId, progMon::isCanceled).orElseThrow().item());
+                final RepositoryItem item = deepListItem(itemId, progMon::isCanceled) //
+                    .orElseThrow(HubFailureIOException::new) //
+                    .item();
+                deepListedItems = Map.of(item.getId(), item);
             } else {
                 // we cache the first item's siblings, since all items are expected to stem from the same group
                 deepListedItems = ClassUtils.castStream(WorkflowGroup.class, firstParent) //
@@ -160,12 +168,12 @@ public final class HubDownloader extends AbstractHubTransfer {
                 var repositoryItem = deepListedItems.get(itemId.id());
                 if (repositoryItem == null) {
                     final var message = "Item '%s' could not be found".formatted(itemId.id());
-                    notDownloadable.put(IPath.forPosix(itemId.id()), createFailureValue(
-                        new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null)));
-                } else if (!firstParent.getMasonControls().containsKey(CatalogServiceUtils.DOWNLOAD)) {
+                    notDownloadable.put(IPath.forPosix(itemId.id()),
+                        FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_NOT_FOUND, message));
+                } else if (!firstParent.getMasonControls().containsKey(DOWNLOAD)) {
                     final var message = "Item at '" + repositoryItem.getPath() + "' cannot be downloaded.";
-                    notDownloadable.put(IPath.forPosix(itemId.id()), createFailureValue(
-                        new RFC9457( null, null, message, null, List.of(), null), Pair.of(message, null)));
+                    notDownloadable.put(IPath.forPosix(itemId.id()),
+                        FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_NOT_DOWNLOADABLE, message));
                 } else {
                     final var rootPath = IPath.forPosix(repositoryItem.getPath());
                     progMon.subTask("Analyzing '%s'".formatted(shortenedPath(rootPath.toString())));
@@ -190,7 +198,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                     numDownloads++;
                 }
             } else {
-                notDownloadable.put(targetPath, ((Failure<?, FailureValue>)result).coerceResultType());
+                notDownloadable.put(targetPath, ((Failure<?, FailureValue>)result).failure());
             }
         }
         final var totalSize = optTotalSize < 0 ? OptionalLong.empty() : OptionalLong.of(optTotalSize);
@@ -199,7 +207,7 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static boolean supportsArtifactDownload(final Map<String, Control> spaceParentControls) {
-        return spaceParentControls.containsKey(CatalogServiceUtils.INITIATE_DOWNLOAD);
+        return spaceParentControls.containsKey(INITIATE_DOWNLOAD);
     }
 
     /**
@@ -245,7 +253,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         return out;
     }
 
-    private Map<IPath, Future<Result<Path, FailureValue>>> submitDownloadJobs(final boolean isArtifactDownload,
+    private Map<IPath, Future<Result<Path, FailureValue>>> submitDownloadJobs(final boolean supportsArtifactDownload,
         final List<DownloadInfo> downloadInfos, final boolean allSizesKnown, final TempFileSupplier tempFileSupplier,
         final double maxProgress, final BranchingExecMonitor splitter) {
         final var downloadJobs = new LinkedHashMap<IPath, Future<Result<Path, FailureValue>>>();
@@ -255,8 +263,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                 final var itemSize = allSizesKnown ? download.size().getAsLong() : 1;
                 final var monitor = splitter.createLeafChild(hubItem.path().toString(), itemSize / maxProgress);
                 downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
-                    isArtifactDownload ? (() -> artifactDownloadItemTask(download, tempFileSupplier, monitor))
-                        : (() -> downloadItemTask(download, tempFileSupplier, monitor))));
+                    new DownloadItemTask(download, tempFileSupplier, monitor, supportsArtifactDownload)));
             }
         }
         return downloadJobs;
@@ -271,20 +278,23 @@ public final class HubDownloader extends AbstractHubTransfer {
             var canceled = false;
             for (final var unfinishedJob : downloadJobs.entrySet()) {
                 final var pathInTarget = unfinishedJob.getKey();
-                final var future = unfinishedJob.getValue();
 
+                final ErrorHandler<Path> errorHandler = thrw -> {
+                    if (thrw instanceof CancelationException ce) {
+                        throw ce;
+                    } else if (thrw instanceof CouldNotAuthorizeException cnae) {
+                        return Result.failure(FailureValue.fromAuthFailure(cnae));
+                    } else {
+                        return Result.failure(FailureValue.fromUnexpectedThrowable(
+                            "Failed to download item '" + pathInTarget + "': " + thrw.getMessage(), thrw));
+                    }
+                };
+
+                final Future<Result<Path, FailureValue>> downloadFuture = unfinishedJob.getValue();
                 try {
-                    final var downloadResult = waitForCancellable(future, cancelChecker, throwable -> {
-                        if (throwable instanceof CancelationException ce) { // NOSONAR
-                            throw ce;
-                        } else {
-                            return createFailureValue(
-                                new RFC9457(null, null, throwable.getMessage(), null, List.of(), null),
-                                Pair.of(throwable.getMessage(), throwable));
-                        }
-                    });
-
-                    // wrap the path into an `Optional`
+                    // wrap the path in `Optional.of(...)`, folders are represented by `Optional.empty()`
+                    final Result<Path, FailureValue> downloadResult =
+                        waitForCancellable(downloadFuture, cancelChecker, errorHandler);
                     downloaded.put(pathInTarget, downloadResult.map(Optional::of));
                 } catch (CancelationException cee) { // NOSONAR
                     // we continue to collect results to we can clean up already finished downloads
@@ -325,74 +335,83 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    private Result<Path, FailureValue> downloadItemTask(final DownloadInfo download,
-        final TempFileSupplier tempFileSupplier, final LeafExecMonitor monitor)
-                throws IOException, CancelationException, CouldNotAuthorizeException {
-        // set a very small non-zero value to signal that the download job has started
-        monitor.setProgress(Double.MIN_VALUE);
-        var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
-        final var hubItem = download.item();
-        try {
-            LOGGER.atDebug() //
-                .addArgument(hubItem.path()) //
-                .addArgument(tempFile.get()) //
-                .log("Downloading '{}' into file '{}'");
+    private final class DownloadItemTask implements Callable<Result<Path, FailureValue>> {
 
-            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-                final var response = m_catalogClient.downloadItemById(download.id().id(), null, null, m_clientHeaders,
-                    (in, contentLength) -> {
-                        // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                        final var numBytes = contentLength.orElse(download.size().orElse(-1));
-                        writeStreamToFileWithProgress(in, numBytes, tempFile.get(), monitor);
-                        return tempFile.getAndSet(null);
-                    });
-                return Result.success(response.checkSuccessful());
+        private final DownloadInfo m_download;
+        private final TempFileSupplier m_tempFileSupplier;
+        private final LeafExecMonitor m_monitor;
+        private final boolean m_supportsArtifactDownload;
+
+        DownloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
+            final LeafExecMonitor monitor, final boolean supportsArtifactDownload) {
+            m_download = download;
+            m_tempFileSupplier = tempFileSupplier;
+            m_monitor = monitor;
+            m_supportsArtifactDownload = supportsArtifactDownload;
+        }
+
+        @Override
+        public Result<Path, FailureValue> call() throws CancelationException, CouldNotAuthorizeException {
+            // set a very small non-zero value to signal that the download job has started
+            m_monitor.setProgress(Double.MIN_VALUE);
+            final AtomicReference<Path> tempFile;
+            try {
+                tempFile = new AtomicReference<>(m_tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
+            } catch (final IOException ex) {
+                return Result.failure(
+                    FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR, "Could not create temporary file", ex));
             }
-        } finally {
-            LOGGER.atDebug() //
-                .addArgument(hubItem.path()) //
-                .log("Ended downloading '{}'");
-            monitor.done();
-            final var remainingAfterFailure = tempFile.get();
-            if (remainingAfterFailure != null) {
-                Files.deleteIfExists(remainingAfterFailure);
+
+            final var hubItem = m_download.item();
+            try {
+                LOGGER.atDebug() //
+                    .addArgument(hubItem.path()) //
+                    .addArgument(tempFile.get()) //
+                    .log("Downloading '{}' into file '{}'");
+
+                try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                    return m_supportsArtifactDownload ? performArtifactDownload(tempFile)
+                        : performDownload(tempFile);
+                } catch (SocketException | SocketTimeoutException ex) {
+                    return Result.failure(FailureValue.forConnectivityProblem(ex));
+                } catch (HubFailureIOException ex) { // NOSONAR
+                    return ex.asFailure();
+                } catch (IOException ex) {
+                    return Result.failure(
+                        FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR, "Failed to download item", ex));
+                }
+            } finally {
+                LOGGER.atDebug() //
+                    .addArgument(hubItem.path()) //
+                    .log("Ended downloading '{}'");
+                m_monitor.done();
+                final var remainingAfterFailure = tempFile.get();
+                if (remainingAfterFailure != null) {
+                    FileUtils.deleteQuietly(remainingAfterFailure.toFile());
+                }
             }
         }
-    }
 
-    private Result<Path, FailureValue> artifactDownloadItemTask(final DownloadInfo download,
-        final TempFileSupplier tempFileSupplier, final LeafExecMonitor monitor)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
-        // set a very small non-zero value to signal that the download job has started
-        monitor.setProgress(Double.MIN_VALUE);
+        private Result<Path, FailureValue> performDownload(final AtomicReference<Path> tempFile)
+            throws IOException, CancelationException {
+            final var response = m_catalogClient.downloadItemById(m_download.id().id(), null, null,
+                m_clientHeaders, (in, contentLength) -> {
+                    // prefer size from the HTTP request if available, fall back to Catalog information otherwise
+                    final var numBytes = contentLength.orElse(m_download.size().orElse(-1));
+                    writeStreamToFileWithProgress(in, numBytes, tempFile.get(), m_monitor);
+                    return tempFile.getAndSet(null);
+                });
+            return response.result();
+        }
 
-        // prepare the artifact download
-        LOGGER.atDebug() //
-            .addArgument(download.item().path()) //
-            .log("Preparing download of item {}");
-
-        final var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
-        try {
-            LOGGER.atDebug() //
-                .addArgument(download.item().path()) //
-                .addArgument(tempFile.get()) //
-                .log("Downloading '{}' into file '{}'");
-
+        private Result<Path, FailureValue> performArtifactDownload(final AtomicReference<Path> tempFile)
+            throws IOException, CancelationException {
             try (final var downloadStream =
-                m_catalogClient.createArtifactDownloadStream(download.id(), null, m_clientHeaders)) {
+                m_catalogClient.createArtifactDownloadStream(m_download.id(), null, m_clientHeaders)) {
                 // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                final var numBytes = downloadStream.getContentLength().orElse(download.size().orElse(-1));
-                writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), monitor);
+                final var numBytes = downloadStream.getContentLength().orElse(m_download.size().orElse(-1));
+                writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), m_monitor);
                 return Result.success(tempFile.getAndSet(null));
-            }
-        } finally {
-            LOGGER.atDebug() //
-                .addArgument(download.item().path()) //
-                .log("Ended downloading '{}'");
-            monitor.done();
-            final var remainingAfterFailure = tempFile.get();
-            if (remainingAfterFailure != null) {
-                Files.deleteIfExists(remainingAfterFailure);
             }
         }
     }
@@ -424,7 +443,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         } else {
             final var message = "Unexpected item type at '" + itemPath + "': " + repositoryItem.getType();
             results.put(targetPath, Pair.of(hubItem,
-                createFailureValue(new RFC9457(null, null, message, null, List.of(), null), Pair.of(message, null))));
+                Result.failure(FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_UNKNOWN_TYPE, message))));
             return 0L;
         }
         return size;
@@ -435,25 +454,6 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static long getSize(final RepositoryItem item) {
-        if (item instanceof Sized s) {
-            return s.getSize();
-        } else {
-            return -1L;
-        }
+        return item instanceof Sized s ? s.getSize() : -1;
     }
-
-    /**
-     * Creates the failure value for the response. If the accept header contains the problem JSON header it returns
-     * a JSON failure otherwise a plain text failure.
-     *
-     * @param problemJSON {@link RFC9457}
-     * @param exceptionFailure a pair of a error message and a {@link Throwable} cause
-     *
-     * @return {@link Result}
-     */
-    public static <T> Failure<T, FailureValue> createFailureValue(final RFC9457 problemJSON,
-        final Pair<String, Throwable> exceptionFailure) {
-        return newFailureValue(problemJSON, exceptionFailure);
-    }
-
 }

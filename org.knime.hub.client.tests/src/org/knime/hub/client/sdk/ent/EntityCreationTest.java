@@ -413,7 +413,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateRFC9457ErrorResponse() throws IOException, URISyntaxException {
-        final var basic = load("rfc9457.json", RFC9457.class);
+        final var basic = load("rfc9457.json", ProblemDescription.class);
         assertEquals(Optional.empty(), basic.getType(), "Unexpected type");
         assertEquals(Optional.empty(), basic.getStatus(), "Unexpected status");
         assertEquals("Item '*k9uLSSInH1xt2UHo' does not exist.", basic.getTitle(), "Unexpected title");
@@ -422,7 +422,7 @@ class EntityCreationTest {
         assertEquals(Optional.empty(), basic.getCode(), "Unexpected code");
         assertEquals(Map.of(), basic.getAdditionalProperties(), "Unexpected additional properties");
 
-        final var additional = load("rfc9457AdditionalProps.json", RFC9457.class);
+        final var additional = load("rfc9457AdditionalProps.json", ProblemDescription.class);
         assertEquals(Optional.of("https://example.com/probs/out-of-credit"), additional.getType(), "Unexpected type");
         assertEquals(Optional.empty(), additional.getStatus(), "Unexpected status");
         assertEquals("You do not have enough credit.", additional.getTitle(), "Unexpected title");
@@ -433,7 +433,7 @@ class EntityCreationTest {
             "detail", "Your current balance is 30, but that costs 50.");
         assertEquals(additionalProps, additional.getAdditionalProperties(), "Unexpected additional properties");
 
-        final var withCode = load("rfc9457WithCode.json", RFC9457.class);
+        final var withCode = load("rfc9457WithCode.json", ProblemDescription.class);
         assertEquals(Optional.of("https://example.net/permission-error"), withCode.getType(), "Unexpected type");
         assertEquals(Optional.empty(), withCode.getStatus(), "Unexpected status");
         assertEquals("User does not have permission to see the requested workflow.", withCode.getTitle(),
