@@ -22,7 +22,6 @@ package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URL;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -50,9 +49,6 @@ import org.knime.hub.client.sdk.ent.UploadStarted;
 import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
@@ -65,64 +61,38 @@ import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
  *
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public class CatalogServiceClientWrapper {
+final class CatalogServiceClientWrapper {
 
-    static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
+    private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
             RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
     /** Read timeout for expensive operations like {@link #initiateUpload(ItemID, UploadManifest, EntityTag)}. */
-    static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
+    private static final Duration SLOW_OPERATION_READ_TIMEOUT = Duration.ofMinutes(15);
 
     private static final String KNIME_SERVER_NAMESPACE = "knime";
 
     /** Maximum number of pre-fetched upload URLs per upload. */
-    public static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
+    static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
     /** Relation that points to the endpoint for initiating an async upload flow. */
-    public static final String INITIATE_UPLOAD =  "%s:initiate-upload".formatted(KNIME_SERVER_NAMESPACE);
+    static final String INITIATE_UPLOAD =  "%s:initiate-upload".formatted(KNIME_SERVER_NAMESPACE);
 
-    /** Relation that allows the requester to poll the status of an item upload. */
-    public static final String UPLOAD_STATUS =  "%s:upload-status".formatted(KNIME_SERVER_NAMESPACE);
+    /** Relation that provides the items download control. */
+    static final String DOWNLOAD = "%s:download".formatted(KNIME_SERVER_NAMESPACE);
 
-    /** Relation that allows the requester to request an upload part. */
-    public static final String CREATE_UPLOAD_PART =  "%s:create-upload-part".formatted(KNIME_SERVER_NAMESPACE);
+    /** Relation that provides the items upload control. */
+    static final String UPLOAD = "%s:upload".formatted(KNIME_SERVER_NAMESPACE);
 
-    /** Relation that allows the requester to notify Catalog Service that an item upload is completed. */
-    public static final String COMPLETE_UPLOAD_PART =  "%s:complete-upload".formatted(KNIME_SERVER_NAMESPACE);
-
-    /** Relation that allows the requester to abort an item upload. */
-    public static final String ABORT_UPLOAD_PART =  "%s:abort-upload".formatted(KNIME_SERVER_NAMESPACE);
-
-    /** Relation that provides the items download control */
-    public static final String DOWNLOAD = "%s:download".formatted(KNIME_SERVER_NAMESPACE);
-
-    /** Relation that provides the items upload control */
-    public static final String UPLOAD = "%s:upload".formatted(KNIME_SERVER_NAMESPACE);
-
-    /** Relation that provides the items edit control */
-    public static final String EDIT = "edit";
+    /** Relation that provides the items edit control. */
+    static final String EDIT = "edit";
 
     /** Media type for a KNIME Workflow */
-    public static final MediaType KNIME_WORKFLOW_MEDIA_TYPE =
-            new MediaType("application", "vnd.knime.workflow+zip");
+    static final MediaType KNIME_WORKFLOW_MEDIA_TYPE = new MediaType("application", "vnd.knime.workflow+zip");
     /** Media type for a KNIME Workflow Group */
-    public static final MediaType KNIME_WORKFLOW_GROUP_MEDIA_TYPE =
-            new MediaType("application", "vnd.knime.workflow-group+zip");
+    private static final MediaType KNIME_WORKFLOW_GROUP_MEDIA_TYPE =
+        new MediaType("application", "vnd.knime.workflow-group+zip");
     /** Media type of a workflow group no zip */
-    public static final MediaType MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP =
-            new MediaType("application", "vnd.knime.workflow-group");
-
-    /**
-     * Target description for a file HTTP download.
-     *
-     * @param name item name
-     * @param type item type
-     * @param url download URL
-     */
-    @JsonSerialize
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record DownloadTarget(String name, RepositoryItem.RepositoryItemType type, URL url) {
-    }
+    static final MediaType MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP = new MediaType("application", "vnd.knime.workflow-group");
 
     /**
      * Repository item with associated {@code null}-able etag.
@@ -153,7 +123,7 @@ public class CatalogServiceClientWrapper {
      * @param catalogClient {@link HubClientAPI}
      * @param additionalHeaders additional header parameters for up and download
      */
-    public CatalogServiceClientWrapper(final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders) {
+    CatalogServiceClientWrapper(final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders) {
         m_catalogClient = catalogClient;
         m_additionalHeaders = additionalHeaders;
     }
@@ -169,7 +139,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public Optional<UploadStarted> initiateUpload(final ItemID parentId,
+    Optional<UploadStarted> initiateUpload(final ItemID parentId,
             final UploadManifest manifest, final EntityTag eTag) throws IOException, CouldNotAuthorizeException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
         if (eTag != null) {
@@ -196,7 +166,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
+    UploadTarget requestAdditionalUploadPart(final String uploadId, final int partNumber) // NOSONAR
             throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.requestPartUpload(uploadId, partNumber, m_additionalHeaders);
@@ -212,7 +182,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public UploadStatus pollUploadState(final String uploadId) throws IOException, CouldNotAuthorizeException {
+    UploadStatus pollUploadState(final String uploadId) throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.pollUploadStatus(uploadId, m_additionalHeaders);
             return response.checkSuccessful();
@@ -227,7 +197,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public void reportUploadFinished(final String uploadId, final Map<Integer, EntityTag> artifactETags)
+    void reportUploadFinished(final String uploadId, final Map<Integer, EntityTag> artifactETags)
         throws IOException, CouldNotAuthorizeException {
         final Map<Integer, String> artifactETagMap = artifactETags.entrySet().stream() //
             .sorted(Comparator.comparingInt(Entry::getKey)) //
@@ -248,7 +218,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public void cancelUpload(final String uploadId) throws IOException, CouldNotAuthorizeException {
+    void cancelUpload(final String uploadId) throws IOException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = m_catalogClient.cancelUpload(uploadId, m_additionalHeaders);
             response.checkSuccessful();
@@ -269,7 +239,7 @@ public class CatalogServiceClientWrapper {
      * @throws IOException if an I/O error occurred
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
+    Optional<TaggedRepositoryItem> fetchRepositoryItem(final String itemIDOrPath,
             final Map<String, String> queryParams, final ItemVersion version, final EntityTag ifNoneMatch,
             final EntityTag ifMatch) throws IOException, CouldNotAuthorizeException {
         Map<String, String> additionalHeaders = new HashMap<>(m_additionalHeaders);
@@ -319,7 +289,7 @@ public class CatalogServiceClientWrapper {
      * @throws CancelationException if the operation was canceled
      * @throws CouldNotAuthorizeException if the request could not be authorized
      */
-    public <R> R downloadItem(final ItemID id, final RepositoryItemType itemType,
+    <R> R downloadItem(final ItemID id, final RepositoryItemType itemType,
         final DownloadContentHandler<R> contentHandler)
         throws IOException, CancelationException, CouldNotAuthorizeException {
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
@@ -340,8 +310,7 @@ public class CatalogServiceClientWrapper {
      *
      * @return hub base URI
      */
-    public URI getHubAPIBaseURI() {
+    URI getHubAPIBaseURI() {
         return m_catalogClient.getApiClient().getBaseURI();
     }
-
 }
