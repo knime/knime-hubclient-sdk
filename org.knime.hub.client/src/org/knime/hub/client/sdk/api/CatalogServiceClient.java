@@ -88,7 +88,7 @@ import jakarta.ws.rs.core.MediaType;
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
-public final class CatalogClient {
+public final class CatalogServiceClient {
 
     /* API paths */
     private static final String REPOSITORY_API_PATH = "repository";
@@ -125,14 +125,14 @@ public final class CatalogClient {
 
     private final @NotOwning ApiClient m_apiClient;
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogClient.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogServiceClient.class);
 
     /**
-     * Create the {@link CatalogClient} given an {@link ApiClient}
+     * Create the {@link CatalogServiceClient} given an {@link ApiClient}
      *
      * @param apiClient the {@link ApiClient}
      */
-    public CatalogClient(final @NotOwning ApiClient apiClient) {
+    public CatalogServiceClient(final @NotOwning ApiClient apiClient) {
         m_apiClient = apiClient;
     }
 

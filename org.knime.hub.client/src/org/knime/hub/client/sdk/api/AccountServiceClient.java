@@ -80,7 +80,7 @@ public final class AccountServiceClient {
     private static final Logger LOGGER = LoggerFactory.getLogger(AccountServiceClient.class);
 
     /**
-     * Create the {@link CatalogClient} given an {@link ApiClient}
+     * Create the {@link AccountServiceClient} given an {@link ApiClient}
      *
      * @param apiClient the {@link ApiClient}
      */

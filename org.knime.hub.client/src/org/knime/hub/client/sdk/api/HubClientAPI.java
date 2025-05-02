@@ -61,7 +61,7 @@ public final class HubClientAPI implements AutoCloseable {
 
     private final @Owning ApiClient m_apiClient;
 
-    private final CatalogClient m_catalog;
+    private final CatalogServiceClient m_catalog;
 
     private final AccountServiceClient m_accountService;
 
@@ -72,7 +72,7 @@ public final class HubClientAPI implements AutoCloseable {
      */
     public HubClientAPI(final @Owning ApiClient apiClient) {
         m_apiClient = apiClient;
-        m_catalog = new CatalogClient(m_apiClient);
+        m_catalog = new CatalogServiceClient(m_apiClient);
         m_accountService = new AccountServiceClient(m_apiClient);
     }
 
@@ -88,9 +88,9 @@ public final class HubClientAPI implements AutoCloseable {
     /**
      * Retrieves the catalog client
      *
-     * @return {@link CatalogClient}
+     * @return {@link CatalogServiceClient}
      */
-    public CatalogClient catalog() {
+    public CatalogServiceClient catalog() {
         return m_catalog;
     }
 

@@ -41,7 +41,7 @@ import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
 import org.knime.hub.client.sdk.CancelationException;
-import org.knime.hub.client.sdk.api.CatalogClient;
+import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
 import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
@@ -65,7 +65,7 @@ import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
  *
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
-public class CatalogServiceClient {
+public class CatalogServiceClientWrapper {
 
     static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
             RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
@@ -143,7 +143,7 @@ public class CatalogServiceClient {
     }
 
     @NotOwning
-    private final CatalogClient m_catalogClient;
+    private final CatalogServiceClient m_catalogClient;
 
     private final Map<String, String> m_additionalHeaders;
 
@@ -153,7 +153,7 @@ public class CatalogServiceClient {
      * @param catalogClient {@link HubClientAPI}
      * @param additionalHeaders additional header parameters for up and download
      */
-    public CatalogServiceClient(final CatalogClient catalogClient, final Map<String, String> additionalHeaders) {
+    public CatalogServiceClientWrapper(final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders) {
         m_catalogClient = catalogClient;
         m_additionalHeaders = additionalHeaders;
     }

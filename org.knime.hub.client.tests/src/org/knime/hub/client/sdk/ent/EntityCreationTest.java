@@ -324,7 +324,7 @@ class EntityCreationTest {
 	    assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
 	    assertTrue(billboard.isEnableResetOnUploadCheckbox().isEmpty(), "Unexpected enabled");
 	    assertTrue(billboard.getOAuthInformation().isEmpty(), "Unexpected OAuth information");
-	    assertTrue(billboard.hasForceResetOnUpload().isEmpty(), "Unexpected enabled");
+	    assertTrue(billboard.isForceResetOnUpload().isEmpty(), "Unexpected enabled");
 	    assertTrue(billboard.getClientExplorerFetchTimeout().isEmpty(), "Unexpected fetch timeout");
 	    assertTrue(billboard.getClientExplorerFetchInterval().isEmpty(), "Unexpected fetch interval");
 
@@ -363,8 +363,8 @@ class EntityCreationTest {
         assertEquals("https://auth.hub.com/auth/realms/knime/protocol/openid-connect/auth",
             oAuthInfo.get().getAuthorizationEndpoint().get().toString(), "Unexpected authorization endpoint");
 
-        assertTrue(billboard.hasForceResetOnUpload().isPresent(), "Expected force reset on upload");
-        assertTrue(billboard.hasForceResetOnUpload().get(), "Unexpected disabled");
+        assertTrue(billboard.isForceResetOnUpload().isPresent(), "Expected force reset on upload");
+        assertTrue(billboard.isForceResetOnUpload().get(), "Unexpected disabled");
 
         assertTrue(billboard.getClientExplorerFetchTimeout().isPresent(), "Expected fetch timeout");
         assertEquals(billboard.getClientExplorerFetchTimeout().get(),

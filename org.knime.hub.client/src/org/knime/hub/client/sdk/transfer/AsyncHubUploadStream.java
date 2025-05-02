@@ -62,7 +62,7 @@ import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.hub.client.sdk.api.CatalogClient;
+import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.UploadManifest;
@@ -86,8 +86,8 @@ public final class AsyncHubUploadStream extends OutputStream {
     private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
     private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
 
-    private final @NotOwning CatalogClient m_hubClient;
-    private final CatalogServiceClient m_catalogClient;
+    private final @NotOwning CatalogServiceClient m_hubClient;
+    private final CatalogServiceClientWrapper m_catalogClient;
 
     private final String m_itemName;
     private final String m_uploadId;
@@ -145,8 +145,8 @@ public final class AsyncHubUploadStream extends OutputStream {
      */
     public static final class AsyncUploadStreamBuilder {
 
-        private CatalogServiceClient m_catalogClient;
-        private @NotOwning CatalogClient m_hubClient;
+        private CatalogServiceClientWrapper m_catalogClient;
+        private @NotOwning CatalogServiceClient m_hubClient;
         private Map<String, String> m_additionalHeaders = new HashMap<>();
 
         private String m_itemName;
@@ -161,12 +161,12 @@ public final class AsyncHubUploadStream extends OutputStream {
         }
 
         /**
-         * Adds the {@link CatalogClient}, can't be null
+         * Adds the {@link CatalogServiceClient}, can't be null
          *
-         * @param catalogClient {@link CatalogClient}
+         * @param catalogClient {@link CatalogServiceClient}
          * @return {@link AsyncUploadStreamBuilder}
          */
-        public AsyncUploadStreamBuilder withCatalogClient(final CatalogClient catalogClient) {
+        public AsyncUploadStreamBuilder withCatalogClient(final CatalogServiceClient catalogClient) {
             m_hubClient = catalogClient;
             return this;
         }
@@ -255,12 +255,12 @@ public final class AsyncHubUploadStream extends OutputStream {
             CheckUtils.checkArgumentNotNull(m_parentId);
             CheckUtils.checkArgumentNotNull(m_itemName);
 
-            m_catalogClient = new CatalogServiceClient(m_hubClient, m_additionalHeaders);
+            m_catalogClient = new CatalogServiceClientWrapper(m_hubClient, m_additionalHeaders);
 
-            final var mediaType = m_isWorkflowLike ? CatalogServiceClient.KNIME_WORKFLOW_MEDIA_TYPE.toString()
+            final var mediaType = m_isWorkflowLike ? CatalogServiceClientWrapper.KNIME_WORKFLOW_MEDIA_TYPE.toString()
                 : MediaType.APPLICATION_OCTET_STREAM;
             final var uploadParts =
-                    Math.min(CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
+                    Math.min(CatalogServiceClientWrapper.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
             // Initiate upload request
             final var manifest = new UploadManifest(Map.of(m_itemName, new ItemUploadRequest(mediaType, uploadParts)));
             final var preparedUploadOpt =

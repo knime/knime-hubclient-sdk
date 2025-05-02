@@ -146,7 +146,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                 if (repositoryItem == null) {
                     notDownloadable.put(IPath.forPosix(itemId.id()),
                         Result.failure("Item '%s' could not be found", null));
-                } else if (!firstParent.getMasonControls().containsKey(CatalogServiceClient.DOWNLOAD)) {
+                } else if (!firstParent.getMasonControls().containsKey(CatalogServiceClientWrapper.DOWNLOAD)) {
                     notDownloadable.put(IPath.forPosix(itemId.id()),
                             Result.failure("Item at '" + repositoryItem.getPath() + "' cannot be downloaded.", null));
                 } else {

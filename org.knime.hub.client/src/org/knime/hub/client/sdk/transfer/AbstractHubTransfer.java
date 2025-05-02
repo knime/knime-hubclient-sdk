@@ -48,7 +48,7 @@ import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.transfer.CatalogServiceClient.TaggedRepositoryItem;
+import org.knime.hub.client.sdk.transfer.CatalogServiceClientWrapper.TaggedRepositoryItem;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 
@@ -95,14 +95,14 @@ class AbstractHubTransfer {
         HUB_ITEM_TRANSFER_POOL = executorService;
     }
 
-    CatalogServiceClient m_catalogClient;
+    CatalogServiceClientWrapper m_catalogClient;
 
     /**
      * @param hubClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
     AbstractHubTransfer(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
-        m_catalogClient = new CatalogServiceClient(hubClient.catalog(), additionalHeaders);
+        m_catalogClient = new CatalogServiceClientWrapper(hubClient.catalog(), additionalHeaders);
     }
 
     /**

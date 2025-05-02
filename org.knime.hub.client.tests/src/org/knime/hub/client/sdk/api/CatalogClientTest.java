@@ -58,7 +58,7 @@ import org.knime.core.util.hub.SpecificVersion;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 
 /**
- * Tests for the {@link CatalogClient}.
+ * Tests for the {@link CatalogServiceClient}.
  *
  * @author Manuel Hotz, KNIME GmbH, Konstanz, Germany
  */
@@ -68,20 +68,20 @@ class CatalogClientTest {
     void testItemVersionQueryParam() {
         var expected = new HTTPQueryParameter("version", "42");
         final var specific = new SpecificVersion(42);
-        var actual = CatalogClient.getQueryParameter(specific).orElseThrow();
+        var actual = CatalogServiceClient.getQueryParameter(specific).orElseThrow();
         assertEquals(expected, actual, "Unexpected specific version query parameter");
 
         expected = new HTTPQueryParameter("version", "most-recent");
         final var mostRecent = MostRecent.getInstance();
-        actual = CatalogClient.getQueryParameter(mostRecent).orElseThrow();
+        actual = CatalogServiceClient.getQueryParameter(mostRecent).orElseThrow();
         assertEquals(expected, actual, "Unexpected most-recent version query parameter");
 
         expected = new HTTPQueryParameter("version", "current-state");
         final var currentState = CurrentState.getInstance();
-        actual = CatalogClient.getQueryParameter(currentState).orElseThrow();
+        actual = CatalogServiceClient.getQueryParameter(currentState).orElseThrow();
         assertEquals(expected, actual, "Unexpected current-state version query parameter");
 
-        CatalogClient.getQueryParameter(null).ifPresent(p -> {
+        CatalogServiceClient.getQueryParameter(null).ifPresent(p -> {
             fail("Unexpected query parameter for null version: " + p);
         });
     }

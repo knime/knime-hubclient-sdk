@@ -197,7 +197,7 @@ public final class HubUploader extends AbstractHubTransfer {
     public static boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls, final String host) {
         final var overwrittenHosts = List.of(System.getProperty(FORCE_ASYNC_UPLOAD_HOSTS_FEATURE_FLAG, "").split(","));
         return overwrittenHosts.contains(host)
-                || spaceParentControls.containsKey(CatalogServiceClient.INITIATE_UPLOAD);
+                || spaceParentControls.containsKey(CatalogServiceClientWrapper.INITIATE_UPLOAD);
     }
 
     private static Optional<Pair<IPath, Collision>> checkForCollision(final WorkflowGroup remoteItem, // NOSONAR
@@ -214,7 +214,7 @@ public final class HubUploader extends AbstractHubTransfer {
                     .filter(item -> IPath.forPosix(item.getPath()).lastSegment().equals(name)) //
                     .findAny().orElse(null);
                 if (current == null) {
-                    if (spaceControls.containsKey(CatalogServiceClient.UPLOAD)) { // NOSONAR
+                    if (spaceControls.containsKey(CatalogServiceClientWrapper.UPLOAD)) { // NOSONAR
                         // ancestor item doesn't exist but can be created, no conflict
                         return Optional.empty();
                     } else {
@@ -225,7 +225,7 @@ public final class HubUploader extends AbstractHubTransfer {
             } else {
                 // conflict between a local ancestor folder and a non-folder item on Hub
                 final boolean canUploadToParent =
-                        parent == null || spaceControls.containsKey(CatalogServiceClient.UPLOAD);
+                        parent == null || spaceControls.containsKey(CatalogServiceClientWrapper.UPLOAD);
                 return Optional.of(Pair.of(path.uptoSegment(level),
                     new Collision(false, false, canUploadToParent)));
             }
@@ -235,7 +235,7 @@ public final class HubUploader extends AbstractHubTransfer {
         final boolean remoteIsFolder = current instanceof WorkflowGroup;
         final boolean localIsFolder = localItemType == ItemType.WORKFLOW_GROUP;
         final boolean canUploadToParent = parent != null
-                && spaceControls.containsKey(CatalogServiceClient.UPLOAD);
+                && spaceControls.containsKey(CatalogServiceClientWrapper.UPLOAD);
         if (remoteIsFolder && localIsFolder) {
             // copying an empty folder over an existing one is not a conflict
             return Optional.empty();
@@ -247,7 +247,7 @@ public final class HubUploader extends AbstractHubTransfer {
             return Optional.of(Pair.of(path, //
                 new Collision( //
                     isTypeCompatible(current.getType(), localItemType), //
-                    spaceControls.containsKey(CatalogServiceClient.EDIT), //
+                    spaceControls.containsKey(CatalogServiceClientWrapper.EDIT), //
                     canUploadToParent)));
         }
     }
@@ -276,12 +276,12 @@ public final class HubUploader extends AbstractHubTransfer {
             final int numInitialParts) throws IOException, CouldNotAuthorizeException {
 
         final Map<String, ItemUploadRequest> uploadRequests = new LinkedHashMap<>();
-        int partsRemaining = CatalogServiceClient.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
+        int partsRemaining = CatalogServiceClientWrapper.MAX_NUM_PREFETCHED_UPLOAD_PARTS;
         for (final var entry : items.entrySet()) {
             final var itemType = entry.getValue().type();
             final String mediaType = switch (itemType) {
-                case WORKFLOW_GROUP -> CatalogServiceClient.MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP.toString();
-                case WORKFLOW_LIKE -> CatalogServiceClient.KNIME_WORKFLOW_MEDIA_TYPE.toString();
+                case WORKFLOW_GROUP -> CatalogServiceClientWrapper.MEDIA_TYPE_WORKFLOW_GROUP_NO_ZIP.toString();
+                case WORKFLOW_LIKE -> CatalogServiceClientWrapper.KNIME_WORKFLOW_MEDIA_TYPE.toString();
                 case DATA_FILE -> MediaType.APPLICATION_OCTET_STREAM;
             };
             final var partsHere = itemType == ItemType.WORKFLOW_GROUP ? 0 : Math.min(partsRemaining, numInitialParts);
@@ -680,15 +680,15 @@ public final class HubUploader extends AbstractHubTransfer {
 
         private final Map<Integer, UploadTarget> m_initialParts;
 
-        private final CatalogServiceClient m_client;
+        private final CatalogServiceClientWrapper m_client;
 
         /**
          * Creates a supplier for additional upload parts
          *
-         * @param client {@link CatalogServiceClient}
+         * @param client {@link CatalogServiceClientWrapper}
          * @param instructions {@link ItemUploadInstructions}
          */
-        public UploadPartSupplier(final CatalogServiceClient client, final ItemUploadInstructions instructions) {
+        public UploadPartSupplier(final CatalogServiceClientWrapper client, final ItemUploadInstructions instructions) {
             m_client = client;
             m_uploadId = instructions.getUploadId();
             m_initialParts = new LinkedHashMap<>(instructions.getParts().orElse(Map.of()));

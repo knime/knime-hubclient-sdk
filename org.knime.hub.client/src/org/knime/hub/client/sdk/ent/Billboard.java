@@ -136,7 +136,7 @@ public final class Billboard {
 
     /**
      * Returns whether the reset on upload checkbox in the deploy dialog should be enabled if
-     * {@link Billboard#hasForceResetOnUpload()} equals {@code true}.
+     * {@link Billboard#isForceResetOnUpload()} equals {@code true}.
      *
      * @return <code>true</code> if the checkbox should be enabled, <code>false</code> otherwise.
      */
@@ -164,7 +164,7 @@ public final class Billboard {
      */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     @JsonProperty(JSON_PROPERTY_FORCE_RESET_ON_UPLOAD)
-    public Optional<Boolean> hasForceResetOnUpload() {
+    public Optional<Boolean> isForceResetOnUpload() {
         return Optional.ofNullable(m_forceResetOnUpload);
     }
 
