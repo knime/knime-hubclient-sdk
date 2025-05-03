@@ -20,9 +20,7 @@
  */
 package org.knime.hub.client.sdk.transfer;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -37,7 +35,6 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
@@ -45,6 +42,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
+import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.Result;
@@ -160,7 +158,7 @@ public final class HubDownloader extends AbstractHubTransfer {
                 if (repositoryItem == null) {
                     notDownloadable.put(IPath.forPosix(itemId.id()),
                         Result.failure("Item '%s' could not be found", null));
-                } else if (!firstParent.getMasonControls().containsKey(CatalogServiceClientWrapper.DOWNLOAD)) {
+                } else if (!firstParent.getMasonControls().containsKey(CatalogServiceUtils.DOWNLOAD)) {
                     notDownloadable.put(IPath.forPosix(itemId.id()),
                             Result.failure("Item at '" + repositoryItem.getPath() + "' cannot be downloaded.", null));
                 } else {
@@ -196,7 +194,7 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static boolean supportsArtifactDownload(final Map<String, Control> spaceParentControls) {
-        return spaceParentControls.containsKey(CatalogServiceClientWrapper.INITIATE_DOWNLOAD);
+        return spaceParentControls.containsKey(CatalogServiceUtils.INITIATE_DOWNLOAD);
     }
 
     /**
@@ -245,16 +243,10 @@ public final class HubDownloader extends AbstractHubTransfer {
             final var hubItem = download.item();
             if (!hubItem.isFolder()) {
                 final var itemSize = allSizesKnown ? download.size().getAsLong() : 1;
-                final var contribution = itemSize / maxProgress;
-                if (isArtifactDownload) {
-                    downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
-                        () -> artifactDownloadItemTask(download, tempFileSupplier,
-                            splitter.createLeafChild(hubItem.path().toString(), contribution))));
-                } else {
-                    downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
-                        () -> downloadItemTask(download, tempFileSupplier,
-                            splitter.createLeafChild(hubItem.path().toString(), contribution))));
-                }
+                final var monitor = splitter.createLeafChild(hubItem.path().toString(), itemSize / maxProgress);
+                downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
+                    isArtifactDownload ? (() -> artifactDownloadItemTask(download, tempFileSupplier, monitor))
+                        : (() -> downloadItemTask(download, tempFileSupplier, monitor))));
             }
         }
         return downloadJobs;
@@ -301,7 +293,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    private static void cleanUpDownloads(Map<IPath, Result<Optional<Path>>> downloaded) {
+    private static void cleanUpDownloads(final Map<IPath, Result<Optional<Path>>> downloaded) {
         for (final var res : downloaded.values()) {
             if (res instanceof Success<Optional<Path>> success) {
                 final var path = success.value();
@@ -321,42 +313,31 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    @SuppressWarnings("java:S5612") // lambda with many lines
     private Result<Path> downloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
             final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
         // set a very small non-zero value to signal that the download job has started
         monitor.setProgress(Double.MIN_VALUE);
         var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
+        final var hubItem = download.item();
         try {
             LOGGER.atDebug() //
-                .addArgument(download.item().path()) //
+                .addArgument(hubItem.path()) //
                 .addArgument(tempFile.get()) //
                 .log("Downloading '{}' into file '{}'");
-            final var file =
-                m_catalogClient.downloadItem(download.id(), download.item().type(), (in, contentLength) -> {
-                    // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                    final var numBytes = contentLength.orElse(download.size().orElse(-1));
-                    final var bufferSize = (int)(FileUtils.ONE_MB / 2);
-                    try (final var bufferedInStream = new BufferedInputStream(in, bufferSize);
-                            final var outStream = Files.newOutputStream(tempFile.get())) {
-                        final var buffer = new byte[bufferSize];
-                        long written = 0;
-                        for (int read; (read = bufferedInStream.read(buffer)) >= 0;) {
-                            monitor.checkCanceled();
-                            outStream.write(buffer, 0, read);
-                            written += read;
-                            monitor.addTransferredBytes(read);
-                            if (numBytes >= 0) { // NOSONAR
-                                monitor.setProgress(Math.min(1.0 * written / numBytes, 1.0));
-                            }
-                        }
-                    }
-                    return tempFile.getAndSet(null);
-                });
-            return Result.success(file);
+
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                final var response = m_catalogClient.downloadItemById(download.id().id(), null, null, m_clientHeaders,
+                    (in, contentLength) -> {
+                        // prefer size from the HTTP request if available, fall back to Catalog information otherwise
+                        final var numBytes = contentLength.orElse(download.size().orElse(-1));
+                        writeStreamToFileWithProgress(in, numBytes, tempFile.get(), monitor);
+                        return tempFile.getAndSet(null);
+                    });
+                return Result.success(response.checkSuccessful());
+            }
         } finally {
             LOGGER.atDebug() //
-                .addArgument(download.item().path()) //
+                .addArgument(hubItem.path()) //
                 .log("Ended downloading '{}'");
             monitor.done();
             final var remainingAfterFailure = tempFile.get();
@@ -366,7 +347,6 @@ public final class HubDownloader extends AbstractHubTransfer {
         }
     }
 
-    @SuppressWarnings("java:S5612") // lambda with many lines
     private Result<Path> artifactDownloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
             final LeafExecMonitor monitor) throws IOException, CancelationException, CouldNotAuthorizeException {
         // set a very small non-zero value to signal that the download job has started
@@ -375,50 +355,22 @@ public final class HubDownloader extends AbstractHubTransfer {
         // prepare the artifact download
         LOGGER.atDebug() //
             .addArgument(download.item().path()) //
-            .log("Prpearing download of item {}");
-        final var preparedDownload = m_catalogClient.prepareItemDownlaod(download.id(), null);
+            .log("Preparing download of item {}");
 
-        final var downloadId = preparedDownload.getDownloadId();
-        final var downloadPath = download.item().path();
-
-        URL downloadUrl;
-        try {
-            // poll the download status until its ready
-            downloadUrl = awaitReadyDownloadState(downloadPath, downloadId);
-        } catch (final InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException(
-                "Download of '%s' has been interrupted while waiting for Hub".formatted(downloadPath));
-        }
-
-        var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
+        final var tempFile = new AtomicReference<>(tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
         try {
             LOGGER.atDebug() //
                 .addArgument(download.item().path()) //
                 .addArgument(tempFile.get()) //
                 .log("Downloading '{}' into file '{}'");
-            final var downloadResponse =
-                m_catalogClient.downloadItemFromRequestURL(downloadUrl, download.item().type(), (in, contentLength) -> {
-                    // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                    final var numBytes = contentLength.orElse(download.size().orElse(-1));
-                    final var bufferSize = (int)(FileUtils.ONE_MB / 2);
-                    try (final var bufferedInStream = new BufferedInputStream(in, bufferSize);
-                            final var outStream = Files.newOutputStream(tempFile.get())) {
-                        final var buffer = new byte[bufferSize];
-                        long written = 0;
-                        for (int read; (read = bufferedInStream.read(buffer)) >= 0;) {
-                            monitor.checkCanceled();
-                            outStream.write(buffer, 0, read);
-                            written += read;
-                            monitor.addTransferredBytes(read);
-                            if (numBytes >= 0) { // NOSONAR
-                                monitor.setProgress(Math.min(1.0 * written / numBytes, 1.0));
-                            }
-                        }
-                    }
-                    return tempFile.getAndSet(null);
-                });
-            return Result.success(downloadResponse.checkSuccessful());
+
+            try (final var downloadStream =
+                m_catalogClient.createArtifactDownloadStream(download.id(), null, m_clientHeaders)) {
+                // prefer size from the HTTP request if available, fall back to Catalog information otherwise
+                final var numBytes = downloadStream.getContentLength().orElse(download.size().orElse(-1));
+                writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), monitor);
+                return Result.success(tempFile.getAndSet(null));
+            }
         } finally {
             LOGGER.atDebug() //
                 .addArgument(download.item().path()) //
@@ -427,41 +379,6 @@ public final class HubDownloader extends AbstractHubTransfer {
             final var remainingAfterFailure = tempFile.get();
             if (remainingAfterFailure != null) {
                 Files.deleteIfExists(remainingAfterFailure);
-            }
-        }
-    }
-
-    private URL awaitReadyDownloadState(final IPath downloadPath, final String downloadId)
-            throws IOException, CouldNotAuthorizeException, InterruptedException {
-        final var t0 = System.currentTimeMillis();
-        for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {
-            final var state = m_catalogClient.pollDownloadState(downloadId);
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.atDebug() //
-                    .addArgument(downloadPath) //
-                    .addArgument(state.getStatus()) //
-                    .addArgument(state.getStatusMessage()) //
-                    .setMessage("Polling state of download item '{}': {}, '{}'") //
-                    .log();
-            }
-
-            switch (state.getStatus()) {
-                case ABORTED:
-                    throw new IOException(state.getStatusMessage());
-                case PREPARING, ZIPPING:
-                    break;
-                case READY:
-                    return state.getDownloadUrl().orElseThrow();
-                case FAILED:
-                    throw new IOException(state.getStatusMessage());
-            }
-
-            // Sequence: 200ms, 400ms, 600ms, 800ms and then 1s until the timeout is reached
-            Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
-
-            final long elapsed = System.currentTimeMillis() - t0;
-            if (elapsed > CatalogServiceClientWrapper.DOWNLOAD_STATUS_POLL_TIMEOUT.toMillis()) {
-                throw new IOException("Download was not ready within %.1fs".formatted(elapsed / 1000.0));
             }
         }
     }

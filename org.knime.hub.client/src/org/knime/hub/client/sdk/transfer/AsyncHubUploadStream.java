@@ -87,7 +87,7 @@ public final class AsyncHubUploadStream extends OutputStream {
     private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
 
     private final @NotOwning CatalogServiceClient m_hubClient;
-    private final CatalogServiceClientWrapper m_catalogClient;
+    private final Map<String, String> m_clientHeaders;
 
     private final String m_itemName;
     private final String m_uploadId;
@@ -101,18 +101,18 @@ public final class AsyncHubUploadStream extends OutputStream {
     private volatile boolean m_canceled;
 
     private AsyncHubUploadStream(final AsyncUploadStreamBuilder builder) {
-        m_catalogClient = builder.m_catalogClient;
         m_hubClient = builder.m_hubClient;
+        m_clientHeaders = builder.m_additionalHeaders;
         m_itemName = builder.m_itemName;
         m_uploadId = builder.m_uploadInstructions.getUploadId();
         m_timeout = builder.m_timeout;
 
         // Create file part uploader to upload separate chunks of data
-        m_filePartUploader = new FilePartUploader(m_hubClient.getApiClient().getConnectTimeout(),
-            m_hubClient.getApiClient().getReadTimeout(), NUMBER_OF_PART_UPLOAD_RETRIES);
+        m_filePartUploader =
+            new FilePartUploader(URLConnectionUploader.getInstance(), NUMBER_OF_PART_UPLOAD_RETRIES, false);
 
         // Create the supplier which can request additional upload parts
-        final var partSupplier = new UploadPartSupplier(m_catalogClient, builder.m_uploadInstructions);
+        final var partSupplier = new UploadPartSupplier(m_hubClient, m_clientHeaders, builder.m_uploadInstructions);
         final var execMonitor = LeafExecMonitor.nullExecMonitor(() -> m_canceled);
 
         // Create chunking output stream
@@ -145,7 +145,6 @@ public final class AsyncHubUploadStream extends OutputStream {
      */
     public static final class AsyncUploadStreamBuilder {
 
-        private CatalogServiceClientWrapper m_catalogClient;
         private @NotOwning CatalogServiceClient m_hubClient;
         private Map<String, String> m_additionalHeaders = new HashMap<>();
 
@@ -255,16 +254,14 @@ public final class AsyncHubUploadStream extends OutputStream {
             CheckUtils.checkArgumentNotNull(m_parentId);
             CheckUtils.checkArgumentNotNull(m_itemName);
 
-            m_catalogClient = new CatalogServiceClientWrapper(m_hubClient, m_additionalHeaders);
-
-            final var mediaType = m_isWorkflowLike ? CatalogServiceClientWrapper.KNIME_WORKFLOW_MEDIA_TYPE.toString()
+            final var mediaType = m_isWorkflowLike ? CatalogServiceUtils.KNIME_WORKFLOW_TYPE_ZIP.toString()
                 : MediaType.APPLICATION_OCTET_STREAM;
             final var uploadParts =
-                    Math.min(CatalogServiceClientWrapper.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
+                Math.min(CatalogServiceUtils.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
             // Initiate upload request
             final var manifest = new UploadManifest(Map.of(m_itemName, new ItemUploadRequest(mediaType, uploadParts)));
-            final var preparedUploadOpt =
-                m_catalogClient.initiateUpload(new ItemID(m_parentId), manifest, m_parentETag);
+            final var preparedUploadOpt = CatalogServiceUtils.initiateUpload(m_hubClient, m_additionalHeaders,
+                new ItemID(m_parentId), manifest, m_parentETag);
             if (preparedUploadOpt.isEmpty()) {
                 return null;
             }
@@ -333,7 +330,7 @@ public final class AsyncHubUploadStream extends OutputStream {
             }
 
             // notify Catalog
-            m_catalogClient.cancelUpload(m_uploadId);
+            CatalogServiceUtils.cancelUpload(m_hubClient, m_clientHeaders, m_uploadId);
         }
     }
 
@@ -377,50 +374,34 @@ public final class AsyncHubUploadStream extends OutputStream {
 
         try {
             // report back to catalog
-            m_catalogClient.reportUploadFinished(m_uploadId, m_finishedParts);
+            CatalogServiceUtils.reportUploadFinished(m_hubClient, m_clientHeaders, m_uploadId, m_finishedParts);
 
             // wait for the upload to be completed server-side
-            pollUntilCompletion();
+            final var finalState = CatalogServiceUtils.awaitUploadProcessed(m_hubClient, m_clientHeaders, m_uploadId,
+                m_timeout.toMillis(), state -> {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.atDebug() //
+                            .addArgument(m_itemName) //
+                            .addArgument(state.getStatus()) //
+                            .addArgument(state.getStatusMessage()) //
+                            .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
+                            .log();
+                    }
+                });
+            switch (finalState.getStatus()) {
+                case ABORTED, FAILED:
+                    throw new IOException(finalState.getStatusMessage());
+                case ANALYSIS_PENDING, PREPARED: // timeout
+                    throw new IOException("Hub didn't complete upload within %.1fs" //
+                        .formatted(m_timeout.toMillis() / 1000.0));
+                case COMPLETED:
+                    break;
+            }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Upload of '%s' has been interrupted while waiting for Hub".formatted(m_itemName));
         } catch (final CouldNotAuthorizeException ex) {
             throw new IOException("Lost connection to Hub while closing upload of '%s'".formatted(m_itemName), ex);
-        }
-    }
-
-    private void pollUntilCompletion() throws IOException, InterruptedException, CouldNotAuthorizeException {
-        // Wait until the upload status is completed
-        final var t0 = System.currentTimeMillis();
-        for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {
-            final var state = m_catalogClient.pollUploadState(m_uploadId);
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.atDebug() //
-                    .addArgument(m_itemName) //
-                    .addArgument(state.getStatus()) //
-                    .addArgument(state.getStatusMessage()) //
-                    .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
-                    .log();
-            }
-
-            switch (state.getStatus()) {
-                case ABORTED:
-                    throw new IOException(state.getStatusMessage());
-                case ANALYSIS_PENDING, PREPARED:
-                    break;
-                case COMPLETED:
-                    return;
-                case FAILED:
-                    throw new IOException(state.getStatusMessage());
-            }
-
-            // Sequence: 200ms, 400ms, 600ms, 800ms and then 1s until the timeout is reached
-            Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
-
-            final long elapsed = System.currentTimeMillis() - t0;
-            if (elapsed > m_timeout.toMillis()) {
-                throw new IOException("Hub didn't complete upload within %.1fs".formatted(elapsed / 1000.0));
-            }
         }
     }
 }

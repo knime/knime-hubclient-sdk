@@ -1,0 +1,158 @@
+/*
+ * ------------------------------------------------------------------------
+ *
+ *  Copyright by KNIME AG, Zurich, Switzerland
+ *  Website: http://www.knime.com; Email: contact@knime.com
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License, Version 3, as
+ *  published by the Free Software Foundation.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, see <http://www.gnu.org/licenses>.
+ *
+ *  Additional permission under GNU GPL version 3 section 7:
+ *
+ *  KNIME interoperates with ECLIPSE solely via ECLIPSE's plug-in APIs.
+ *  Hence, KNIME and ECLIPSE are both independent programs and are not
+ *  derived from each other. Should, however, the interpretation of the
+ *  GNU GPL Version 3 ("License") under any applicable laws result in
+ *  KNIME and ECLIPSE being a combined program, KNIME AG herewith grants
+ *  you the additional permission to use and propagate KNIME together with
+ *  ECLIPSE with only the license terms in place for ECLIPSE applying to
+ *  ECLIPSE and the GNU GPL Version 3 applying for KNIME, provided the
+ *  license terms of ECLIPSE themselves allow for the respective use and
+ *  propagation of ECLIPSE together with KNIME.
+ *
+ *  Additional permission relating to nodes for KNIME that extend the Node
+ *  Extension (and in particular that are based on subclasses of NodeModel,
+ *  NodeDialog, and NodeView) and that only interoperate with KNIME through
+ *  standard APIs ("Nodes"):
+ *  Nodes are deemed to be separate and independent programs and to not be
+ *  covered works.  Notwithstanding anything to the contrary in the
+ *  License, the License does not apply to Nodes, you are not required to
+ *  license Nodes under the License, and you are granted a license to
+ *  prepare and propagate Nodes, in each case even if such Nodes are
+ *  propagated with or for interoperation with KNIME.  The owner of a Node
+ *  may freely choose the license terms applicable to such Node, including
+ *  when such Node is propagated with or for interoperation with KNIME.
+ * ---------------------------------------------------------------------
+ *
+ * History
+ *   7 May 2025 (leonard.woerteler): created
+ */
+package org.knime.hub.client.sdk.transfer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.function.UnaryOperator;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jdt.annotation.Owning;
+import org.knime.core.util.ThreadLocalHTTPAuthenticator;
+import org.knime.core.util.exception.HttpExceptionUtils;
+import org.knime.core.util.proxy.URLConnectionFactory;
+import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.FilePartUploader.StreamingUploader;
+
+import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status.Family;
+import jakarta.ws.rs.ext.RuntimeDelegate;
+import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
+
+final class URLConnectionUploader implements StreamingUploader {
+
+    private static final URLConnectionUploader INSTANCE = new URLConnectionUploader();
+
+    private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
+        RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
+
+    private URLConnectionUploader() {
+    }
+
+    public static StreamingUploader getInstance() {
+        return INSTANCE;
+    }
+
+    @Override
+    public EntityTag performUpload(final URL targetUrl, final String httpMethod,
+        final Map<String, List<String>> httpHeaders, final @Owning InputStream contentStream, final long contentLength,
+        final LeafExecMonitor monitor, final UnaryOperator<String> errorMessageCallback)
+        throws CancelationException, IOException {
+        HttpURLConnection connection = null;
+        try (contentStream) {
+            connection = prepareConnection(targetUrl, httpMethod, httpHeaders, contentLength);
+
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                try (final var out = connection.getOutputStream()) {
+                    transferContent(contentStream, contentLength, out, monitor);
+                }
+                monitor.setProgress(0.99);
+
+                final var statusInfo = Response.Status.fromStatusCode(connection.getResponseCode());
+                if (statusInfo.getFamily() == Family.SUCCESSFUL) {
+                    return ETAG_DELEGATE.fromString(connection.getHeaderField(HttpHeaders.ETAG));
+                }
+
+                final String result = readErrorMessage(connection);
+                final var message = "(%d %s)%s".formatted(statusInfo.getStatusCode(), statusInfo.getReasonPhrase(),
+                    StringUtils.isBlank(result) ? "" : (": " + result));
+                throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(), errorMessageCallback.apply(message));
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+            monitor.done();
+        }
+    }
+
+    private static HttpURLConnection prepareConnection(final URL targetUrl, final String httpMethod,
+        final Map<String, List<String>> httpHeaders, final long contentLength) throws IOException {
+        HttpURLConnection connection;
+        connection = (HttpURLConnection)URLConnectionFactory.getConnection(targetUrl);
+        connection.setRequestMethod(httpMethod);
+        for (final var header : httpHeaders.entrySet()) {
+            for (final var value : header.getValue()) {
+                connection.addRequestProperty(header.getKey(), value);
+            }
+        }
+        connection.setFixedLengthStreamingMode(contentLength);
+        connection.setDoOutput(true);
+        return connection;
+    }
+
+    private static void transferContent(final InputStream contentStream, final long contentLength,
+        final OutputStream out, final LeafExecMonitor monitor) throws IOException, CancelationException {
+        final var buffer = new byte[64 * (int)FileUtils.ONE_KB];
+        long transferred = 0;
+        for (int read; (read = contentStream.read(buffer, 0, buffer.length)) >= 0;) {
+            monitor.checkCanceled();
+            out.write(buffer, 0, read);
+            transferred += read;
+            monitor.addTransferredBytes(read);
+            monitor.setProgress(0.95 * transferred / contentLength);
+        }
+    }
+
+    private static String readErrorMessage(final HttpURLConnection conn) throws IOException {
+        try (final var errStream = conn.getErrorStream()) {
+            return errStream == null ? null : new String(errStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+}

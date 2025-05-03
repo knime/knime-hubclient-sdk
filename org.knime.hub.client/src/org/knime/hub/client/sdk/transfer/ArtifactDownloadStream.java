@@ -52,213 +52,113 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
+import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
+import org.knime.core.util.exception.HttpExceptionUtils;
+import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
-import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
-import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream.AsyncUploadStreamBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status.Family;
+import jakarta.ws.rs.core.Response.StatusType;
 
 /**
  * Provides an artifact download stream for single item download from a hub instance.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@SuppressWarnings("java:S4929") // FiterInputStream has sufficient read(int) implementation.
 public final class ArtifactDownloadStream extends FilterInputStream {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArtifactDownloadStream.class);
 
     private @Owning Response m_response;
-    private OptionalLong m_contentLength;
-    private Optional<EntityTag> m_etag;
-    private Map<String, List<Object>> m_responseHeaders;
-
-    private ArtifactDownloadStream(final @Owning InputStream downloadStream,
-        final ArtifactDownloadStreamBuilder builder) {
-        super(downloadStream);
-        m_response = builder.m_response;
-        m_contentLength = builder.m_contentLength;
-        m_etag = builder.m_etag;
-        m_responseHeaders = builder.m_responseHeaders;
-    }
+    private final long m_contentLength;
+    private final Map<String, List<Object>> m_responseHeaders;
 
     /**
-     * Creates a new {@link AsyncUploadStreamBuilder}
+     * Opens an {@link ArtifactDownloadStream} for the given artifact in the given version.
+     * @param catalogClient catalog client for initiating the stream
+     * @param headers headers for Hub API calls
+     * @param itemId ID of the item to download
+     * @param version version of the item to download
      *
-     * @return {@link AsyncUploadStreamBuilder}
+     * @return the opened stream
+     * @throws IOException if the download stream couldn't be opened
+     * @throws CouldNotAuthorizeException if a call to a Hub API could not be authorized
      */
-    public static ArtifactDownloadStreamBuilder builder() {
-        return new ArtifactDownloadStreamBuilder();
-    }
+    public static @Owning ArtifactDownloadStream create(final CatalogServiceClient catalogClient,
+        final Map<String, String> headers, final ItemID itemId, final ItemVersion version)
+        throws IOException, CouldNotAuthorizeException {
+        CheckUtils.checkArgumentNotNull(catalogClient);
+        CheckUtils.checkArgumentNotNull(itemId);
 
-    /**
-     * Artifact download stream builder
-     *
-     * @author Magnus Gohm, KNIME AG, Konstanz, Germany
-     */
-    public static final class ArtifactDownloadStreamBuilder {
+        // prepare the artifact download
+        LOGGER.atDebug() //
+            .addArgument(itemId.id()) //
+            .log("Preparing download of item with ID: {}");
 
-        private CatalogServiceClientWrapper m_catalogClient;
-        private @NotOwning CatalogServiceClient m_hubClient;
-        private Map<String, String> m_additionalHeaders = new HashMap<>();
-
-        private String m_itemId;
-        private ItemVersion m_version;
-
-        private @NotOwning Response m_response; // closed by ArtifactDownloadStream
-        private OptionalLong m_contentLength;
-        private Optional<EntityTag> m_etag;
-        private Map<String, List<Object>> m_responseHeaders;
-
-        private ArtifactDownloadStreamBuilder() {
+        final String downloadId;
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = catalogClient.preparedDownload(itemId.id(), version, headers);
+            downloadId = response.checkSuccessful().getDownloadId();
         }
 
-        /**
-         * Adds the item ID.
-         *
-         * @param itemId the ID of the item to download
-         * @return {@link ArtifactDownloadStreamBuilder}
-         */
-        public ArtifactDownloadStreamBuilder withItemId(final String itemId) {
-            m_itemId = itemId;
-            return this;
-        }
-
-        /**
-         * Adds the item version.
-         *
-         * @param version the {@link ItemVersion} of the item to download
-         * @return {@link ArtifactDownloadStreamBuilder}
-         */
-        public ArtifactDownloadStreamBuilder withItemVersion(final ItemVersion version) {
-            m_version = version;
-            return this;
-        }
-
-        /**
-         * Adds the {@link CatalogClient}, can't be null.
-         *
-         * @param catalogClient {@link CatalogClient}
-         * @return {@link ArtifactDownloadStreamBuilder}
-         */
-        public ArtifactDownloadStreamBuilder withCatalogClient(final CatalogServiceClient catalogClient) {
-            m_hubClient = catalogClient;
-            return this;
-        }
-
-        /**
-         * Adds additional headers to the requests of the artifact download.
-         *
-         * @param headerMap the map of headers
-         * @return {@link ArtifactDownloadStreamBuilder}
-         */
-        public ArtifactDownloadStreamBuilder withHeaders(final Map<String, String> headerMap) {
-            if (headerMap != null) {
-                m_additionalHeaders.putAll(headerMap);
-            }
-            return this;
-        }
-
-        /**
-         * Creates an artifact download stream to the hub.
-         *
-         * @return an {@link ArtifactDownloadStream}
-         *
-         * @throws IOException if an I/O error occurred during the download
-         * @throws CouldNotAuthorizeException if the authenticator has lost connection
-         * @throws CancelationException if the process got cancelled
-         */
-        public @Owning ArtifactDownloadStream build()
-                throws IOException, CouldNotAuthorizeException, CancelationException {
-            CheckUtils.checkArgumentNotNull(m_hubClient);
-            CheckUtils.checkArgumentNotNull(m_itemId);
-
-            m_catalogClient = new CatalogServiceClientWrapper(m_hubClient, m_additionalHeaders);
-
-            // prepare the artifact download
-            LOGGER.atDebug() //
-                .addArgument(m_itemId) //
-                .log("Prpearing download of item with ID: {}");
-            final var preparedDownload = m_catalogClient.prepareItemDownlaod(new ItemID(m_itemId), m_version);
-
-            final var downloadId = preparedDownload.getDownloadId();
-
-            URL downloadUrl;
-            try {
-                // poll the download status until its ready
-                downloadUrl = awaitReadyDownloadState(m_itemId, downloadId);
-            } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException(
-                    "Download of item with ID: '%s' has been interrupted while waiting for Hub".formatted(m_itemId));
-            }
-
-            // retrieve the download stream
-            m_response = m_catalogClient.downloadItemResponse(downloadUrl);
-            m_contentLength = OptionalLong.of(m_response.getLength());
-            m_etag = Optional.ofNullable(m_response.getEntityTag());
-            m_responseHeaders = m_response.getHeaders();
-
-            final var downloadStream = m_response.readEntity(InputStream.class);
-            CheckUtils.checkArgument(downloadStream != null, "Expected existing input stream");
-            return new ArtifactDownloadStream(downloadStream, this);
-        }
-
-        private URL awaitReadyDownloadState(final String itemId, final String downloadId)
-                throws IOException, CouldNotAuthorizeException, InterruptedException {
-            final var t0 = System.currentTimeMillis();
-            for (var numberOfStatusPolls = 0L;; numberOfStatusPolls++) {
-                final var state = m_catalogClient.pollDownloadState(downloadId);
+        final URL downloadUrl;
+        try {
+            // poll the download status until it's ready
+            downloadUrl = CatalogServiceUtils.awaitDownloadReady(catalogClient, headers, downloadId, state -> {
                 if (LOGGER.isDebugEnabled()) {
                     LOGGER.atDebug() //
-                        .addArgument(itemId) //
+                        .addArgument(itemId.id()) //
                         .addArgument(state.getStatus()) //
                         .addArgument(state.getStatusMessage()) //
                         .setMessage("Polling state of download item with ID '{}': {}, '{}'") //
                         .log();
                 }
-
-                switch (state.getStatus()) {
-                    case ABORTED:
-                        throw new IOException(state.getStatusMessage());
-                    case PREPARING, ZIPPING:
-                        break;
-                    case READY:
-                        return state.getDownloadUrl().orElseThrow();
-                    case FAILED:
-                        throw new IOException(state.getStatusMessage());
-                }
-
-                // Sequence: 200ms, 400ms, 600ms, 800ms and then 1s until the timeout is reached
-                Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
-
-                final long elapsed = System.currentTimeMillis() - t0;
-                if (elapsed > CatalogServiceClientWrapper.DOWNLOAD_STATUS_POLL_TIMEOUT.toMillis()) {
-                    throw new IOException("Download was not ready within %.1fs".formatted(elapsed / 1000.0));
-                }
-            }
+            });
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(
+                "Download of item with ID: '%s' has been interrupted while waiting for Hub".formatted(itemId.id()));
         }
 
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
+            return openDownloadStream(invocationBuilder.get());
+        }
     }
 
-    @Override
-    public void close() throws IOException {
-        super.close();
-        m_response.close();
+    private static @Owning ArtifactDownloadStream openDownloadStream(final @Owning Response response)
+            throws ResourceAccessException {
+        final StatusType statusInfo = response.getStatusInfo();
+        if (statusInfo.getFamily() != Family.SUCCESSFUL) {
+            try (response) {
+                var reason = Optional.ofNullable(statusInfo.getReasonPhrase()) //
+                        .orElse(statusInfo.toEnum().getReasonPhrase());
+                final String errContent = response.hasEntity() ? response.readEntity(String.class) : "";
+                throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
+                    "Could not open download stream to %s: %s".formatted(response,
+                        errContent.isBlank() ? reason : (reason + ": " + errContent)));
+            }
+        }
+        return new ArtifactDownloadStream(response);
+    }
+
+    private ArtifactDownloadStream(final @Owning Response response) {
+        super(response.readEntity(InputStream.class));
+        m_response = response;
+        m_contentLength = response.getLength();
+        m_responseHeaders = response.getHeaders();
     }
 
     /**
@@ -267,16 +167,7 @@ public final class ArtifactDownloadStream extends FilterInputStream {
      * @return {@link OptionalLong}
      */
     public OptionalLong getContentLength() {
-        return m_contentLength;
-    }
-
-    /**
-     * Retrieves the entity tag of the response.
-     *
-     * @return {@link EntityTag}
-     */
-    public Optional<EntityTag> getEntityTag() {
-        return m_etag;
+        return m_contentLength < 0 ? OptionalLong.empty() : OptionalLong.of(m_contentLength);
     }
 
     /**
@@ -288,4 +179,17 @@ public final class ArtifactDownloadStream extends FilterInputStream {
         return m_responseHeaders;
     }
 
+    @Override
+    public int read(final byte[] b, final int off, final int len) throws IOException {
+        return in.read(b, off, len);
+    }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            super.close();
+        } finally {
+            m_response.close();
+        }
+    }
 }

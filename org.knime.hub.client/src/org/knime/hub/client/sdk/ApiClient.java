@@ -50,18 +50,13 @@ package org.knime.hub.client.sdk;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -74,10 +69,8 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.KNIMEServerHostnameVerifier;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.proxy.URLConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,7 +178,6 @@ public class ApiClient implements AutoCloseable {
 
         // Create a http client builder and register the defined JSON provider
         final var clientBuilder = ClientBuilder.newBuilder();
-        clientBuilder.hostnameVerifier(KNIMEServerHostnameVerifier.getInstance());
 
         // Register a GZIP response filter for compressed responses
         clientBuilder.register(GZipResponseFilter.class);
@@ -202,6 +194,16 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
 
         m_httpClient = clientBuilder.build();
+    }
+
+    /**
+     * Creates an invocation builder for non-Hub calls (e.g. to MinIO or S3) that don't use our authentication.
+     *
+     * @param url target URL
+     * @return the invocation builder
+     */
+    public Invocation.Builder nonApiInvocationBuilder(final String url) {
+        return m_httpClient.target(url).request();
     }
 
     /**
@@ -225,7 +227,6 @@ public class ApiClient implements AutoCloseable {
         private final Map<String, String> m_cookieParams = new HashMap<>();
         private MediaType m_contentType;
         private String m_headerAccept;
-        private boolean m_useAuthenticator = true;
 
         private Duration m_requestReadTimeout;
 
@@ -347,37 +348,22 @@ public class ApiClient implements AutoCloseable {
          * @return {@link ApiRequest}
          */
         public ApiRequest withAcceptHeaders(final MediaType... accepts) {
-            if (accepts == null) {
-                m_headerAccept = null;
-            } else if (accepts[0] == null) {
+            if (accepts == null || accepts.length == 0 || accepts[0] == null) {
                 m_headerAccept = null;
             } else {
-                m_headerAccept = accepts.length == 0 ? null :
-                    String.join(", ", Arrays.asList(accepts).stream().map(Object::toString).toList());
+                m_headerAccept = String.join(", ", Arrays.asList(accepts).stream().map(Object::toString).toList());
             }
             return this;
         }
 
         /**
-         * Set the read timeout
+         * Set the read timeout.
          *
          * @param readTimeout
          * @return {@link ApiRequest}
          */
         public ApiRequest withReadTimeout(final Duration readTimeout) {
             m_requestReadTimeout = readTimeout;
-            return this;
-        }
-
-        /**
-         * Decides if the given {@link Authenticator} should be used for the requests. If called the
-         * {@link Authenticator} will not be used as authorization header. It's then still possible to set
-         * authorization headers as additional header parameters.
-         *
-         * @return {@link ApiRequest}
-         */
-        public ApiRequest withoutAuthenticator() {
-            m_useAuthenticator = false;
             return this;
         }
 
@@ -401,26 +387,6 @@ public class ApiClient implements AutoCloseable {
             }
 
             try {
-                return uriBuilder.build();
-            } catch (URISyntaxException e) {
-                throw new IllegalStateException("Unexpected URI syntax violation", e);
-            }
-        }
-
-        /**
-         * Build full URL by concatenating the given URL with query parameters.
-         *
-         * @param url the request URL
-         * @return The full URL
-         * @throws UnsupportedEncodingException
-         * @throws URISyntaxException
-         */
-        private URI buildUrl(final URL url) {
-            try {
-                var uriBuilder = new URIBuilder(url.toURI());
-                for (var entry : m_queryParams.entrySet()) {
-                    uriBuilder.addParameter(entry.getKey(), entry.getValue());
-                }
                 return uriBuilder.build();
             } catch (URISyntaxException e) {
                 throw new IllegalStateException("Unexpected URI syntax violation", e);
@@ -469,10 +435,6 @@ public class ApiClient implements AutoCloseable {
             m_headerParams.remove(HttpHeaders.USER_AGENT);
             if (m_userAgent != null) {
                 m_headerParams.put(HttpHeaders.USER_AGENT, m_userAgent);
-            }
-
-            if (m_useAuthenticator) {
-                m_headerParams.put(HttpHeaders.AUTHORIZATION, auth.getAuthorization());
             }
 
             // Update accept header and set content-type header
@@ -610,72 +572,6 @@ public class ApiClient implements AutoCloseable {
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
-
-        }
-
-        /**
-         * Invoke API by sending HTTP request with the given options.
-         *
-         * @param url               The HTTP request URL.
-         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
-         * @param body              The request body object - if it is not binary, otherwise null.
-         *
-         * @return {@link ApiResponse} containing a {@link Response}
-         * @throws CouldNotAuthorizeException
-         * @throws IOException
-         */
-        @SuppressWarnings("resource") // receiving code has responsibility to close the response
-        public @Owning ApiResponse<Response> invokeAPI(final URL url, final Method method, final Object body)
-                throws CouldNotAuthorizeException, IOException {
-            final var uri = buildUrl(url);
-            final var response = getAPIResponse(uri, method, body, m_auth);
-            final var responseHeaders = response.getHeaders();
-
-            // Get the status info and set the response content-type to
-            // null in case the response does not have any content.
-            final var responseStatusInfo = response.getStatusInfo();
-            String responseContentType = null;
-            if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).get(0).toString();
-            }
-
-            final var responseStatusFamily = responseStatusInfo.getFamily();
-            final var responseStatusCode = responseStatusInfo.getStatusCode();
-            final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-            final var responseEtag = response.getEntityTag();
-            if (Family.SUCCESSFUL == responseStatusFamily) {
-                if (responseContentType == null) {
-                    response.close();
-                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                        Optional.ofNullable(responseEtag), Result.success(null));
-                }
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                    Optional.ofNullable(responseEtag), Result.success(response));
-            } else if (Family.CLIENT_ERROR == responseStatusFamily || Family.SERVER_ERROR == responseStatusFamily) {
-                // TODO JSON error handling
-                final var message =
-                    StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
-                        responseStatusInfo::getReasonPhrase);
-                response.close();
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                    Optional.ofNullable(responseEtag), Result.failure(message, null));
-            } else if (Family.REDIRECTION == responseStatusFamily) {
-                String message;
-                if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                    final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                    message = "Redirect failed (firewall?): '%s'".formatted(location);
-                } else {
-                    message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) : null,
-                        responseStatusInfo::getReasonPhrase);
-                }
-                response.close();
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                    Optional.ofNullable(responseEtag), Result.failure(message, null));
-            } else {
-                response.close();
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
-                    Optional.ofNullable(responseEtag), null);
-            }
         }
 
         /**
@@ -696,35 +592,10 @@ public class ApiClient implements AutoCloseable {
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final DownloadContentHandler<R> contentHandler)
                         throws IOException, CancelationException, CouldNotAuthorizeException {
-            return invokeAPIWithURI(buildUrl(path), method, body, contentHandler);
-        }
-
-        /**
-         * Invoke API by sending HTTP request with the given options. This method handles binary response downloads
-         * given a download request URL.
-         *
-         * @param <R>
-         * @param url               The HTTP request URL.
-         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
-         * @param body              The request body object - if it is not binary, otherwise null.
-         * @param contentHandler    The {@link DownloadContentHandler}.
-         *
-         * @return {@link ApiResponse}
-         * @throws IOException
-         * @throws CancelationException
-         * @throws CouldNotAuthorizeException
-         */
-        public <R> ApiResponse<R> invokeAPI(final URL url, final Method method, final Object body,
-                final DownloadContentHandler<R> contentHandler)
-                        throws IOException, CancelationException, CouldNotAuthorizeException {
-            return invokeAPIWithURI(buildUrl(url), method, body, contentHandler);
-        }
-
-        private <R> ApiResponse<R> invokeAPIWithURI(final URI uri, final Method method, final Object body,
-            final DownloadContentHandler<R> contentHandler)
-                    throws CouldNotAuthorizeException, IOException, CancelationException {
-            // Retrieve the API response
             final var t0 = System.currentTimeMillis();
+
+            // Retrieve the API response
+            final var uri = buildUrl(path);
             try(final var response = getAPIResponse(uri, method, body, m_auth)) {
                 final var responseHeaders = response.getHeaders();
 
@@ -783,109 +654,66 @@ public class ApiClient implements AutoCloseable {
         }
 
         /**
-         * Invoke API by sending HTTP request with the given options.
-         * This method handles uploads of binary request bodies.
+         * Invoke API by sending HTTP request with the given options. This method handles uploads of binary request
+         * bodies.
          *
-         * @param <R>
-         * @param path              The sub-path of the HTTP URL.
-         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
-         * @param contentHandler    The {@link UploadContentHandler}.
+         * @param path The sub-path of the HTTP URL.
+         * @param method The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param data input stream for the data to be uploaded
+         * @param numBytes number of bytes to be written
          *
          * @return {@link ApiResponse}
-         * @throws IOException
-         * @throws CancelationException if the invocation was canceled through the content handler
-         * @throws CouldNotAuthorizeException
+         * @throws IOException if an error occurs during transmission
+         * @throws CouldNotAuthorizeException if a Hub call could not be authenticated
          */
-        public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method,
-                final UploadContentHandler<R> contentHandler)
-                        throws IOException, CancelationException, CouldNotAuthorizeException {
-
-            m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
-
-            if (m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
-                m_contentType = MediaType.valueOf(m_headerParams.get(HttpHeaders.CONTENT_TYPE));
-            }
-            CheckUtils.checkArgumentNotNull(m_contentType,
-                "Missing required content type for '%s' '%s'".formatted(method, path));
-            m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
-
-            if (m_headerAccept != null) {
-                m_headerParams.put(HttpHeaders.ACCEPT,
-                        String.join(", ", Arrays.asList(m_headerAccept).stream().map(Object::toString).toList()));
+        public ApiResponse<Void> invokeAPI(final IPath path, final Method method, final @Owning InputStream data,
+            final long numBytes) throws IOException, CouldNotAuthorizeException {
+            if (numBytes >= 0) {
+                m_headerParams.put(HttpHeaders.CONTENT_LENGTH, Long.toString(numBytes));
             }
 
-            // Create http url connection for upload stream.
-            final var conn = prepareAuthenticatedConnection(buildUrl(path).toURL(), method);
-            conn.connect();
+            // Retrieve the API response
+            final var t0 = System.currentTimeMillis();
+            final var uri = buildUrl(path);
+            try (final var response = getAPIResponse(uri, method, data, m_auth)) {
+                final var responseHeaders = response.getHeaders();
 
-            // Perform upload
-            R responseEntity = null;
-            try (final var out = conn.getOutputStream()) {
-                responseEntity = contentHandler.handleUpload(out);
-            } catch (final CancelationException e) {
-                conn.disconnect();
-                throw e;
-            }
+                // Get the status info and set the response content-type to
+                // null in case the response does not have any content.
+                final var responseStatusInfo = response.getStatusInfo();
 
-            // Get the response headers
-            final var connHeaders = conn.getHeaderFields();
-            Map<String, List<Object>> responseHeaders = new HashMap<>();
-            for (final var entry : connHeaders.entrySet()) {
-                responseHeaders.put(entry.getKey(), new ArrayList<>(entry.getValue()));
-            }
-
-            // Set the response content-type to null
-            // in case the response does not have any content.
-            String responseContentType = null;
-            if (responseHeaders.get(HttpHeaders.CONTENT_TYPE) != null) {
-                responseContentType = responseHeaders.get(HttpHeaders.CONTENT_TYPE).toString();
-            }
-
-            final var responseStatusInfo = Response.Status.fromStatusCode(conn.getResponseCode());
-            final var responseStatusFamily = responseStatusInfo.getFamily();
-            final var responseStatusCode = responseStatusInfo.getStatusCode();
-            final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
-            if (Family.SUCCESSFUL == responseStatusFamily) {
-                if (responseContentType == null) {
+                final var responseStatusFamily = responseStatusInfo.getFamily();
+                final var responseStatusCode = responseStatusInfo.getStatusCode();
+                final var responseStatusMessage = responseStatusInfo.getReasonPhrase();
+                final var responseEtag = response.getEntityTag();
+                if (Family.SUCCESSFUL == responseStatusFamily) {
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                            Optional.ofNullable(responseEtag), Result.success(null));
+                } else if(Family.CLIENT_ERROR == responseStatusFamily ||
+                        Family.SERVER_ERROR == responseStatusFamily) {
+                    // TODO JSON error handling
+                    final var message = StringUtils.getIfBlank(response.hasEntity() ?
+                        response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
                     return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, null, Result.success(responseEntity));
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                } else if (Family.REDIRECTION == responseStatusFamily) {
+                    String message;
+                    if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
+                        final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
+                        message = "Redirect failed (firewall?): '%s'".formatted(location);
+                    } else {
+                        message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
+                                null, responseStatusInfo::getReasonPhrase);
+                    }
+                    return new ApiResponse<>(responseHeaders, responseStatusCode,
+                            responseStatusMessage, Optional.ofNullable(responseEtag), Result.failure(message, null));
+                } else {
+                    return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage,
+                            Optional.ofNullable(responseEtag), null);
                 }
-                return new ApiResponse<>(responseHeaders, responseStatusCode,
-                            responseStatusMessage, null, Result.success(responseEntity));
-
-            } else if (Family.CLIENT_ERROR == responseStatusFamily ||
-                    Family.SERVER_ERROR == responseStatusFamily) {
-                // TODO JSON error handling
-                String message;
-                try (final var errStream = conn.getErrorStream()) {
-                    message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
-                        : responseStatusMessage;
-                }
-                conn.disconnect();
-                return new ApiResponse<>(responseHeaders, responseStatusCode,
-                        responseStatusMessage, null, Result.failure(message, null));
-            } else {
-                return new ApiResponse<>(responseHeaders, responseStatusCode, responseStatusMessage, null, null);
+            } finally {
+                logDuration(uri, t0, System.currentTimeMillis());
             }
-        }
-
-        /**
-         * Prepares the authenticated HTTP connection to perform an upload.
-         *
-         * @param url    the request URL
-         * @param method the request method
-         * @return the {@link HttpURLConnection}
-         * @throws IOException
-         */
-        private HttpURLConnection prepareAuthenticatedConnection(final URL url, final Method method)
-                throws IOException {
-            final var conn = (HttpURLConnection) URLConnectionFactory.getConnection(url);
-            conn.setRequestMethod(method.name());
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(Math.toIntExact(m_connectionTimeout.toMillis()));
-            conn.setReadTimeout(Math.toIntExact(m_readTimeout.toMillis()));
-            m_headerParams.forEach(conn::addRequestProperty);
-            return conn;
         }
 
         private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {
@@ -969,29 +797,8 @@ public class ApiClient implements AutoCloseable {
                 throws IOException, CancelationException;
     }
 
-    /**
-     * Callback interface for endpoints uploading larger binary results.
-     *
-     * @param <R> type of the upload result
-     */
-    @FunctionalInterface
-    public interface UploadContentHandler<R> {
-        /**
-         * Called if the request succeeded, may consume the input stream, which is
-         * passed out of the method doing the request. The input stream is closed after
-         * this method returns.
-         *
-         * @param out output data stream
-         * @return result of upload
-         * @throws IOException                if an I/O error occurred
-         * @throws CancelationException if the upload was canceled
-         */
-        R handleUpload(@Owning OutputStream out) throws IOException, CancelationException;
-    }
-
     @Override
     public void close() {
         m_httpClient.close();
     }
-
 }

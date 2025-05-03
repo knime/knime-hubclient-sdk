@@ -20,7 +20,11 @@
  */
 package org.knime.hub.client.sdk.transfer;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -43,14 +47,17 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.transfer.CatalogServiceClientWrapper.TaggedRepositoryItem;
+import org.knime.hub.client.sdk.transfer.CatalogServiceUtils.TaggedRepositoryItem;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 
 import jakarta.ws.rs.core.EntityTag;
 
@@ -95,14 +102,16 @@ class AbstractHubTransfer {
         HUB_ITEM_TRANSFER_POOL = executorService;
     }
 
-    CatalogServiceClientWrapper m_catalogClient;
+    final CatalogServiceClient m_catalogClient;
+    final Map<String, String> m_clientHeaders;
 
     /**
      * @param hubClient Hub API client
      * @param additionalHeaders additional headers for up and download
      */
     AbstractHubTransfer(final @NotOwning HubClientAPI hubClient, final Map<String, String> additionalHeaders) {
-        m_catalogClient = new CatalogServiceClientWrapper(hubClient.catalog(), additionalHeaders);
+        m_catalogClient = hubClient.catalog();
+        m_clientHeaders = additionalHeaders;
     }
 
     /**
@@ -219,7 +228,11 @@ class AbstractHubTransfer {
                     Thread.currentThread().interrupt();
                     throw new CancelationException();
                 } catch (final ExecutionException e) { // NOSONAR cause is propagated
-                    return errorHandler.handle(e.getCause());
+                    final Throwable cause = e.getCause();
+                    if (cause instanceof CancelationException ce) {
+                        throw ce;
+                    }
+                    return errorHandler.handle(cause);
                 }
             }
         } finally {
@@ -238,13 +251,13 @@ class AbstractHubTransfer {
      * @throws CouldNotAuthorizeException
      */
     TaggedRepositoryItem deepListParent(final ItemID itemId, final BooleanSupplier cancelChecker)
-            throws IOException, CancelationException, CouldNotAuthorizeException {
+        throws IOException, CancelationException, CouldNotAuthorizeException {
         return runInCommonPool(cancelChecker, () -> {
-            final var itemAndETag = m_catalogClient //
-                .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
+            final var itemAndETag = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
             final var parentPath = IPath.forPosix(itemAndETag.item().getPath()).removeLastSegments(1);
-            return m_catalogClient //
-                .fetchRepositoryItem(parentPath.toString(), Map.of("deep", "true"), null, null, null).orElseThrow();
+            return CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders, parentPath.toString(),
+                Map.of("deep", "true"), null, null, null).orElseThrow();
         });
     }
 
@@ -262,17 +275,36 @@ class AbstractHubTransfer {
             throws IOException, CancelationException, CouldNotAuthorizeException {
         return runInCommonPool(cancelChecker, () -> { // NOSONAR
             while (true) {
-                final var itemAndETag = m_catalogClient //
-                    .fetchRepositoryItem(itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
+                final var itemAndETag = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient, m_clientHeaders,
+                    itemId.id(), Map.of("details", "none"), null, null, null).orElseThrow();
                 final RepositoryItem repoItem = itemAndETag.item();
                 final EntityTag eTag = itemAndETag.etag();
-                final Optional<TaggedRepositoryItem> deep = m_catalogClient //
-                    .fetchRepositoryItem(repoItem.getPath(), Map.of("deep", "true"), null, null, eTag);
+                final Optional<TaggedRepositoryItem> deep = CatalogServiceUtils.fetchRepositoryItem(m_catalogClient,
+                    m_clientHeaders, repoItem.getPath(), Map.of("deep", "true"), null, null, eTag);
                 if (deep.isPresent()) {
                     return deep;
                 }
             }
         });
+    }
+
+    static void writeStreamToFileWithProgress(@Owning final InputStream in, final long numBytes, final Path outFile,
+        final LeafExecMonitor monitor) throws IOException, CancelationException {
+        final var bufferSize = (int)(FileUtils.ONE_MB / 2);
+        try (final var bufferedInStream = new BufferedInputStream(in, bufferSize);
+                final var outStream = Files.newOutputStream(outFile)) {
+            final var buffer = new byte[bufferSize];
+            long written = 0;
+            for (int read; (read = bufferedInStream.read(buffer)) >= 0;) {
+                monitor.checkCanceled();
+                outStream.write(buffer, 0, read);
+                written += read;
+                monitor.addTransferredBytes(read);
+                if (numBytes >= 0) {
+                    monitor.setProgress(Math.min(1.0 * written / numBytes, 1.0));
+                }
+            }
+        }
     }
 
     private interface CommonPoolJob<T> {

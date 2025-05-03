@@ -49,6 +49,7 @@
 package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -64,14 +65,12 @@ import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.DownloadContentHandler;
 import org.knime.hub.client.sdk.ApiClient.Method;
-import org.knime.hub.client.sdk.ApiClient.UploadContentHandler;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.ent.DownloadStatus;
 import org.knime.hub.client.sdk.ent.PreparedDownload;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.ent.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
@@ -79,6 +78,7 @@ import org.knime.hub.client.sdk.ent.UploadStatus;
 import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.transfer.ArtifactDownloadStream;
 import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
+import org.knime.hub.client.sdk.transfer.ItemID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -588,19 +588,17 @@ public final class CatalogServiceClient {
      * @param accountId The ID of the account the repository item is associated with (required)
      * @param subPath The "/" delimited path to the resource below the account root level (required)
      * @param contentType The content type of the request body (required).
-     * @param contentHandler The content handler to out source the input stream to a provided output stream (required).
      * @param additionalHeaders Map of additional headers
+     * @param dataToTransfer stream of bytes to be uploaded
+     * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
      * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
-     * @throws CancelationException if the operation was canceled
      */
-    public <R> ApiResponse<R> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
-        final MediaType contentType, final UploadContentHandler<R> contentHandler,
-        final Map<String, String> additionalHeaders)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
-        CheckUtils.checkArgumentNotNull(contentHandler);
+    public ApiResponse<Void> uploadItemByCanonicalPath(final String accountId, final IPath subPath,
+        final MediaType contentType, final Map<String, String> additionalHeaders, final InputStream dataToTransfer,
+        final long contentLength) throws IOException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
@@ -608,8 +606,10 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(PATH_PIECE_USERS).append(accountId)
             .append(subPath + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .invokeAPI(requestPath, Method.PUT, contentHandler);
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
     }
 
     /**
@@ -637,9 +637,11 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -668,9 +670,11 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -683,25 +687,26 @@ public final class CatalogServiceClient {
      * @param id The repository items unique ID. It always starts with a * and does not change even if the repository
      *            item is renamed or moved. (required)
      * @param contentType The content type of the request body (required).
-     * @param contentHandler The content handler to out source the input stream to a provided output stream (required).
      * @param additionalHeaders Map of additional headers
+     * @param dataToTransfer stream of bytes to be uploaded
+     * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
      * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
-     * @throws CancelationException if the operation was canceled
      */
-    public <R> ApiResponse<R> uploadItemById(final String id, final MediaType contentType,
-        final UploadContentHandler<R> contentHandler, final Map<String, String> additionalHeaders)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
-        CheckUtils.checkArgumentNotNull(contentHandler);
+    public ApiResponse<Void> uploadItemById(final String id, final MediaType contentType,
+        final Map<String, String> additionalHeaders, final InputStream dataToTransfer, final long contentLength)
+        throws IOException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(id);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .invokeAPI(requestPath, Method.PUT, contentHandler);
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
     }
 
     /**
@@ -721,16 +726,18 @@ public final class CatalogServiceClient {
      */
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
-                throws CouldNotAuthorizeException, IOException {
+        throws CouldNotAuthorizeException, IOException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
         CheckUtils.checkArgumentNotNull(fromRepository);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString())
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.FALSE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -758,9 +765,11 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository)
-            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString())
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
+            .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
     }
 
@@ -771,26 +780,27 @@ public final class CatalogServiceClient {
      * KNIME ID of the target repository item.
      *
      * @param path The absolute path to the repository item. (required)
-     * @param contentType The content type of the request body (required).
+     * @param contentType The content type of the request body (required)
      * @param additionalHeaders Map of additional headers
-     * @param contentHandler The content handler to out source the input stream to a provided output stream (required).
+     * @param dataToTransfer stream of bytes to be uploaded
+     * @param contentLength number of bytes that will be written, or {@code -1} if unknown
      * @return {@link ApiResponse}
      *
      * @throws CouldNotAuthorizeException if the authorization fails
      * @throws IOException if an I/O error occurred
-     * @throws CancelationException if the operation was canceled
      */
-    public <R> ApiResponse<R> uploadItemByPath(final IPath path, final MediaType contentType,
-        final Map<String, String> additionalHeaders, final UploadContentHandler<R> contentHandler)
-        throws IOException, CancelationException, CouldNotAuthorizeException {
-        CheckUtils.checkArgumentNotNull(contentHandler);
+    public ApiResponse<Void> uploadItemByPath(final IPath path, final MediaType contentType,
+        final Map<String, String> additionalHeaders, final @Owning InputStream dataToTransfer, final long contentLength)
+        throws IOException, CouldNotAuthorizeException {
         CheckUtils.checkArgumentNotNull(contentType);
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
 
-        return m_apiClient.createApiRequest().withContentTypeHeader(contentType).withHeaders(additionalHeaders)
-            .invokeAPI(requestPath, Method.PUT, contentHandler);
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(contentType) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, dataToTransfer, contentLength);
     }
 
     /**
@@ -809,8 +819,9 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.DELETE, null,
-            VOID);
+        return m_apiClient.createApiRequest() //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.DELETE, null, VOID);
     }
 
     /**
@@ -831,17 +842,18 @@ public final class CatalogServiceClient {
         final Duration readTimeout, final Map<String, String> additionalHeaders)
                 throws CouldNotAuthorizeException, IOException {
         LOGGER.atDebug() //
-        .addArgument(() -> requestBody.getItems().size()) //
-        .log("Initiating upload of {} items");
+            .addArgument(() -> requestBody.getItems().size()) //
+            .log("Initiating upload of {} items");
 
         CheckUtils.checkArgumentNotNull(parentId);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(parentId).append(PATH_PIECE_MANIFEST);
 
-        return m_apiClient.createApiRequest()
-                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
-                .withHeaders(additionalHeaders).withReadTimeout(readTimeout)
-                .invokeAPI(requestPath, Method.POST, requestBody, UPLOAD_STARTED);
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withReadTimeout(readTimeout) //
+            .invokeAPI(requestPath, Method.POST, requestBody, UPLOAD_STARTED);
     }
 
     /**
@@ -860,8 +872,9 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_STATUS);
 
-        return m_apiClient.createApiRequest().withHeaders(additionalHeaders).invokeAPI(requestPath, Method.GET, null,
-            UPLOAD_STATUS);
+        return m_apiClient.createApiRequest() //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.GET, null, UPLOAD_STATUS);
     }
 
     /**
@@ -881,10 +894,10 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId);
 
-        return m_apiClient.createApiRequest()
-                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)
-                .withHeaders(additionalHeaders)
-                .invokeAPI(requestPath, Method.POST, requestBody, VOID);
+        return m_apiClient.createApiRequest() //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.POST, requestBody, VOID);
     }
 
     /**
@@ -905,10 +918,10 @@ public final class CatalogServiceClient {
 
         final var requestPath = IPath.forPosix(UPLOAD_API_PATH).append(uploadId).append(PATH_PIECE_PARTS);
 
-        return m_apiClient.createApiRequest()
-                .withHeaders(additionalHeaders)
-                .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber))
-                .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
+        return m_apiClient.createApiRequest() //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_PART_NUMBER, Integer.toString(partNumber)) //
+            .invokeAPI(requestPath, Method.POST, null, UPLOAD_TARGET);
     }
 
     /**
@@ -938,21 +951,15 @@ public final class CatalogServiceClient {
      *
      * @param itemId the ID of the repository item to download
      * @param version the {@link ItemVersion} of the repository item
-     * @param itemType the {@link RepositoryItemType} of the item to download
      * @param additionalHeaders additional headers for the download process
      *
      * @return {@link ArtifactDownloadStream}
      * @throws IOException if an I/O error occurred during the download
      * @throws CouldNotAuthorizeException if the authenticator has lost connection
-     * @throws CancelationException if the download got cancelled
      */
-    public @Owning ArtifactDownloadStream createArtifactDownloadStream(final String itemId, final ItemVersion version,
-        final RepositoryItemType itemType, final Map<String, String> additionalHeaders)
-        throws IOException, CouldNotAuthorizeException, CancelationException {
-        return ArtifactDownloadStream.builder().withCatalogClient(this)
-            .withItemId(itemId)
-            .withItemVersion(version)
-            .withHeaders(additionalHeaders).build();
+    public @Owning ArtifactDownloadStream createArtifactDownloadStream(final ItemID itemId, final ItemVersion version,
+        final Map<String, String> additionalHeaders) throws IOException, CouldNotAuthorizeException {
+        return ArtifactDownloadStream.create(this, additionalHeaders, itemId, version);
     }
 
     /**
