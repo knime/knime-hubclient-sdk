@@ -23,6 +23,7 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -208,21 +209,26 @@ public final class HubDownloader extends AbstractHubTransfer {
      */
     public Map<IPath, Pair<HubItem, Result<Optional<Path>>>> download(final DownloadResources resources,
             final TempFileSupplier tempFileSupplier, final IProgressMonitor progMon) throws CancelationException {
-        final var splitter = beginMultiProgress(progMon, "Downloading items...", status -> {
-            final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
-                .formatted(status.numDone(), resources.itemsToDownload().size(), 100.0 * status.totalProgress(),
-                    bytesToHuman(status.bytesPerSecond()));
-            progMon.setTaskName(firstLine);
-            progMon.subTask(status.active().stream() //
-                .map(e -> " \u2022 %s of '%s'".formatted(percentage(e.getValue()),
-                    StringUtils.abbreviateMiddle(e.getKey(), "...", MAX_PATH_LENGTH_IN_MESSAGE))) //
-                .collect(Collectors.joining("\n")));
-        });
-        final var totalSize = resources.totalSize();
-        final var downloadJobs = submitDownloadJobs(resources.supportsArtifactDownload(), resources.itemsToDownload(),
-            totalSize.isPresent(), tempFileSupplier, totalSize.orElse(resources.numDownloads()), splitter);
 
-        final Map<IPath, Result<Optional<Path>>> downloaded = awaitDownloads(downloadJobs, progMon::isCanceled);
+        final Map<IPath, Result<Optional<Path>>> downloaded;
+        try (final var poller = startPoller(Duration.ofMillis(200))) {
+            final var splitter = beginMultiProgress(progMon, "Downloading items...", poller, (status, transferRate) -> {
+                final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
+                        .formatted(status.numDone(), resources.itemsToDownload().size(), 100.0 * status.totalProgress(),
+                            bytesToHuman(transferRate));
+                progMon.setTaskName(firstLine);
+                progMon.subTask(status.active().stream() //
+                    .map(e -> " \u2022 %s of '%s'".formatted(percentage(e.getValue()),
+                        StringUtils.abbreviateMiddle(e.getKey(), "...", MAX_PATH_LENGTH_IN_MESSAGE))) //
+                    .collect(Collectors.joining("\n")));
+            });
+            final var totalSize = resources.totalSize();
+            final var downloadJobs =
+                submitDownloadJobs(resources.supportsArtifactDownload(), resources.itemsToDownload(),
+                    totalSize.isPresent(), tempFileSupplier, totalSize.orElse(resources.numDownloads()), splitter);
+
+            downloaded = awaitDownloads(downloadJobs, progMon::isCanceled);
+        }
 
         final Map<IPath, Pair<HubItem, Result<Optional<Path>>>> out = new LinkedHashMap<>();
         for (final var download : resources.itemsToDownload()) {

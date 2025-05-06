@@ -21,7 +21,6 @@
 package org.knime.hub.client.sdk.transfer;
 
 import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
@@ -127,13 +126,13 @@ public sealed interface ConcurrentExecMonitor {
         }
 
         /**
+         * Progress snapshot.
+         *
          * @param active list of currently active sub-operations, each represented as a pair of its name and progress
          * @param numDone number of finished tasks (with progress 100%)
          * @param totalProgress progress of the whole operation (between 0 and 1)
-         * @param bytesPerSecond current transfer rate in bytes per second
          */
-        public static record ProgressStatus(List<Pair<String, Double>> active, int numDone, double totalProgress,
-            double bytesPerSecond) {}
+        public static record ProgressStatus(List<Pair<String, Double>> active, int numDone, double totalProgress) {}
 
         /**
          * Representation of the progress of a sub-process.
@@ -147,16 +146,7 @@ public sealed interface ConcurrentExecMonitor {
          */
         private record SubProgress(String name, double contribution, AtomicDouble progress) {}
 
-        /**
-         * Representation of the number of bytes transferred up until a certain point in time.
-         *
-         * @param timestamp point in time at which the snapshot was taken
-         * @param numBytesTransferred number of bytes transferred up until {@link #timestamp()}
-         */
-        private record TransferredBytesSnapshot(long timestamp, long numBytesTransferred) {}
-
         private final Deque<SubProgress> m_subProgs = new ConcurrentLinkedDeque<>();
-        private final Deque<TransferredBytesSnapshot> m_snapshots = new ArrayDeque<>();
         private final AtomicLong m_bytesTransferred;
         private final DoubleConsumer m_upstreamProgress;
         private final BooleanSupplier m_cancelChecker;
@@ -209,6 +199,15 @@ public sealed interface ConcurrentExecMonitor {
         }
 
         /**
+         * The number of bytes transferred until the current moment.
+         *
+         * @return number of bytes transferred in total
+         */
+        public long getBytesTransferred() {
+            return m_bytesTransferred.get();
+        }
+
+        /**
          * Computes the current progress of the operation.
          *
          * @return status of the operation and its sub-operations
@@ -227,25 +226,7 @@ public sealed interface ConcurrentExecMonitor {
                 }
             }
 
-            final long newTimestamp = System.currentTimeMillis();
-            final long newTransferred = m_bytesTransferred.get();
-            final double bytesPerSecond;
-            synchronized (this) {
-                while (m_snapshots.size() > 1
-                        && (newTimestamp - m_snapshots.peekFirst().timestamp()) > THROUGHPUT_WINDOW_SIZE.toMillis()) {
-                    m_snapshots.removeFirst();
-                }
-                if (m_snapshots.isEmpty()) {
-                    bytesPerSecond = 0;
-                } else {
-                    final var first = m_snapshots.peekFirst();
-                    final long millisecondsDiff = newTimestamp - first.timestamp();
-                    final long bytesDiff = newTransferred - first.numBytesTransferred();
-                    bytesPerSecond = bytesDiff / (millisecondsDiff / 1000.0);
-                }
-                m_snapshots.addLast(new TransferredBytesSnapshot(newTimestamp, newTransferred));
-            }
-            return new ProgressStatus(active, done, totalProgress, bytesPerSecond);
+            return new ProgressStatus(active, done, totalProgress);
         }
 
         @Override

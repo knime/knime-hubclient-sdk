@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -325,42 +326,47 @@ public final class HubUploader extends AbstractHubTransfer {
      */
     public Map<IPath, Result<String>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
             final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
-            final IProgressMonitor progMon)
-            throws IOException, CancelationException {
-        final var resources = collectFileResources(itemsToUpload, exporter, progMon);
-        final var uploadJobs = submitUploadJobs(exporter, tempFileSupplier, itemsToUpload, resources, progMon);
-        return awaitUploads(uploadJobs, progMon::isCanceled);
+            final IProgressMonitor progMon) throws IOException, CancelationException {
+        try (final var poller = startPoller(Duration.ofMillis(200))) {
+            final var resources = collectFileResources(itemsToUpload, exporter, progMon);
+            final var uploadJobs =
+                submitUploadJobs(exporter, tempFileSupplier, itemsToUpload, resources, progMon, poller);
+            return awaitUploads(uploadJobs, progMon::isCanceled);
+        }
     }
 
     private Map<IPath, Future<Result<String>>> submitUploadJobs(final WorkflowExporter<CancelationException> exporter,
-        final TempFileSupplier tempFileSupplier,
-        final Map<IPath, ItemToUpload> itemsToUpload, final FileResources resources, final IProgressMonitor progMon) {
+        final TempFileSupplier tempFileSupplier, final Map<IPath, ItemToUpload> itemsToUpload,
+        final FileResources resources, final IProgressMonitor progMon, final ProgressPoller poller) {
+
         final Map<IPath, Future<Result<String>>> uploadJobs = new LinkedHashMap<>();
         if (itemsToUpload.size() == 1) {
             // only one item is being uploaded, show part uploads as details
             final var pathInTarget = itemsToUpload.keySet().iterator().next();
             final var itemToUpload = itemsToUpload.get(pathInTarget);
             final var itemType = itemToUpload.localItem().type();
-            final String title = "Uploading '%s'...".formatted(pathInTarget);
+            final var title = "Uploading '%s'...".formatted(pathInTarget);
             final var numPartsIfKnown =
                 itemType != ItemType.DATA_FILE ? " parts of %s".formatted(bytesToHuman(m_chunkSize))
                     : "/%d parts".formatted((resources.totalSize() + m_chunkSize - 1) / m_chunkSize);
-            final var splitter = beginMultiProgress(progMon, title, status -> {
+            final var splitter = beginMultiProgress(progMon, title, poller, (status, transferRate) -> {
                 final var firstLine = "Uploading '%s': %d%s transferred (%.1f%%, %s/sec)" //
-                    .formatted(pathInTarget, status.numDone(), numPartsIfKnown,
-                        100.0 * status.totalProgress(), bytesToHuman(status.bytesPerSecond()));
+                    .formatted(pathInTarget, status.numDone(), numPartsIfKnown, 100.0 * status.totalProgress(),
+                        bytesToHuman(transferRate));
                 progMon.setTaskName(firstLine);
                 progMon.subTask(status.active().stream() //
                     .map(e -> " \u2022 %s of file part %s".formatted(percentage(e.getValue()), e.getKey())) //
                     .collect(Collectors.joining("\n")));
             });
+
             submitUploadJob(exporter, tempFileSupplier, uploadJobs, pathInTarget, resources, splitter, itemToUpload);
         } else {
             // multiple items to upload, each one is one line of detail
-            final var splitter = beginMultiProgress(progMon, "Uploading items...", status -> {
+            final var title = "Uploading items...";
+            final var splitter = beginMultiProgress(progMon, title, poller, (status, transferRate) -> {
                 final var firstLine = "Uploading: %d/%d items transferred (%.1f%%, %s/sec)" //
                     .formatted(status.numDone(), itemsToUpload.size(), 100.0 * status.totalProgress(),
-                        bytesToHuman(status.bytesPerSecond()));
+                        bytesToHuman(transferRate));
                 progMon.setTaskName(firstLine);
                 progMon.subTask(status.active().stream() //
                     .map(e -> " \u2022 %s of '%s'".formatted(percentage(e.getValue()), shortenedPath(e.getKey()))) //

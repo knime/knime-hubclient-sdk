@@ -25,8 +25,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
@@ -38,8 +40,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.function.LongSupplier;
+import java.util.function.ObjDoubleConsumer;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -48,6 +51,7 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
+import org.knime.core.util.KNIMETimer;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.CancelationException;
@@ -123,11 +127,12 @@ class AbstractHubTransfer {
      * @return an execution context that can be split into sub-contexts for the parts
      */
     static BranchingExecMonitor beginMultiProgress(final IProgressMonitor progMon, final String beginTaskMessage,
-            final Consumer<ProgressStatus> reporter) {
+        final ProgressPoller poller, final ObjDoubleConsumer<ProgressStatus> reporter) {
         final var unitsOfWork = 1_000;
         progMon.beginTask(beginTaskMessage, unitsOfWork);
         final var splitter = new AtomicReference<BranchingExecMonitor>();
         final var prevWorked = new AtomicInteger();
+        final var statusRef = new AtomicReference<ProgressStatus>();
         final DoubleConsumer progress = p -> {
             final var status = splitter.get().getStatus();
             final var previous = prevWorked.get();
@@ -136,10 +141,89 @@ class AbstractHubTransfer {
                 progMon.worked(newWorked - previous);
                 prevWorked.set(newWorked);
             }
-            reporter.accept(status);
+            statusRef.set(status);
         };
-        splitter.set(new BranchingExecMonitor(progMon::isCanceled, progress));
-        return splitter.get();
+        final var execMonitor = new BranchingExecMonitor(progMon::isCanceled, progress);
+        splitter.set(execMonitor);
+
+        poller.setPollerTask(new Updater(execMonitor::getBytesTransferred, 1_500) {
+            @Override
+            protected void update(final double bytesPerSecond) {
+                final var status = statusRef.get();
+                if (status != null) {
+                    reporter.accept(status, bytesPerSecond);
+                }
+            }
+        });
+        return execMonitor;
+    }
+
+    private abstract static class Updater implements Runnable {
+
+        private final LongSupplier m_bytesTransferred;
+        private final int m_intervalMillis;
+
+        private long m_lastUpdated;
+        private long m_bytesWritten;
+        private double m_transferRate;
+
+        Updater(final LongSupplier bytesTransferred, final int intervalMillis) {
+            m_bytesTransferred = bytesTransferred;
+            m_intervalMillis = intervalMillis;
+        }
+
+        @Override
+        public void run() {
+            final var now = System.currentTimeMillis();
+            final var millisSinceLastUpdate = now - m_lastUpdated;
+            m_lastUpdated = now;
+
+            final var bytesWrittenOld = m_bytesWritten;
+            m_bytesWritten = m_bytesTransferred.getAsLong();
+            final var newRate = millisSinceLastUpdate <= 0 ? 0
+                : (1_000.0 * (m_bytesWritten - bytesWrittenOld) / millisSinceLastUpdate);
+
+            final var retained = Math.exp(-1.0 * millisSinceLastUpdate / m_intervalMillis);
+            m_transferRate = retained * m_transferRate + (1 - retained) * newRate;
+
+            update(m_transferRate);
+        }
+
+        protected abstract void update(double bytesPerSecond);
+    }
+
+    interface ProgressPoller extends AutoCloseable {
+        void setPollerTask(Runnable task);
+
+        @Override
+        void close();
+    }
+
+    static @Owning ProgressPoller startPoller(final Duration interval) {
+        final AtomicReference<Runnable> pollerRef = new AtomicReference<>();
+        final TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                final var poller = pollerRef.get();
+                if (poller != null) {
+                    poller.run();
+                }
+            }
+        };
+
+        KNIMETimer.getInstance().schedule(timerTask, 0, interval.toMillis());
+
+        return new ProgressPoller() {
+            @Override
+            public void setPollerTask(final Runnable task) {
+                pollerRef.set(task);
+            }
+
+            @Override
+            public void close() {
+                timerTask.cancel();
+            }
+        };
     }
 
     /**
