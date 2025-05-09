@@ -69,9 +69,11 @@ import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.ent.CopyOrMoveRequestBody;
 import org.knime.hub.client.sdk.ent.DownloadStatus;
 import org.knime.hub.client.sdk.ent.PreparedDownload;
 import org.knime.hub.client.sdk.ent.RepositoryItem;
+import org.knime.hub.client.sdk.ent.SpaceRenameRequestBody;
 import org.knime.hub.client.sdk.ent.SpaceRequestBody;
 import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.ent.UploadStarted;
@@ -101,6 +103,7 @@ public final class CatalogServiceClient {
     private static final String REPOSITORY_API_PATH = "repository";
     private static final String UPLOAD_API_PATH = "uploads";
     private static final String DOWNLOAD_API_PATH = "downloads";
+    private static final String SPACES_API_PATH = "spaces";
 
     /* Path pieces */
     private static final String PATH_PIECE_USERS = "Users";
@@ -109,6 +112,9 @@ public final class CatalogServiceClient {
     private static final String PATH_PIECE_STATUS = "status";
     private static final String PATH_PIECE_PARTS = "parts";
     private static final String PATH_PIECE_ARTIFACT = "artifact";
+    private static final String PATH_PIECE_COPIES = "copies";
+    private static final String PATH_PIECE_PATH = "path";
+    private static final String PATH_PIECE_NAME = "name";
 
     /* Query parameters */
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
@@ -635,7 +641,7 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
+    public ApiResponse<RepositoryItem> legacyServerCopyById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -654,6 +660,36 @@ public final class CatalogServiceClient {
     }
 
     /**
+     * Performs a server side copy of a repository item by ID. Depending on the content type of the request the server
+     * side copy is either a workflow/component (application/vnd.knime.workflow+zip) workflow group
+     * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting preservers the
+     * KNIME ID of the target repository item.
+     *
+     * @param id The repository items unique ID. It always starts with a * and does not change even if the repository
+     *            item is renamed or moved. (required)
+     * @param canonicalPath The new canonical path of the repository item
+     * @param force Whether to force the copy or move operation, i.e. overwrite existing items
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<RepositoryItem> serverCopyById(final String id, final IPath canonicalPath,
+        final boolean force, final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(canonicalPath);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_COPIES);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.POST,
+                new CopyOrMoveRequestBody(canonicalPath.toString(), force), REPOSITORY_ITEM);
+    }
+
+    /**
      * Performs a server side move of a repository item by ID. Depending on the content type of the request the server
      * side move is either a workflow/component (application/vnd.knime.workflow+zip) workflow group
      * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting updates the
@@ -668,7 +704,7 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
+    public ApiResponse<RepositoryItem> legacyServerMoveById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -684,6 +720,36 @@ public final class CatalogServiceClient {
             .withQueryParam(QUERY_PARAM_FROM_REPOSITORY, fromRepository) //
             .withQueryParam(QUERY_PARAM_MOVE, Boolean.TRUE.toString()) //
             .invokeAPI(requestPath, Method.PUT, null, REPOSITORY_ITEM);
+    }
+
+    /**
+     * Performs a server side move of a repository item by ID. Depending on the content type of the request the server
+     * side move is either a workflow/component (application/vnd.knime.workflow+zip) workflow group
+     * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting updates the
+     * KNIME ID of the target repository item with the KNIME ID of the source repository item.
+     *
+     * @param id The repository items unique ID. It always starts with a * and does not change even if the repository
+     *            item is renamed or moved. (required)
+     * @param canonicalPath The new canonical path of the repository item
+     * @param force Whether to force the copy or move operation, i.e. overwrite existing items
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<RepositoryItem> serverMoveById(final String id, final IPath canonicalPath,
+        final boolean force, final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(canonicalPath);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_PATH);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)//
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT,
+                new CopyOrMoveRequestBody(canonicalPath.toString(), force), REPOSITORY_ITEM);
     }
 
     /**
@@ -731,7 +797,7 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
+    public ApiResponse<RepositoryItem> legacyServerCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -763,7 +829,7 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
+    public ApiResponse<RepositoryItem> legacyServerMoveByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -1011,6 +1077,31 @@ public final class CatalogServiceClient {
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.GET, null, DONWLOAD_STATUS);
+    }
+
+    /**
+     * Renames the space with the given ID.
+     *
+     * @param id The ID of the space to rename
+     * @param name The new name of the space
+     * @param force Whether to force the space rename, i.e. overwrite existing items
+     * @param additionalHeaders additional header parameters
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<RepositoryItem> renameSpace(final String id, final String name, final boolean force,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(name);
+
+        final var requestPath = IPath.forPosix(SPACES_API_PATH).append(id).append(PATH_PIECE_NAME);
+
+        return m_apiClient.createApiRequest() //
+                .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+                .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+                .withHeaders(additionalHeaders) //
+                .invokeAPI(requestPath, Method.PUT, new SpaceRenameRequestBody(name, force), REPOSITORY_ITEM);
     }
 
     /**

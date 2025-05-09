@@ -75,16 +75,16 @@ public final class Space extends WorkflowGroup {
     private final boolean m_private;
 
     @JsonCreator
-    private Space(
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children,
-            @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
-        super(path, id, owner, description, details, masonControls, children);
+    private Space(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children,
+        @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
+        super(path, canonicalPath, id, owner, description, details, masonControls, children);
         this.m_private = isPrivate.booleanValue();
     }
 

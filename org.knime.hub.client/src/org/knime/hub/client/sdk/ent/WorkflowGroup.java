@@ -92,6 +92,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * Workflow group
      *
      * @param path the path of a workflow group
+     * @param canonicalPath the canonical path of the workflow group
      * @param id the ID of a workflow group
      * @param owner the owner of a workflow group
      * @param description the description of a workflow group
@@ -101,13 +102,14 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      */
     @JsonCreator
     protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-            @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
-        super(path, id, owner, description, details, masonControls);
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
+        super(path, canonicalPath, id, owner, description, details, masonControls);
         this.m_children = children;
     }
 

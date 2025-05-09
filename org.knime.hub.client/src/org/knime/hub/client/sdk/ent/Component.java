@@ -73,15 +73,15 @@ public final class Component extends RepositoryItem implements Sized {
     private final long m_size;
 
     @JsonCreator
-    private Component(
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-            @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-            @JsonProperty(value = Component.JSON_PROPERTY_SIZE, required = true) final long size) {
-        super(path, id, owner, description, details, masonControls);
+    private Component(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = Component.JSON_PROPERTY_SIZE, required = true) final long size) {
+        super(path, canonicalPath, id, owner, description, details, masonControls);
         m_size = size;
     }
 

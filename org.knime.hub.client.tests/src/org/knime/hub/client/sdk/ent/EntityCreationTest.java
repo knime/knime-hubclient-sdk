@@ -94,6 +94,19 @@ class EntityCreationTest {
     private static final String EXPECTED_WORKFLOW_GROUP_PATH = "/Users/jdoe/Space/WorkflowGroup";
     private static final String EXPECTED_SPACE_PATH = "/Users/jdoe/Space";
 
+    private static final String EXPECTED_COMPONENT_CANONICAL_PATH =
+            "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space/Component";
+    private static final String EXPECTED_DATA_CANONICAL_PATH =
+            "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space/Data";
+    private static final String EXPECTED_WORKFLOW_CANONICAL_PATH =
+            "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space/Workflow";
+    private static final String EXPECTED_WORKFLOW_GROUP_CANONICAL_PATH =
+            "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space/WorkflowGroup";
+    private static final String EXPECTED_SPACE_CANONICAL_PATH =
+            "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space";
+
+    //account:team:a885bb42-d808-4557-9a7f-9f10c5777739
+
     private static final String EXPECTED_OWNER = "jdoe";
     private static final String EXPECTED_DESCRIPTION = "This is a description";
     private static final long EXPECTED_SIZE = 1337L;
@@ -117,6 +130,7 @@ class EntityCreationTest {
         final var component = load("component.json", Component.class);
         assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, component.getType(), "Unexpected type");
         assertEquals(EXPECTED_COMPONENT_PATH, component.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_COMPONENT_CANONICAL_PATH, component.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_COMPONENT_ID, component.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, component.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, component.getDescription().get(), "Unexpected description");
@@ -127,6 +141,8 @@ class EntityCreationTest {
         final var componentWithDetails = load("componentWithDetails.json", Component.class);
         assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, componentWithDetails.getType(), "Unexpected type");
         assertEquals(EXPECTED_COMPONENT_PATH, componentWithDetails.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_COMPONENT_CANONICAL_PATH,
+            componentWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_COMPONENT_ID, componentWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, componentWithDetails.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, componentWithDetails.getDescription().get(), "Unexpected description");
@@ -141,6 +157,7 @@ class EntityCreationTest {
         final var data = load("data.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
         assertEquals(EXPECTED_DATA_PATH, data.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_DATA_CANONICAL_PATH, data.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_DATA_ID, data.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, data.getOwner(), "Unexpected owner");
         assertTrue(data.getDescription().isEmpty(), "Unexpected description");
@@ -150,14 +167,14 @@ class EntityCreationTest {
 
         final var dataWithDetails = load("dataWithDetails.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
-        assertEquals(EXPECTED_DATA_PATH, data.getPath(), "Unexpected path");
-        assertEquals(EXPECTED_DATA_ID, data.getId(), "Unexpected id");
-        assertEquals(EXPECTED_OWNER, data.getOwner(), "Unexpected owner");
-        assertTrue(data.getDescription().isEmpty(), "Unexpected description");
-        assertTrue(data.getDetails().isEmpty(), "Unexpected details");
-        assertEquals(EXPECTED_SPACE_ID, dataWithDetails.getDetails().get().getSpace().getSpaceId(),
-            "Unexpected space Id");
-        assertEquals(EXPECTED_SIZE, data.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_DATA_PATH, dataWithDetails.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_DATA_CANONICAL_PATH, dataWithDetails.getCanonicalPath(), "Unexpected canonical path");
+        assertEquals(EXPECTED_DATA_ID, dataWithDetails.getId(), "Unexpected id");
+        assertEquals(EXPECTED_OWNER, dataWithDetails.getOwner(), "Unexpected owner");
+        assertTrue(dataWithDetails.getDescription().isEmpty(), "Unexpected description");
+        assertEquals(EXPECTED_SPACE_ID,
+                dataWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
+        assertEquals(EXPECTED_SIZE, dataWithDetails.getSize(), "Unexpected size");
     }
 
     @Test
@@ -165,6 +182,7 @@ class EntityCreationTest {
         final var workflow = load("workflow.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflow.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflow.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_WORKFLOW_CANONICAL_PATH, workflow.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_ID, workflow.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflow.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, workflow.getDescription().get(), "Unexpected description");
@@ -175,6 +193,8 @@ class EntityCreationTest {
         final var workflowWithDetails = load("workflowWithDetails.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflowWithDetails.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflowWithDetails.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_WORKFLOW_CANONICAL_PATH,
+            workflowWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_ID, workflowWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowWithDetails.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, workflowWithDetails.getDescription().get(), "Unexpected description");
@@ -199,6 +219,8 @@ class EntityCreationTest {
         final var workflowGroup = load("workflowGroup.json", WorkflowGroup.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroup.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroup.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_WORKFLOW_GROUP_CANONICAL_PATH,
+            workflowGroup.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_ID, workflowGroup.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowGroup.getOwner(), "Unexpected owner");
         assertTrue(workflowGroup.getDescription().isEmpty(), "Unexpected description");
@@ -210,6 +232,8 @@ class EntityCreationTest {
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroupWithDetails.getType(),
             "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroupWithDetails.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_WORKFLOW_GROUP_CANONICAL_PATH,
+            workflowGroupWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_ID, workflowGroupWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowGroupWithDetails.getOwner(), "Unexpected owner");
         assertTrue(workflowGroupWithDetails.getDescription().isEmpty(), "Unexpected description");
@@ -224,6 +248,7 @@ class EntityCreationTest {
         final var space = load("space.json", Space.class);
         assertEquals(RepositoryItem.RepositoryItemType.SPACE, space.getType(), "Unexpected type");
         assertEquals(EXPECTED_SPACE_PATH, space.getPath(), "Unexpected path");
+        assertEquals(EXPECTED_SPACE_CANONICAL_PATH, space.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_SPACE_ID, space.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, space.getOwner(), "Unexpected owner");
         assertEquals(EXPECTED_DESCRIPTION, space.getDescription().get(), "Unexpected description");
