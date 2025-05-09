@@ -76,7 +76,7 @@ public enum FailureType {
     UPLOAD_PROCESSING_FAILED,
     /** There was a problem zipping and sending a workflow to Hub. */
     UPLOAD_OF_WORKFLOW_FAILED,
-    /** An uplad part was unreadable while trying to compute an MD5 hash. */
+    /** An upload part was unreadable while trying to compute an MD5 hash. */
     UPLOAD_PART_UNREADABLE,
     /** Upload of a part was aborted after exhausting its retries. */
     PART_UPLOAD_EXHAUSTED_RETRIES,
