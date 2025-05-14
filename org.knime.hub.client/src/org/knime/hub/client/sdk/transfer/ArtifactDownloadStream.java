@@ -52,13 +52,13 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
@@ -88,9 +88,6 @@ public final class ArtifactDownloadStream extends FilterInputStream {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ArtifactDownloadStream.class);
 
-    /** Timeout for download status polls */
-    private static final Duration DOWNLOAD_STATUS_POLL_TIMEOUT = Duration.ofSeconds(5);
-
     private @Owning Response m_response;
     private final long m_contentLength;
     private final Map<String, List<Object>> m_responseHeaders;
@@ -101,14 +98,15 @@ public final class ArtifactDownloadStream extends FilterInputStream {
      * @param clientHeaders headers for Hub API calls
      * @param itemId ID of the item to download
      * @param version version of the item to download
+     * @param cancelChecker called to find out whether or not this method should be canceled
      *
      * @return the opened stream
      * @throws HubFailureIOException if the download stream couldn't be opened
      * @throws CancelationException if the user cancelled the operation while waiting for the download to be ready
      */
     public static @Owning ArtifactDownloadStream create(final CatalogServiceClient catalogClient,
-        final Map<String, String> clientHeaders, final ItemID itemId, final ItemVersion version)
-        throws HubFailureIOException, CancelationException {
+        final Map<String, String> clientHeaders, final ItemID itemId, final ItemVersion version,
+        final BooleanSupplier cancelChecker) throws HubFailureIOException, CancelationException {
         CheckUtils.checkArgumentNotNull(catalogClient);
         CheckUtils.checkArgumentNotNull(itemId);
 
@@ -124,7 +122,7 @@ public final class ArtifactDownloadStream extends FilterInputStream {
         }
 
         // poll the download status until it's ready
-        final var downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadId);
+        final var downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadId, cancelChecker);
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
@@ -133,8 +131,8 @@ public final class ArtifactDownloadStream extends FilterInputStream {
     }
 
     private static URL awaitDownloadReady(final CatalogServiceClient catalogClient,
-        final Map<String, String> clientHeaders, final ItemID itemId, final String downloadId)
-        throws HubFailureIOException, CancelationException {
+        final Map<String, String> clientHeaders, final ItemID itemId, final String downloadId,
+        final BooleanSupplier cancelChecker) throws HubFailureIOException, CancelationException {
 
         final Set<DownloadStatus.StatusEnum> endStates = EnumSet.of(DownloadStatus.StatusEnum.READY,
             DownloadStatus.StatusEnum.ABORTED, DownloadStatus.StatusEnum.FAILED);
@@ -155,18 +153,22 @@ public final class ArtifactDownloadStream extends FilterInputStream {
                     .setMessage("Polling state of download item with ID '{}': {}, '{}'") //
                     .log();
                 }
-                return endStates.contains(state.getStatus());
+                return cancelChecker.getAsBoolean() || endStates.contains(state.getStatus());
             }
         };
 
         final DownloadStatus finalState;
         try {
-            finalState = AbstractHubTransfer.poll(DOWNLOAD_STATUS_POLL_TIMEOUT.toMillis(), poller) //
+            finalState = AbstractHubTransfer.poll(-1, poller) //
                 .orElseThrow(HubFailureIOException::new);
         } catch (final InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new CancelationException(
                 "Download of item with ID: '%s' has been interrupted while waiting for Hub".formatted(itemId.id()), ex);
+        }
+
+        if (cancelChecker.getAsBoolean()) {
+            throw new CancelationException();
         }
 
         return switch (finalState.getStatus()) {

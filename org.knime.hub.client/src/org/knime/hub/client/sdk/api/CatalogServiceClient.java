@@ -54,6 +54,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -947,8 +948,7 @@ public final class CatalogServiceClient {
     public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
-        return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike,
-            null);
+        return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike);
     }
 
     /**
@@ -957,15 +957,16 @@ public final class CatalogServiceClient {
      * @param itemId the ID of the repository item to download
      * @param version the {@link ItemVersion} of the repository item
      * @param additionalHeaders additional headers for the download process
+     * @param cancelChecker called to find out whether or not this method should be canceled ({@code true} -> cancel)
      *
      * @return {@link ArtifactDownloadStream}
      * @throws IOException if an I/O error occurred during the download
      * @throws CancelationException if creating the download was canceled
      */
     public @Owning ArtifactDownloadStream createArtifactDownloadStream(final ItemID itemId, final ItemVersion version,
-        final Map<String, String> additionalHeaders)
+        final Map<String, String> additionalHeaders, final BooleanSupplier cancelChecker)
         throws IOException, CancelationException {
-        return ArtifactDownloadStream.create(this, additionalHeaders, itemId, version);
+        return ArtifactDownloadStream.create(this, additionalHeaders, itemId, version, cancelChecker);
     }
 
     /**

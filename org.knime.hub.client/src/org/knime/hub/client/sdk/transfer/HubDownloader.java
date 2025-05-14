@@ -406,8 +406,8 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private Result<Path, FailureValue> performArtifactDownload(final AtomicReference<Path> tempFile)
             throws IOException, CancelationException {
-            try (final var downloadStream =
-                m_catalogClient.createArtifactDownloadStream(m_download.id(), null, m_clientHeaders)) {
+            try (final var downloadStream = m_catalogClient.createArtifactDownloadStream(m_download.id(), null,
+                m_clientHeaders, m_monitor.cancelChecker())) {
                 // prefer size from the HTTP request if available, fall back to Catalog information otherwise
                 final var numBytes = downloadStream.getContentLength().orElse(m_download.size().orElse(-1));
                 writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), m_monitor);

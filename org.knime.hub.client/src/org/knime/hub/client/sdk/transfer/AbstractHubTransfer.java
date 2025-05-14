@@ -612,7 +612,7 @@ class AbstractHubTransfer {
             Thread.sleep(numberOfStatusPolls < 4 ? (200 * (numberOfStatusPolls + 1)) : 1_000);
 
             final long elapsed = System.currentTimeMillis() - t0;
-            if (timeoutMillis >= 0 && elapsed > timeoutMillis) {
+            if (timeoutMillis >= 0 && elapsed >= timeoutMillis) {
                 return Result.success(state);
             }
         }

@@ -497,53 +497,61 @@ public final class HubUploader extends AbstractHubTransfer {
             return uploadResult.asFailure();
         }
 
-        try {
-            final var result =
-                awaitUploadProcessed(m_catalogClient, m_clientHeaders, path, uploadInstructions.getUploadId(), -1);
-            if (!(result instanceof Success<UploadStatus, ?> success)) {
-                return result.asFailure();
-            }
+        final var result = awaitUploadProcessed(m_catalogClient, m_clientHeaders, path,
+            uploadInstructions.getUploadId(), -1, splitter.cancelChecker());
 
-            final UploadStatus finalStatus = success.value();
-            return switch (finalStatus.getStatus()) {
-                case COMPLETED -> Result.success(finalStatus.getStatusMessage());
-                case ANALYSIS_PENDING, PREPARED -> throw new IllegalStateException(
-                    "Stopped polling upload early even though no timeout was provided");
-                case ABORTED -> Result
-                    .failure(FailureValue.withTitle(FailureType.UPLOAD_ABORTED_BY_HUB, finalStatus.getStatusMessage()));
-                case FAILED -> Result.failure(
-                    FailureValue.withTitle(FailureType.UPLOAD_PROCESSING_FAILED, finalStatus.getStatusMessage()));
-            };
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new CancelationException(e);
+        if (!(result instanceof Success<UploadStatus, ?> success)) {
+            return result.asFailure();
         }
+
+        final UploadStatus finalStatus = success.value();
+        return switch (finalStatus.getStatus()) {
+            case COMPLETED -> Result.success(finalStatus.getStatusMessage());
+            case ANALYSIS_PENDING, PREPARED -> throw new IllegalStateException(
+                "Stopped polling upload early even though no timeout was provided");
+            case ABORTED -> Result
+            .failure(FailureValue.withTitle(FailureType.UPLOAD_ABORTED_BY_HUB, finalStatus.getStatusMessage()));
+            case FAILED -> Result.failure(
+                FailureValue.withTitle(FailureType.UPLOAD_PROCESSING_FAILED, finalStatus.getStatusMessage()));
+        };
     }
 
     static Result<UploadStatus, FailureValue> awaitUploadProcessed(final CatalogServiceClient catalogClient,
-        final Map<String, String> clientHeaders, final String path, final String uploadId, final long timeoutMillis)
-        throws InterruptedException {
+        final Map<String, String> clientHeaders, final String path, final String uploadId, final long timeoutMillis,
+        final BooleanSupplier cancelChecker) throws CancelationException {
 
         final Set<UploadStatus.StatusEnum> endStates = EnumSet.of(UploadStatus.StatusEnum.COMPLETED,
             UploadStatus.StatusEnum.ABORTED, UploadStatus.StatusEnum.FAILED);
 
-        return poll(timeoutMillis, new PollingCallable<UploadStatus>() {
-            @Override
-            public ApiResponse<UploadStatus> poll() throws HubFailureIOException {
-                return catalogClient.pollUploadStatus(uploadId, clientHeaders);
-            }
+        try {
+            final Result<UploadStatus, FailureValue> result = poll(timeoutMillis, new PollingCallable<>() { // NOSONAR cancel check must be between this and the `return`
+                @Override
+                public ApiResponse<UploadStatus> poll() throws HubFailureIOException {
+                    return catalogClient.pollUploadStatus(uploadId, clientHeaders);
+                }
 
-            @Override
-            public boolean accept(final UploadStatus state) {
-                LOGGER.atDebug() //
+                @Override
+                public boolean accept(final UploadStatus state) {
+                    LOGGER.atDebug() //
                     .addArgument(path) //
                     .addArgument(state.getStatus()) //
                     .addArgument(state.getStatusMessage()) //
                     .setMessage("Polling state of uploaded item '{}': {}, '{}'") //
                     .log();
-                return endStates.contains(state.getStatus());
+                    return cancelChecker.getAsBoolean() || endStates.contains(state.getStatus());
+                }
+            });
+
+            if (cancelChecker.getAsBoolean()) {
+                throw new CancelationException();
             }
-        });
+
+            return result;
+
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CancelationException(e);
+        }
     }
 
     private Result<Void, FailureValue> uploadWorkflowLike(final String path,

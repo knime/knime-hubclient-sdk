@@ -52,10 +52,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.Map;
-import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Future;
+import java.util.function.BooleanSupplier;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -63,6 +63,7 @@ import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
+import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
@@ -92,7 +93,6 @@ public final class AsyncHubUploadStream extends OutputStream {
 
     private final String m_itemName;
     private final String m_uploadId;
-    private final Duration m_timeout;
 
     private final FilePartUploader m_filePartUploader;
     private final SortedMap<Integer, String> m_finishedParts = new TreeMap<>();
@@ -111,14 +111,14 @@ public final class AsyncHubUploadStream extends OutputStream {
      * @param parentETag ETag of the parent group, may be {@code null}
      * @param itemName name of the item to upload
      * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
-     * @param timeout duration of time after which the upload stream aborts the polling for the upload to finish on Hub
      * @return upload stream of {@code null}, which indicates that the parent workflow group has changed
-     * @throws HubFailureIOException
+     * @throws HubFailureIOException if an error occurred
      * @throws UnsupportedOperationException if asynchronous uploads are not supported by the connected Hub
      */
+    @SuppressWarnings("java:S2301") // boolean flag as parameter
     public static @Owning AsyncHubUploadStream create(final CatalogServiceClient catalogClient,
         final Map<String, String> clientHeaders, final String parentId, final EntityTag parentETag,
-        final String itemName, final boolean isWorkflowLike, final Duration timeout) throws HubFailureIOException {
+        final String itemName, final boolean isWorkflowLike) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(catalogClient);
         CheckUtils.checkArgumentNotNull(parentId);
         CheckUtils.checkArgumentNotNull(itemName);
@@ -139,16 +139,15 @@ public final class AsyncHubUploadStream extends OutputStream {
         // Obtain upload instructions and create supplier for additional upload parts
         final var itemInstructions = preparedUploadOpt.get().getItems();
         final var uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(itemName));
-        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, timeout);
+        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions);
     }
 
     private AsyncHubUploadStream(final CatalogServiceClient hubClient, final Map<String, String> clientHeaders,
-        final String itemName, final ItemUploadInstructions uploadInstructions, final Duration timeout) {
+        final String itemName, final ItemUploadInstructions uploadInstructions) {
         m_hubClient = hubClient;
         m_clientHeaders = clientHeaders;
         m_itemName = itemName;
         m_uploadId = uploadInstructions.getUploadId();
-        m_timeout = Objects.requireNonNullElseGet(timeout, () -> Duration.ofDays(365));
 
         // Create file part uploader to upload separate chunks of data
         m_filePartUploader = new FilePartUploader(URLConnectionUploader.INSTANCE, NUMBER_OF_PART_UPLOAD_RETRIES, false);
@@ -254,8 +253,17 @@ public final class AsyncHubUploadStream extends OutputStream {
         }
     }
 
-    @Override
-    public void close() throws IOException {
+    /**
+     * Closes the stream and waits for Hub to finish processing the uploaded items. Calling {@link #close()} is
+     * equivalent to calling {@code closeAndAwait(null, () -> false)}.
+     *
+     * @param timeout maximum time to wait for Hub to finish processing the upload, may be {@code null} to mean infinity
+     * @param cancelChecker called to find out whether or not this method should be canceled ({@code true} -> cancel)
+     * @throws CancelationException if the operation was canceled
+     * @throws IOException if an error occurred
+     */
+    public void closeAndAwait(final Duration timeout, final BooleanSupplier cancelChecker)
+        throws CancelationException, IOException {
         // close the chunking output stream, potentially starting a last chunk upload
         try (final var out = m_chunkingOutputStream) {
             if (out == null) {
@@ -274,28 +282,35 @@ public final class AsyncHubUploadStream extends OutputStream {
             throw cancelAfter(ioe);
         }
 
-        try {
-            // report back to catalog
-            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-                m_hubClient.reportUploadFinished(m_uploadId, m_finishedParts, m_clientHeaders).result() //
-                    .orElseThrow(HubFailureIOException::new);
-            }
+        // report back to catalog
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            m_hubClient.reportUploadFinished(m_uploadId, m_finishedParts, m_clientHeaders).result() //
+                .orElseThrow(HubFailureIOException::new);
+        }
 
-            // wait for the upload to be completed server-side
-            final var finalState = HubUploader.awaitUploadProcessed(m_hubClient, m_clientHeaders, m_itemName,
-                m_uploadId, m_timeout.toMillis()).orElseThrow(HubFailureIOException::new);
+        // wait for the upload to be completed server-side
+        final long timeoutMillis = timeout == null ? -1 : timeout.toMillis();
+        final var finalState = HubUploader.awaitUploadProcessed(m_hubClient, m_clientHeaders, m_itemName,
+            m_uploadId, timeoutMillis, cancelChecker).orElseThrow(HubFailureIOException::new);
 
-            switch (finalState.getStatus()) {
-                case ABORTED, FAILED:
-                    throw new IOException(finalState.getStatusMessage());
-                case ANALYSIS_PENDING, PREPARED: // timeout
-                    throw new IOException("Hub didn't complete upload within %.1fs" //
-                        .formatted(m_timeout.toMillis() / 1000.0));
-                case COMPLETED:
-                    break;
-            }
-        } catch (final InterruptedException e) {
-            Thread.currentThread().interrupt();
+        switch (finalState.getStatus()) {
+            case ABORTED, FAILED:
+                throw new IOException(finalState.getStatusMessage());
+            case ANALYSIS_PENDING, PREPARED: // timeout
+                throw new IOException("Hub didn't complete upload within %.1fs" //
+                    .formatted(timeout == null ? Double.NaN : (timeoutMillis / 1000.0)));
+            case COMPLETED:
+                break;
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        try (final var out = m_chunkingOutputStream) {
+            closeAndAwait(null, () -> false);
+        } catch (final CancelationException ex) {
+            // should never happen
+            throw new IOException(ex);
         }
     }
 }
