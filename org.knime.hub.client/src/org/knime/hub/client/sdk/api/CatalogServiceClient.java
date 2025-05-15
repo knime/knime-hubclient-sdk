@@ -632,6 +632,9 @@ public final class CatalogServiceClient {
      * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting preservers the
      * KNIME ID of the target repository item.
      *
+     * <p><b>Note:</b> This API call always overwrites the target item.
+     * Prefer using its replacement method to influence overwrite behavior.</p>
+     *
      * @param id The repository items unique ID. It always starts with a * and does not change even if the repository
      *            item is renamed or moved. (required)
      * @param fromRepository Source ID of the repository item which gets copied (required).
@@ -640,8 +643,10 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @deprecated use {@link #serverCopyById(String, IPath, boolean, Map)}
      */
-    public ApiResponse<RepositoryItem> legacyServerCopyById(final String id, final String fromRepository,
+    @Deprecated
+    public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -695,6 +700,9 @@ public final class CatalogServiceClient {
      * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting updates the
      * KNIME ID of the target repository item with the KNIME ID of the source repository item.
      *
+     * <p><b>Note:</b> This API call always overwrites the target item.
+     * Prefer using its replacement method to influence overwrite behavior.</p>
+     *
      * @param id The repository items unique ID. It always starts with a * and does not change even if the repository
      *            item is renamed or moved. (required)
      * @param fromRepository Source ID of the repository item which gets moved (required).
@@ -703,8 +711,10 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @deprecated use {@link #serverMoveById(String, IPath, boolean, Map)}
      */
-    public ApiResponse<RepositoryItem> legacyServerMoveById(final String id, final String fromRepository,
+    @Deprecated
+    public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -789,6 +799,9 @@ public final class CatalogServiceClient {
      * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting preservers the
      * KNIME ID of the target repository item.
      *
+     * <p><b>Note:</b> This API call always overwrites the target item.
+     * Prefer using its replacement method to influence overwrite behavior.</p>
+     *
      * @param path The absolute path to the repository item. (required)
      * @param fromRepository Source path of the repository item which gets copied (required).
      * @param contentType The content type of the request body (required).
@@ -796,8 +809,10 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @deprecated use {@link #serverCopyById(String, IPath, boolean, Map)}
      */
-    public ApiResponse<RepositoryItem> legacyServerCopyByPath(final IPath path, final String fromRepository,
+    @Deprecated
+    public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
@@ -821,6 +836,9 @@ public final class CatalogServiceClient {
      * (application/vnd.knime.workflow-group+zip) or a data file (all other content types). Overwriting updates the
      * KNIME ID of the target repository item with the KNIME ID of the source repository item.
      *
+     * <p><b>Note:</b> This API call always overwrites the target item.
+     * Prefer using its replacement method to influence overwrite behavior.</p>
+     *
      * @param path The absolute path to the repository item. (required)
      * @param fromRepository Source path of repository item which gets moved (required).
      * @param contentType The content type of the request body (required).
@@ -828,8 +846,10 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @deprecated use {@link #serverMoveById(String, IPath, boolean, Map)}
      */
-    public ApiResponse<RepositoryItem> legacyServerMoveByPath(final IPath path, final String fromRepository,
+    @Deprecated
+    public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,
         final MediaType contentType, final Map<String, String> additionalHeaders)
                 throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(contentType);
