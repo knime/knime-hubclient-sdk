@@ -21,7 +21,6 @@
 package org.knime.hub.client.sdk.transfer;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -56,7 +55,6 @@ import org.knime.core.node.workflow.WorkflowExporter.ItemType;
 import org.knime.core.node.workflow.WorkflowExporter.ResourcesToCopy;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
-import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
@@ -80,6 +78,7 @@ import org.knime.hub.client.sdk.ent.UploadTarget;
 import org.knime.hub.client.sdk.ent.WorkflowGroup;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.ProgressPoller;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.UploadTargetFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -332,7 +331,7 @@ public final class HubUploader extends AbstractHubTransfer {
     public Map<IPath, Result<String, FailureValue>> performUpload(final Map<IPath, ItemToUpload> itemsToUpload,
             final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
             final IProgressMonitor progMon) throws CancelationException, HubFailureIOException {
-        try (final var poller = startPoller(Duration.ofMillis(200))) {
+        try (final var poller = ConcurrentExecMonitor.startProgressPoller(Duration.ofMillis(200))) {
             final var resources = collectFileResources(itemsToUpload, exporter, progMon) //
                 .orElseThrow(HubFailureIOException::new);
             final var uploadJobs =
@@ -353,16 +352,17 @@ public final class HubUploader extends AbstractHubTransfer {
             final var itemToUpload = itemsToUpload.get(pathInTarget);
             final var itemType = itemToUpload.localItem().type();
             final var title = "Uploading '%s'...".formatted(pathInTarget);
-            final var numPartsIfKnown =
-                itemType != ItemType.DATA_FILE ? " parts of %s".formatted(bytesToHuman(m_chunkSize))
-                    : "/%d parts".formatted((resources.totalSize() + m_chunkSize - 1) / m_chunkSize);
+            final var numPartsIfKnown = itemType != ItemType.DATA_FILE
+                ? " parts (%s each)".formatted(ConcurrentExecMonitor.bytesToHuman(m_chunkSize))
+                : "/%d parts".formatted((resources.totalSize() + m_chunkSize - 1) / m_chunkSize);
             final var splitter = beginMultiProgress(progMon, title, poller, (status, transferRate) -> {
                 final var firstLine = "Uploading '%s': %d%s transferred (%.1f%%, %s/sec)" //
                     .formatted(pathInTarget, status.numDone(), numPartsIfKnown, 100.0 * status.totalProgress(),
-                        bytesToHuman(transferRate));
+                        ConcurrentExecMonitor.bytesToHuman(transferRate));
                 progMon.setTaskName(firstLine);
                 progMon.subTask(status.active().stream() //
-                    .map(e -> " \u2022 %s of file part %s".formatted(percentage(e.getValue()), e.getKey())) //
+                    .map(e -> " \u2022 %s of file part %s".formatted(ConcurrentExecMonitor.percentage(e.getValue()), //
+                        e.getKey())) //
                     .collect(Collectors.joining("\n")));
             });
 
@@ -373,10 +373,11 @@ public final class HubUploader extends AbstractHubTransfer {
             final var splitter = beginMultiProgress(progMon, title, poller, (status, transferRate) -> {
                 final var firstLine = "Uploading: %d/%d items transferred (%.1f%%, %s/sec)" //
                     .formatted(status.numDone(), itemsToUpload.size(), 100.0 * status.totalProgress(),
-                        bytesToHuman(transferRate));
+                        ConcurrentExecMonitor.bytesToHuman(transferRate));
                 progMon.setTaskName(firstLine);
                 progMon.subTask(status.active().stream() //
-                    .map(e -> " \u2022 %s of '%s'".formatted(percentage(e.getValue()), shortenedPath(e.getKey()))) //
+                    .map(e -> " \u2022 %s of '%s'".formatted(ConcurrentExecMonitor.percentage(e.getValue()),
+                        ConcurrentExecMonitor.shortenedPath(e.getKey(), MAX_PATH_LENGTH_IN_MESSAGE))) //
                     .collect(Collectors.joining("\n")));
             });
 
@@ -784,77 +785,6 @@ public final class HubUploader extends AbstractHubTransfer {
                     hash, subMonitor));
             }
         };
-    }
-
-    /**
-     * Obtains the parent workflow group of the upload target either with the given ID or from a target URI.
-     *
-     * @param parentId the ID of the parent workflow group
-     * @param targetURI the URI of the upload target
-     * @return entity tag and parent group item
-     */
-    public Result<Pair<EntityTag, RepositoryItem>, FailureValue> obtainTargetParentWorkflowGroup(final String parentId,
-        final URI targetURI) {
-        final ApiResponse<RepositoryItem> response;
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            if (parentId != null) {
-                response = m_catalogClient.getRepositoryItemById(parentId, "none", false, false, null, null,
-                    m_clientHeaders);
-            } else {
-                final var parentPath = IPath.forPosix(targetURI.getPath()).removeLastSegments(1);
-                response = m_catalogClient.getRepositoryItemByPath(parentPath, "none", false, false, null, null,
-                    m_clientHeaders);
-            }
-        } catch (HubFailureIOException ex) { // NOSONAR
-            return ex.asFailure();
-        }
-        return response.result().map(item -> Pair.of(response.etag().orElse(null), item));
-    }
-
-    /**
-     * Uploads a local workflow like object via asynchronous upload stream.
-     *
-     * @param localWorkflow the local workflow path
-     * @param targetItemName the target item name
-     * @param parentId the ID of the parent group
-     * @param parentEtag the entity tag of the parent group
-     * @param excludeDataInWorkflows <code>true</code> if internal data should be excluded from the upload
-     * @param uploadLimit the upload limit
-     * @param progressMonitor the progress monitor
-     * @return pair of item path to upload result
-     * @throws IOException if an I/O error occurred during upload
-     * @throws CancelationException if the upload was cancelled by the user
-     */
-    public Pair<IPath, Result<String, FailureValue>> uploadWithAsyncUploadStream(final Path localWorkflow,
-        final String targetItemName, final String parentId, final EntityTag parentEtag,
-        final boolean excludeDataInWorkflows, final long uploadLimit, final IProgressMonitor progressMonitor)
-        throws IOException, CancelationException {
-        // Collect item resources
-        final var workflowExporter = new WorkflowExporter<CancelationException>(excludeDataInWorkflows);
-        final var workflowResources =
-            workflowExporter.collectResourcesToCopy(Set.of(localWorkflow), localWorkflow.getParent());
-
-        // Check upload limit
-        final var uploadSize = workflowResources != null ? workflowResources.numBytes() : Files.size(localWorkflow);
-        if (uploadSize > uploadLimit) {
-            throw HttpExceptionUtils.wrapException(Status.BAD_REQUEST.getStatusCode(),
-                "Upload of '" + targetItemName + "' to '" + m_catalogClient.getApiClient().getBaseURI().getHost()
-                    + "' failed: complete size (" + (uploadSize >> 20) + " MB) exceeds upload limit ("
-                    + (uploadLimit >> 20) + " MB). Please reset workflow (partially) to resize it.");
-        }
-
-        try (final var out =
-            m_catalogClient.createAsyncHubUploadStream(targetItemName, true, parentId, parentEtag, m_clientHeaders)) {
-            workflowExporter.exportInto(workflowResources, out, writeAdvance -> {
-                if (progressMonitor.isCanceled()) {
-                    throw new CancelationException();
-                }
-                progressMonitor.worked((int)Math.floor(writeAdvance * 100));
-            });
-        }
-
-        return Pair.of(IPath.forPosix(targetItemName),
-            Result.success("Uploaded '%s' into parent group with ID '%s'.".formatted(targetItemName, parentId)));
     }
 
     /**

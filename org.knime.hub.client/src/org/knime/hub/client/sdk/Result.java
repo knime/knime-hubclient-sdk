@@ -102,6 +102,19 @@ public sealed interface Result<V, E> {
     }
 
     /**
+     * Creates a copy of this result in which the given function is applied to the contained value if this result
+     * represents a failure. If it is instead a success, only the type changes.
+     *
+     * @param <F> return type of the mapper function
+     * @param mapper function to be applied to the failure value
+     * @return potentially modified copy of this result
+     * @throws T if thrown from the mapper function
+     */
+    default <F, T extends Throwable> Result<V, F> mapFailure(final FailableFunction<E, F, T> mapper) throws T {
+        return match(Result::success, mapper.andThen(Result::failure));
+    }
+
+    /**
      * A collector which partitions the results into successes (storing only the contained values) and failures.
      *
      * @param <V> value type

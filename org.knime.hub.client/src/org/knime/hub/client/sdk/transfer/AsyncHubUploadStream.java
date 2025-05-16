@@ -51,13 +51,18 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.output.NullOutputStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
@@ -71,7 +76,7 @@ import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.UploadManifest;
-import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
 
 import jakarta.ws.rs.core.EntityTag;
@@ -86,7 +91,11 @@ public final class AsyncHubUploadStream extends OutputStream {
 
     private static final int NUMBER_OF_INITIAL_PARTS = 1;
     private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
-    private static final int MAX_CHUNK_SIZE = 8 * (int)FileUtils.ONE_MB;
+
+    /** Minimum <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html">according to Amazon</a> */
+    private static final int MIN_CHUNK_SIZE = 5 * (int)FileUtils.ONE_MB;
+
+    private static final int MAX_PARALLEL_UPLOADS = 2;
 
     private final @NotOwning CatalogServiceClient m_hubClient;
     private final Map<String, String> m_clientHeaders;
@@ -97,9 +106,11 @@ public final class AsyncHubUploadStream extends OutputStream {
     private final FilePartUploader m_filePartUploader;
     private final SortedMap<Integer, String> m_finishedParts = new TreeMap<>();
 
-    private @Owning ChunkingByteOutputStream m_chunkingOutputStream;
-    private Future<Result<Pair<Integer, EntityTag>, FailureValue>> m_pendingUpload;
-    private volatile boolean m_canceled;
+    private @Owning OutputStream m_chunkingOutputStream;
+    private final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> m_pendingUploads = new ArrayDeque<>();
+
+    private final AtomicBoolean m_cancelled = new AtomicBoolean();
+    private final BranchingExecMonitor m_rootMonitor = new BranchingExecMonitor(m_cancelled::get, prog -> {});
 
     /**
      * Creates a new asynchronous upload stream. If a parent {@link EntityTag ETag} is given and the parent workflow
@@ -111,14 +122,16 @@ public final class AsyncHubUploadStream extends OutputStream {
      * @param parentETag ETag of the parent group, may be {@code null}
      * @param itemName name of the item to upload
      * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
-     * @return upload stream of {@code null}, which indicates that the parent workflow group has changed
+     * @param chunkSize Preferred chunk size, ignored if it is smaller than S3's minimum chunk size (currently 5MB)
+     * @return upload stream, may only be {@code null} if a parent ETag was provided and the parent workflow group has
+     *         changed
      * @throws HubFailureIOException if an error occurred
      * @throws UnsupportedOperationException if asynchronous uploads are not supported by the connected Hub
      */
     @SuppressWarnings("java:S2301") // boolean flag as parameter
     public static @Owning AsyncHubUploadStream create(final CatalogServiceClient catalogClient,
         final Map<String, String> clientHeaders, final String parentId, final EntityTag parentETag,
-        final String itemName, final boolean isWorkflowLike) throws HubFailureIOException {
+        final String itemName, final boolean isWorkflowLike, final int chunkSize) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(catalogClient);
         CheckUtils.checkArgumentNotNull(parentId);
         CheckUtils.checkArgumentNotNull(itemName);
@@ -139,11 +152,11 @@ public final class AsyncHubUploadStream extends OutputStream {
         // Obtain upload instructions and create supplier for additional upload parts
         final var itemInstructions = preparedUploadOpt.get().getItems();
         final var uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(itemName));
-        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions);
+        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, chunkSize);
     }
 
     private AsyncHubUploadStream(final CatalogServiceClient hubClient, final Map<String, String> clientHeaders,
-        final String itemName, final ItemUploadInstructions uploadInstructions) {
+        final String itemName, final ItemUploadInstructions uploadInstructions, final int chunkSize) {
         m_hubClient = hubClient;
         m_clientHeaders = clientHeaders;
         m_itemName = itemName;
@@ -154,24 +167,33 @@ public final class AsyncHubUploadStream extends OutputStream {
 
         // Create the supplier which can request additional upload parts
         final var partSupplier = new UploadPartSupplier(m_hubClient, m_clientHeaders, uploadInstructions);
-        final var execMonitor = LeafExecMonitor.nullExecMonitor(() -> m_canceled);
 
         // Create chunking output stream
-        m_chunkingOutputStream = new ChunkingByteOutputStream(MAX_CHUNK_SIZE, null) {
+        m_chunkingOutputStream = new ChunkingByteOutputStream(Math.max(chunkSize, MIN_CHUNK_SIZE), null) {
             @Override
             public void chunkFinished(final int chunkNumber, final byte[] chunk, final byte[] hash) throws IOException {
-                if (m_pendingUpload != null) {
-                    awaitPartFinished();
+                if (m_pendingUploads.size() == MAX_PARALLEL_UPLOADS) {
+                    awaitPartsFinished(1);
                 }
+
                 final var partNumber = chunkNumber + 1;
-                m_pendingUpload =
-                    m_filePartUploader.uploadDataChunk(m_itemName, partNumber, partSupplier, chunk, hash, execMonitor);
+                m_pendingUploads.addLast(m_filePartUploader.uploadDataChunk(m_itemName, partNumber, partSupplier, chunk,
+                    hash, m_rootMonitor.createLeafChild(null, 0.0)));
             }
         };
     }
 
+    /**
+     * Returns the number of bytes this stream has successfully transferred.
+     *
+     * @return number of bytes transferred
+     */
+    public long getBytesTransferred() {
+        return m_rootMonitor.getBytesTransferred();
+    }
+
     @Override
-    public void write(final int b) throws IOException {
+    public synchronized void write(final int b) throws IOException {
         try {
             m_chunkingOutputStream.write(b);
         } catch (final IOException ioe) {
@@ -180,7 +202,7 @@ public final class AsyncHubUploadStream extends OutputStream {
     }
 
     @Override
-    public void write(final byte[] b, final int off, final int len) throws IOException {
+    public synchronized void write(final byte[] b, final int off, final int len) throws IOException {
         try {
             m_chunkingOutputStream.write(b, off, len);
         } catch (final IOException ioe) {
@@ -189,7 +211,7 @@ public final class AsyncHubUploadStream extends OutputStream {
     }
 
     @Override
-    public void write(final byte[] b) throws IOException {
+    public synchronized void write(final byte[] b) throws IOException {
         try {
             m_chunkingOutputStream.write(b);
         } catch (final IOException ioe) {
@@ -197,41 +219,56 @@ public final class AsyncHubUploadStream extends OutputStream {
         }
     }
 
-    private void awaitPartFinished() throws IOException {
-        final var pending = m_pendingUpload;
-        if (pending != null) {
-            m_pendingUpload = null;
-            final var finishedPart = HubUploader.awaitPartFinished(pending) //
-                .orElseThrow(HubFailureIOException::new);
-            m_finishedParts.put(finishedPart.getKey(),
-                AbstractHubTransfer.ETAG_DELEGATE.toString(finishedPart.getValue()));
+    private void awaitPartsFinished(final int reduceBy) throws IOException {
+        try {
+            for (var i = 0; i < reduceBy && !m_pendingUploads.isEmpty(); i++) {
+                final var pending = m_pendingUploads.removeFirst();
+                final var result = AbstractHubTransfer.waitForCancellable(pending, m_cancelled::get,
+                    throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
+                        "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
+                final var finishedPart = result.orElseThrow(HubFailureIOException::new);
+                m_finishedParts.put(finishedPart.getKey(),
+                    AbstractHubTransfer.ETAG_DELEGATE.toString(finishedPart.getValue()));
+            }
+        } catch (CancelationException ex) { // NOSONAR ignore because we've already been cancelled
         }
     }
 
     /**
-     * Cancels the upload process.
+     * Cancels the upload process, may be called asynchronously.
      *
-     * @throws HubFailureIOException if an I/O error occurred during cancellation
+     * @throws HubFailureIOException if an I/O error occurred while notifying Hub of the cancellation
      */
     public void cancel() throws HubFailureIOException {
-        if (m_chunkingOutputStream != null) {
-            // discard the (in-memory) chunking stream, thereby closing the outer one without triggering an upload
-            m_chunkingOutputStream = null;
+        // set immediately to cancel uploads etc.
+        m_cancelled.set(true);
+
+        // critical section of synchronous clean-up operations:
+        final Iterable<Future<?>> pending;
+        synchronized (this) {
+            if (m_chunkingOutputStream == null) {
+                return;
+            }
+
+
+            // discard the in-memory chunking stream (so no more uploads are triggered) and redirect the input
+            m_chunkingOutputStream = NullOutputStream.INSTANCE;
 
             // cancel already pending upload if necessary
-            m_canceled = true;
-            final var pending = m_pendingUpload;
-            if (pending != null) {
-                m_pendingUpload = null;
-                pending.cancel(true);
-            }
+            pending = List.copyOf(m_pendingUploads);
+            m_pendingUploads.clear();
+        }
 
-            // notify Catalog
-            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-                m_hubClient.cancelUpload(m_uploadId, m_clientHeaders) //
-                    .result() //
-                    .orElseThrow(HubFailureIOException::new);
-            }
+        // operations can be performed asynchronously:
+
+        // cancel the pending upload(s)
+        pending.forEach(future -> future.cancel(true));
+
+        // notify Hub of the cancellation
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            m_hubClient.cancelUpload(m_uploadId, m_clientHeaders) //
+                .result() //
+                .orElseThrow(HubFailureIOException::new);
         }
     }
 
@@ -245,7 +282,10 @@ public final class AsyncHubUploadStream extends OutputStream {
     }
 
     @Override
-    public void flush() throws IOException {
+    public synchronized void flush() throws IOException {
+        if (m_chunkingOutputStream == null) {
+            return;
+        }
         try {
             m_chunkingOutputStream.flush();
         } catch (final IOException ioe) {
@@ -262,7 +302,7 @@ public final class AsyncHubUploadStream extends OutputStream {
      * @throws CancelationException if the operation was canceled
      * @throws IOException if an error occurred
      */
-    public void closeAndAwait(final Duration timeout, final BooleanSupplier cancelChecker)
+    public synchronized void closeAndAwait(final Duration timeout, final BooleanSupplier cancelChecker)
         throws CancelationException, IOException {
         // close the chunking output stream, potentially starting a last chunk upload
         try (final var out = m_chunkingOutputStream) {
@@ -276,8 +316,8 @@ public final class AsyncHubUploadStream extends OutputStream {
         }
 
         try {
-            // await that last upload
-            awaitPartFinished();
+            // await that last upload(s)
+            awaitPartsFinished(MAX_PARALLEL_UPLOADS);
         } catch (final IOException ioe) {
             throw cancelAfter(ioe);
         }
@@ -305,7 +345,7 @@ public final class AsyncHubUploadStream extends OutputStream {
     }
 
     @Override
-    public void close() throws IOException {
+    public synchronized void close() throws IOException {
         try (final var out = m_chunkingOutputStream) {
             closeAndAwait(null, () -> false);
         } catch (final CancelationException ex) {

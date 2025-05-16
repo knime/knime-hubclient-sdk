@@ -29,7 +29,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TimerTask;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -46,13 +45,11 @@ import java.util.function.LongSupplier;
 import java.util.function.ObjDoubleConsumer;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.KNIMETimer;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.exception.ResourceAccessException;
@@ -70,6 +67,7 @@ import org.knime.hub.client.sdk.ent.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor.ProgressStatus;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.ProgressPoller;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -237,98 +235,6 @@ class AbstractHubTransfer {
         }
 
         protected abstract void update(double bytesPerSecond);
-    }
-
-    interface ProgressPoller extends AutoCloseable {
-        void setPollerTask(Runnable task);
-
-        @Override
-        void close();
-    }
-
-    static @Owning ProgressPoller startPoller(final Duration interval) {
-        final AtomicReference<Runnable> pollerRef = new AtomicReference<>();
-        final TimerTask timerTask = new TimerTask() {
-            @Override
-            public void run() {
-                final var poller = pollerRef.get();
-                if (poller != null) {
-                    poller.run();
-                }
-            }
-        };
-
-        KNIMETimer.getInstance().schedule(timerTask, 0, interval.toMillis());
-
-        return new ProgressPoller() {
-            @Override
-            public void setPollerTask(final Runnable task) {
-                pollerRef.set(task);
-            }
-
-            @Override
-            public void close() {
-                timerTask.cancel();
-            }
-        };
-    }
-
-    /**
-     * Formats a value between 0 and 1 as a percentage padded to two digits before the decimal point.
-     * <p><b>Examples:</b>
-     * <ul>
-     *   <li>{@code percentage(0.0474)} returns {@code " 4.7%"} where the space is a "Figure Space" U+2007</li>
-     *   <li>{@code percentage(0.9731)} returns {@code "97.3%"}</li>
-     * </ul>
-     *
-     * @param value fraction to be represented as a percentage, must be between {@code 0.0} and {@code 1.0}
-     * @return formatted string
-     */
-    static String percentage(final double value) {
-        // use the "Figure Space" U+2007 for padding, it's the same width as a digit
-        return StringUtils.leftPad("%.1f%%".formatted(100.0 * value), 5, "\u2007");
-    }
-
-    /**
-     * Shortens a string representing a path to at most {@link #MAX_PATH_LENGTH_IN_MESSAGE} characters, replacing a
-     * middle section by {@code "..."} if necessary.
-     * <p><b>Examples:</b>
-     * <ul>
-     *   <li>{@code shortenedPath("a/short/path")} returns {@code "a/short/path"}</li>
-     *   <li>{@code shortenedPath("/this/is/an/extremely-very-tremendously/long/path/with/many/segments/test.txt")}
-     *      returns {@code "/this/is/an/extremely-very-trem...th/with/many/segments/test.txt"}</li>
-     * </ul>
-     *
-     * @param path path to be shortened
-     * @return shortened string
-     */
-    static String shortenedPath(final String path) {
-        return StringUtils.abbreviateMiddle(path, "...", MAX_PATH_LENGTH_IN_MESSAGE);
-    }
-
-    /**
-     * Formats a number of bytes as a human-readable string. The space between number and unit is a "Thin Space" U+2009.
-     * <p><b>Examples:</b>
-     * <ul>
-     *   <li>{@code bytesToHuman(3.0)} returns {@code "3.0 B"}</li>
-     *   <li>{@code bytesToHuman(123456789.0)} returns {@code "117.7 MB"}</li>
-     *   <li>{@code bytesToHuman(3945873069030.0)} returns {@code "3674.9 GB"}</li>
-     * </ul>
-     *
-     * @param numBytes number of bytes
-     * @return formatted string
-     */
-    static String bytesToHuman(final double numBytes) {
-        // use a "Thin Space" U+2009 between number and unit
-        if (numBytes >= FileUtils.ONE_GB) {
-            return "%.1f\u2009GB".formatted(numBytes / FileUtils.ONE_GB);
-        } else if (numBytes >= FileUtils.ONE_MB) {
-            return "%.1f\u2009MB".formatted(numBytes / FileUtils.ONE_MB);
-        } else if (numBytes >= FileUtils.ONE_KB) {
-            return "%.1f\u2009KB".formatted(numBytes / FileUtils.ONE_KB);
-        } else {
-            return "%.1f\u2009B".formatted(numBytes);
-        }
     }
 
     /**

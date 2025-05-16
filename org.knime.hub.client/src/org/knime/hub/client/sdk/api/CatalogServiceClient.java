@@ -1034,7 +1034,7 @@ public final class CatalogServiceClient {
     public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
-        return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike);
+        return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike, -1);
     }
 
     /**

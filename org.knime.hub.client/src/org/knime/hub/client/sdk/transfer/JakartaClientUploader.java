@@ -53,14 +53,15 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.hub.client.sdk.CancelationException;
-import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.StreamingUploader;
 
 import jakarta.ws.rs.ProcessingException;
@@ -83,7 +84,9 @@ class JakartaClientUploader implements StreamingUploader {
     @Override
     public EntityTag performUpload(final URL targetUrl, final String httpMethod,
         final Map<String, List<String>> httpHeaders, final @Owning InputStream contentStream, final long contentLength,
-        final LeafExecMonitor monitor) throws CancelationException, IOException {
+        final LongConsumer writtenBytesAdder, final BooleanSupplier cancelChecker)
+        throws CancelationException, IOException {
+
         final var url = targetUrl.toString();
         final var builder = m_invocationBuilderSupplier.apply(url);
         builder.header(HttpHeaders.CONTENT_LENGTH, Long.toString(contentLength));
@@ -91,12 +94,15 @@ class JakartaClientUploader implements StreamingUploader {
         final var impl = (org.apache.cxf.jaxrs.client.spec.InvocationBuilderImpl)builder;
         impl.getWebClient().getConfiguration().getHttpConduit().getClient().setAllowChunking(false);
 
-        try (contentStream; final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
-                final var wrappedIn = new ReportingInputStream(contentStream, contentLength, monitor);
+        try (contentStream;
+                final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups();
+                final var wrappedIn = new ReportingInputStream(contentStream, writtenBytesAdder, cancelChecker);
                 final var response =
                     builder.method(httpMethod, Entity.entity(wrappedIn, MediaType.APPLICATION_OCTET_STREAM_TYPE))) {
 
-            monitor.checkCanceled();
+            if (cancelChecker.getAsBoolean()) {
+                throw new CancelationException();
+            }
 
             final var statusInfo = response.getStatusInfo();
             if (statusInfo.getFamily() == Family.SUCCESSFUL) {
@@ -114,26 +120,24 @@ class JakartaClientUploader implements StreamingUploader {
     }
 
     private static final class ReportingInputStream extends MonitoringInputStream {
-        private final LeafExecMonitor m_monitor;
-        private long m_written;
-        private final long m_size;
+        private final LongConsumer m_writtenBytesAdder;
+        private final BooleanSupplier m_cancelChecker;
 
-        private ReportingInputStream(final InputStream wrapped, final long size, final LeafExecMonitor monitor) {
+        private ReportingInputStream(final InputStream wrapped, final LongConsumer writtenBytesAdder,
+            final BooleanSupplier cancelChecker) {
             super(wrapped);
-            m_size = size;
-            m_monitor = monitor;
+            m_writtenBytesAdder = writtenBytesAdder;
+            m_cancelChecker = cancelChecker;
         }
 
         @Override
         protected boolean isCanceled() {
-            return m_monitor.cancelChecker().getAsBoolean();
+            return m_cancelChecker.getAsBoolean();
         }
 
         @Override
         protected void addBytesRead(final int numBytes) {
-            m_monitor.addTransferredBytes(numBytes);
-            m_written += numBytes;
-            m_monitor.setProgress(0.95 * m_written / m_size);
+            m_writtenBytesAdder.accept(numBytes);
         }
     }
 }

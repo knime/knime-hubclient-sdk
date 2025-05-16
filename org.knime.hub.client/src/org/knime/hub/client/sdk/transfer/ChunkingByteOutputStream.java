@@ -61,6 +61,7 @@ import java.util.function.Supplier;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
+@SuppressWarnings("javadoc")
 abstract class ChunkingByteOutputStream extends ChunkingOutputStream {
 
     private Supplier<byte[]> m_currentChunk;

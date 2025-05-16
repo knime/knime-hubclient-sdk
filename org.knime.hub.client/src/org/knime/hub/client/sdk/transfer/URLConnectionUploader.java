@@ -56,14 +56,16 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
+import java.util.function.LongConsumer;
 
 import org.apache.commons.io.FileUtils;
+import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.proxy.URLConnectionFactory;
 import org.knime.hub.client.sdk.CancelationException;
-import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.StreamingUploader;
 
 import jakarta.ws.rs.core.EntityTag;
@@ -86,7 +88,8 @@ final class URLConnectionUploader implements StreamingUploader {
     @Override
     public EntityTag performUpload(final URL targetUrl, final String httpMethod,
         final Map<String, List<String>> httpHeaders, final @Owning InputStream contentStream, final long contentLength,
-        final LeafExecMonitor monitor) throws CancelationException, IOException {
+        final LongConsumer writtenBytesAdder, final BooleanSupplier cancelChecker)
+        throws CancelationException, IOException {
 
         HttpURLConnection connection = null;
         try (contentStream) {
@@ -94,9 +97,8 @@ final class URLConnectionUploader implements StreamingUploader {
 
             try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
                 try (final var out = connection.getOutputStream()) {
-                    transferContent(contentStream, contentLength, out, monitor);
+                    transferContent(contentStream, out, writtenBytesAdder, cancelChecker);
                 }
-                monitor.setProgress(0.99);
 
                 final var statusInfo = Response.Status.fromStatusCode(connection.getResponseCode());
                 if (statusInfo.getFamily() == Family.SUCCESSFUL) {
@@ -114,7 +116,6 @@ final class URLConnectionUploader implements StreamingUploader {
             if (connection != null) {
                 connection.disconnect();
             }
-            monitor.done();
         }
     }
 
@@ -133,16 +134,16 @@ final class URLConnectionUploader implements StreamingUploader {
         return connection;
     }
 
-    private static void transferContent(final InputStream contentStream, final long contentLength,
-        final OutputStream out, final LeafExecMonitor monitor) throws IOException, CancelationException {
+    private static void transferContent(@NotOwning final InputStream contentStream, final OutputStream out,
+        final LongConsumer writtenBytesAdder, final BooleanSupplier cancelChecker)
+        throws IOException, CancelationException {
         final var buffer = new byte[64 * (int)FileUtils.ONE_KB];
-        long transferred = 0;
         for (int read; (read = contentStream.read(buffer, 0, buffer.length)) >= 0;) {
-            monitor.checkCanceled();
+            if (cancelChecker.getAsBoolean()) {
+                throw new CancelationException();
+            }
             out.write(buffer, 0, read);
-            transferred += read;
-            monitor.addTransferredBytes(read);
-            monitor.setProgress(0.95 * transferred / contentLength);
+            writtenBytesAdder.accept(read);
         }
     }
 }

@@ -78,6 +78,8 @@ public enum FailureType {
     UPLOAD_OF_WORKFLOW_FAILED,
     /** An upload part was unreadable while trying to compute an MD5 hash. */
     UPLOAD_PART_UNREADABLE,
+    /** The item to be uploaded is larger than the Hub's upload limit. */
+    UPLOAD_LIMIT_EXCEEDED,
     /** Upload of a part was aborted after exhausting its retries. */
     PART_UPLOAD_EXHAUSTED_RETRIES,
 

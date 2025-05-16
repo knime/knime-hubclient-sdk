@@ -24,13 +24,19 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleConsumer;
 import java.util.function.LongConsumer;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.jdt.annotation.Owning;
+import org.knime.core.util.KNIMETimer;
 import org.knime.hub.client.sdk.CancelationException;
 
 import com.google.common.util.concurrent.AtomicDouble;
@@ -40,9 +46,6 @@ import com.google.common.util.concurrent.AtomicDouble;
  * execution monitors in which the leaves report progress and the branch points aggregate the concurrent updates.
  */
 public sealed interface ConcurrentExecMonitor {
-
-    /** Size of the sliding window used for the transfer rate reporting (e.g. "3.7 MB/sec"). */
-    Duration THROUGHPUT_WINDOW_SIZE = Duration.ofSeconds(2);
 
     /**
      * @return a cancel checker that can be asked whether the user has requested the whole operation to be canceled
@@ -255,6 +258,115 @@ public sealed interface ConcurrentExecMonitor {
                     m_upstreamProgress.accept(m_reported);
                 }
             }
+        }
+    }
+
+    /**
+     * Starts a polling task that calls a provided {@link Runnable} with the given interval and stops when
+     * {@link ProgressPoller#close()} is called.
+     *
+     * @param interval duration between two invocations of the provided task
+     * @return the closeable poller
+     */
+    static @Owning ProgressPoller startProgressPoller(final Duration interval) {
+        final AtomicReference<Runnable> taskRef = new AtomicReference<>();
+        final TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                final var task = taskRef.get();
+                if (task != null) {
+                    task.run();
+                }
+            }
+        };
+        KNIMETimer.getInstance().schedule(timerTask, 0, interval.toMillis());
+        return new ProgressPoller(timerTask, taskRef);
+    }
+
+    /**
+     * Progress poller that is invoked by the {@link KNIMETimer} until {@link #close()} is called.
+     */
+    final class ProgressPoller implements AutoCloseable {
+
+        private final TimerTask m_timerTask;
+        private final AtomicReference<Runnable> m_taskRef;
+
+        ProgressPoller(final TimerTask timerTask, final AtomicReference<Runnable> taskRef) {
+            m_timerTask = timerTask;
+            m_taskRef = taskRef;
+        }
+
+        /**
+         * Sets or replaces the task to be invoked periodically.
+         *
+         * @param task new task, may be {@code null}
+         */
+        public void setPollerTask(final Runnable task) {
+            m_taskRef.set(task);
+        }
+
+        @Override
+        public void close() {
+            m_timerTask.cancel();
+        }
+    }
+
+    /**
+     * Formats a value between 0 and 1 as a percentage padded to two digits before the decimal point.
+     * <p><b>Examples:</b>
+     * <ul>
+     *   <li>{@code percentage(0.0474)} returns {@code " 4.7%"} where the space is a "Figure Space" U+2007</li>
+     *   <li>{@code percentage(0.9731)} returns {@code "97.3%"}</li>
+     * </ul>
+     *
+     * @param value fraction to be represented as a percentage, must be between {@code 0.0} and {@code 1.0}
+     * @return formatted string
+     */
+    static String percentage(final double value) {
+        // use the "Figure Space" U+2007 for padding, it's the same width as a digit
+        return StringUtils.leftPad("%.1f%%".formatted(100.0 * value), 5, "\u2007");
+    }
+
+    /**
+     * Shortens a string representing a path to at most a given number of characters, replacing a middle section by
+     * {@code "..."} if necessary.
+     * <b>Examples:</b>
+     * <ul>
+     * <li>{@code shortenedPath("a/short/path")} returns {@code "a/short/path"}</li>
+     * <li>{@code shortenedPath("/this/is/an/extremely-very-tremendously/long/path/with/many/segments/test.txt")}
+     * returns {@code "/this/is/an/extremely-very-trem...th/with/many/segments/test.txt"}</li>
+     * </ul>
+     *
+     * @param path path to be shortened
+     * @param maxLength maximum result length
+     * @return shortened string
+     */
+    static String shortenedPath(final String path, final int maxLength) {
+        return StringUtils.abbreviateMiddle(path, "...", maxLength);
+    }
+
+    /**
+     * Formats a number of bytes as a human-readable string. The space between number and unit is a "Thin Space" U+2009.
+     * <p><b>Examples:</b>
+     * <ul>
+     *   <li>{@code bytesToHuman(3.0)} returns {@code "3.0 B"}</li>
+     *   <li>{@code bytesToHuman(123456789.0)} returns {@code "117.7 MB"}</li>
+     *   <li>{@code bytesToHuman(3945873069030.0)} returns {@code "3674.9 GB"}</li>
+     * </ul>
+     *
+     * @param numBytes number of bytes
+     * @return formatted string
+     */
+    static String bytesToHuman(final double numBytes) {
+        // use a "Thin Space" U+2009 between number and unit
+        if (numBytes >= FileUtils.ONE_GB) {
+            return "%.1f\u2009GB".formatted(numBytes / FileUtils.ONE_GB);
+        } else if (numBytes >= FileUtils.ONE_MB) {
+            return "%.1f\u2009MB".formatted(numBytes / FileUtils.ONE_MB);
+        } else if (numBytes >= FileUtils.ONE_KB) {
+            return "%.1f\u2009KB".formatted(numBytes / FileUtils.ONE_KB);
+        } else {
+            return "%.1f\u2009B".formatted(numBytes);
         }
     }
 }

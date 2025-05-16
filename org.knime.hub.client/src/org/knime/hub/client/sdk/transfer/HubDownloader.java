@@ -40,7 +40,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -176,7 +175,8 @@ public final class HubDownloader extends AbstractHubTransfer {
                         FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_NOT_DOWNLOADABLE, message));
                 } else {
                     final var rootPath = IPath.forPosix(repositoryItem.getPath());
-                    progMon.subTask("Analyzing '%s'".formatted(shortenedPath(rootPath.toString())));
+                    progMon.subTask("Analyzing '%s'".formatted(
+                        ConcurrentExecMonitor.shortenedPath(rootPath.toString(), MAX_PATH_LENGTH_IN_MESSAGE)));
                     final var parent = rootPath.segmentCount() == 0 ? rootPath : rootPath.removeLastSegments(1);
                     optTotalSize = addIfKnown(optTotalSize, collectItems(repositoryItem, parent, results));
                     progMon.worked(1);
@@ -223,15 +223,15 @@ public final class HubDownloader extends AbstractHubTransfer {
             final TempFileSupplier tempFileSupplier, final IProgressMonitor progMon) throws CancelationException {
 
         final Map<IPath, Result<Optional<Path>, FailureValue>> downloaded;
-        try (final var poller = startPoller(Duration.ofMillis(200))) {
+        try (final var poller = ConcurrentExecMonitor.startProgressPoller(Duration.ofMillis(200))) {
             final var splitter = beginMultiProgress(progMon, "Downloading items...", poller, (status, transferRate) -> {
                 final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
                         .formatted(status.numDone(), resources.itemsToDownload().size(), 100.0 * status.totalProgress(),
-                            bytesToHuman(transferRate));
+                            ConcurrentExecMonitor.bytesToHuman(transferRate));
                 progMon.setTaskName(firstLine);
                 progMon.subTask(status.active().stream() //
-                    .map(e -> " \u2022 %s of '%s'".formatted(percentage(e.getValue()),
-                        StringUtils.abbreviateMiddle(e.getKey(), "...", MAX_PATH_LENGTH_IN_MESSAGE))) //
+                    .map(e -> " \u2022 %s of '%s'".formatted(ConcurrentExecMonitor.percentage(e.getValue()),
+                        ConcurrentExecMonitor.shortenedPath(e.getKey(), MAX_PATH_LENGTH_IN_MESSAGE))) //
                     .collect(Collectors.joining("\n")));
             });
             final var totalSize = resources.totalSize();

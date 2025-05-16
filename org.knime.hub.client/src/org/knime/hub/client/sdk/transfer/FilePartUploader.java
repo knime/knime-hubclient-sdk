@@ -36,6 +36,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
+import java.util.function.LongConsumer;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -63,8 +66,6 @@ import jakarta.ws.rs.core.EntityTag;
  * @author Leonard Wörteler, KNIME GmbH, Konstanz, Germany
  */
 public final class FilePartUploader {
-
-    private static final String CONTENT_MD5_HEADER = "Content-MD5";
 
     /**
      * Used to request an upload URL for an upload part.
@@ -97,18 +98,21 @@ public final class FilePartUploader {
          * @param httpHeaders headers to send
          * @param contentStream bytes to send as request body
          * @param contentLength number of bytes in the request body
-         * @param monitor execution monitor for progress and cancellation
+         * @param writtenBytesAdder consumer for newly written bytes
+         * @param cancelChecker cancellation checker
          * @return the ETag sent with a successful response
          *
          * @throws CancelationException if the upload was cancelled
          * @throws IOException if an error occurred during the upload
          */
         EntityTag performUpload(URL targetUrl, String httpMethod, Map<String, List<String>> httpHeaders,
-            @Owning InputStream contentStream, long contentLength, LeafExecMonitor monitor)
-            throws CancelationException, IOException;
+            @Owning InputStream contentStream, long contentLength, LongConsumer writtenBytesAdder,
+            final BooleanSupplier cancelChecker) throws CancelationException, IOException;
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartUploader.class);
+
+    private static final String CONTENT_MD5_HEADER = "Content-MD5";
 
     /** Maximum number of simultaneous upload connections. */
     private static final int PARALLELISM = 4;
@@ -156,8 +160,14 @@ public final class FilePartUploader {
     public Future<Result<Pair<Integer, EntityTag>, FailureValue>> uploadTempFile(final String path,
         final Integer partNum, final UploadTargetFetcher targetFetcher, final Path file, final long fileSize,
         final byte[] md5Hash, final LeafExecMonitor monitor) {
-        return FILE_PART_UPLOAD_POOL.submit(() -> uploadTempFileJob(path, partNum, targetFetcher, file, fileSize,
-            md5Hash == null ? null : Base64.encodeBase64String(md5Hash), monitor));
+        return FILE_PART_UPLOAD_POOL.submit(() -> {
+            try {
+                final InputStreamSupplier inputSupplier = () -> Files.newInputStream(file);
+                return uploadWithRetries(path, partNum, targetFetcher, inputSupplier, fileSize, md5Hash, monitor);
+            } finally {
+                FileUtils.deleteQuietly(file.toFile());
+            }
+        });
     }
 
     /**
@@ -174,8 +184,10 @@ public final class FilePartUploader {
     public Future<Result<Pair<Integer, EntityTag>, FailureValue>> uploadDataChunk(final String path,
         final Integer partNum, final UploadTargetFetcher targetFetcher, final byte[] dataChunk, final byte[] md5Hash,
         final LeafExecMonitor monitor) {
-        return FILE_PART_UPLOAD_POOL.submit(() -> uploadDataChunkJob(path, partNum, targetFetcher, dataChunk,
-            md5Hash == null ? null : Base64.encodeBase64String(md5Hash), monitor));
+        return FILE_PART_UPLOAD_POOL.submit(() -> {
+            final InputStreamSupplier inputSupplier = () -> new ByteArrayInputStream(dataChunk);
+            return uploadWithRetries(path, partNum, targetFetcher, inputSupplier, dataChunk.length, md5Hash, monitor);
+        });
     }
 
     /**
@@ -193,58 +205,64 @@ public final class FilePartUploader {
     public Future<Result<Pair<Integer, EntityTag>, FailureValue>> uploadDataFilePart(final String path,
         final Integer partNum, final UploadTargetFetcher targetFetcher, final Path file, final long offset,
         final long length, final LeafExecMonitor monitor) {
-        return FILE_PART_UPLOAD_POOL.submit( //
-            () -> uploadDataFilePartJob(path, partNum, targetFetcher, file, offset, length, monitor));
-    }
-
-    private Result<Pair<Integer, EntityTag>, FailureValue> uploadTempFileJob(final String path, final Integer partNum,
-            final UploadTargetFetcher targetFetcher, final Path file, final long fileSize, final String md5Hash,
-            final LeafExecMonitor monitor) throws CancelationException {
-        try {
-            var retriesRemaining = m_numRetries;
-            for (var attempt = 0;; attempt++) {
-                monitor.checkCanceled();
-                try (final var inputStream = Files.newInputStream(file)) {
-                    final var partUploadResult = uploadArtifactPart(path, partNum, attempt, targetFetcher,
-                        inputStream, fileSize, md5Hash, monitor);
-                    return partUploadResult.map(eTag -> Pair.of(partNum, eTag));
-                } catch (final IOException e) {
-                    if (retriesRemaining > 0) {
-                        retriesRemaining--;
-                        final var remaining = retriesRemaining;
-                        LOGGER.atDebug()
-                            .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
-                            .setCause(e)
-                            .log("Retrying to upload part {} retries left");
-                    } else {
-                        return retriesExhaustedResult(path, e);
-                    }
-                }
+        return FILE_PART_UPLOAD_POOL.submit(() -> {
+            try {
+                final byte[] md5Hash = m_sendContentMd5 ? calculateHash(file, offset, length) : null;
+                final InputStreamSupplier inputSupplier = () -> newFileRangeInputStream(file, offset, length);
+                return uploadWithRetries(path, partNum, targetFetcher, inputSupplier, length, md5Hash, monitor);
+            } catch (final IOException ex) {
+                return Result.failure(FailureValue.fromThrowable(FailureType.UPLOAD_PART_UNREADABLE,
+                    "Could not calculate hash for part %d of '%s': %s".formatted(partNum, path, ex.getMessage()), ex));
             }
-        } finally {
-            FileUtils.deleteQuietly(file.toFile());
-        }
+        });
     }
 
-    private Result<Pair<Integer, EntityTag>, FailureValue> uploadDataChunkJob(final String path, final Integer partNum,
-        final UploadTargetFetcher targetFetcher, final byte[] dataChunk, final String md5Hash,
-        final LeafExecMonitor monitor) throws CancelationException {
-        final var fileChunkSize = dataChunk.length;
+    private interface InputStreamSupplier {
+        @Owning InputStream newInputStream() throws IOException;
+    }
+
+    private Result<Pair<Integer, EntityTag>, FailureValue> uploadWithRetries(final String path, final int partNum,
+        final UploadTargetFetcher targetFetcher, final InputStreamSupplier inputData, final long numBytes,
+        final byte[] md5Hash, final LeafExecMonitor monitor) throws CancelationException {
+
+        // highest amount of written bytes reported across all retries (so that we don't overshoot or go backwards)
+        final var bytesReported = new AtomicLong();
+
+        // encode the hash only once
+        final String md5Str = md5Hash == null ? null : Base64.encodeBase64String(md5Hash);
+
+        // set a very small non-zero value to signal that the part upload job has started
+        monitor.setProgress(Double.MIN_VALUE);
+
         var retriesRemaining = m_numRetries;
         for (var attempt = 0;; attempt++) {
-            try {
-                try (final var inputStream = new ByteArrayInputStream(dataChunk)) {
-                    final var partUploadResult = uploadArtifactPart(path, partNum, attempt, targetFetcher, inputStream,
-                        fileChunkSize, md5Hash, monitor);
-                    return partUploadResult.map(eTag -> Pair.of(partNum, eTag));
+            monitor.checkCanceled();
+
+            final var bytesWrittenThisTry = new AtomicLong();
+            final LongConsumer writtenBytesAdder = written -> {
+                final var totalWritten = bytesWrittenThisTry.addAndGet(written);
+                final long reported = bytesReported.get();
+                final var newBytesWritten = totalWritten - reported;
+                if (newBytesWritten > 0) {
+                    bytesReported.set(totalWritten);
+                    monitor.addTransferredBytes(newBytesWritten);
+                    monitor.setProgress(0.99 * totalWritten / numBytes);
                 }
+            };
+
+            try (final var inputStream = inputData.newInputStream()) {
+                final var partUploadResult = uploadArtifactPart(path, partNum, attempt, targetFetcher, inputStream,
+                    numBytes, md5Str, writtenBytesAdder, monitor.cancelChecker());
+                monitor.done();
+                return partUploadResult.map(eTag -> Pair.of(partNum, eTag));
             } catch (final IOException e) {
                 if (retriesRemaining > 0) {
                     retriesRemaining--;
                     final var remaining = retriesRemaining;
-                    LOGGER.atDebug()
-                        .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
-                        .setCause(e).log("Retrying to upload part {} retries left");
+                    LOGGER.atDebug() //
+                        .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries)) //
+                        .setCause(e) //
+                        .log("Retrying to upload part {} retries left");
                 } else {
                     return retriesExhaustedResult(path, e);
                 }
@@ -252,7 +270,7 @@ public final class FilePartUploader {
         }
     }
 
-    @SuppressWarnings("resource")
+    @SuppressWarnings("resource") // only needed because we can't add external `@Owning` annotations
     private static @Owning InputStream newFileRangeInputStream(final Path file, final long offset, final long length)
             throws IOException {
         final var raf = new RandomAccessFile(file.toFile(), "r");
@@ -263,57 +281,21 @@ public final class FilePartUploader {
             .get(), length);
     }
 
-    private Result<Pair<Integer, EntityTag>, FailureValue> uploadDataFilePartJob(final String path, final int partNum,
-        final UploadTargetFetcher targetFetcher, final Path dataFile, final long start, final long length,
-        final LeafExecMonitor monitor) throws CancelationException {
-
-        final String md5Hash;
-        try {
-            md5Hash = m_sendContentMd5 ? calculateHash(dataFile, start, length) : null;
-        } catch (final IOException ex) {
-            return Result.failure(FailureValue.fromThrowable(FailureType.UPLOAD_PART_UNREADABLE,
-                "Could not calculate hash for part %d of '%s': %s".formatted(partNum, path, ex.getMessage()), ex));
-        }
-
-        var retriesRemaining = m_numRetries;
-        for (var attempt = 0;; attempt++) {
-            try (final var inputStream = newFileRangeInputStream(dataFile, start, length)) {
-                final Result<EntityTag, FailureValue> partUploadResult = uploadArtifactPart(path, partNum, attempt,
-                    targetFetcher, inputStream, length, md5Hash, monitor);
-                return partUploadResult.map(eTag -> Pair.of(partNum, eTag));
-            } catch (final IOException e) {
-                if (retriesRemaining > 0) {
-                    retriesRemaining--;
-                    final var remaining = retriesRemaining;
-                    LOGGER.atDebug()
-                        .addArgument(() -> "%d of '%s', %d/%d".formatted(partNum, path, remaining, m_numRetries))
-                        .setCause(e)
-                        .log("Retrying to upload part {} retries left");
-                } else {
-                    return retriesExhaustedResult(path, e);
-                }
-            }
-        }
-    }
-
-    private static String calculateHash(final Path file, final long start, final long length) throws IOException {
+    private static byte[] calculateHash(final Path file, final long start, final long length) throws IOException {
         try (final var inStream = newFileRangeInputStream(file, start, length)) {
-            return Base64.encodeBase64String(DigestUtils.md5(inStream));
+            return DigestUtils.md5(inStream);
         }
     }
 
     private Result<EntityTag, FailureValue> uploadArtifactPart(final String path, final int partNumber, // NOSONAR
         final int attempt, final UploadTargetFetcher targetFetcher, final @Owning InputStream artifactStream,
-        final long numBytes, final String md5Hash, final LeafExecMonitor monitor)
-        throws CancelationException, IOException {
+        final long numBytes, final String md5Hash, final LongConsumer writtenBytesAdder,
+        final BooleanSupplier cancelChecker) throws CancelationException, IOException {
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.atDebug().log("Starting attempt {} of the upload of part {} of '{}' ({} bytes)", attempt + 1,
                 partNumber, path, numBytes);
         }
-
-        // set a very small non-zero value to signal that the part upload job has started
-        monitor.setProgress(Double.MIN_VALUE);
 
         try (artifactStream) {
             final var uploadTarget = targetFetcher.fetch(partNumber);
@@ -324,8 +306,8 @@ public final class FilePartUploader {
             if (m_sendContentMd5 && md5Hash != null) {
                 httpHeaders.put(CONTENT_MD5_HEADER, List.of(md5Hash));
             }
-            final var eTag =
-                m_uploader.performUpload(targetUrl, httpMethod, httpHeaders, artifactStream, numBytes, monitor);
+            final var eTag = m_uploader.performUpload(targetUrl, httpMethod, httpHeaders, artifactStream, numBytes,
+                writtenBytesAdder, cancelChecker);
 
             LOGGER.atDebug() //
                 .addArgument(partNumber) //
@@ -351,8 +333,6 @@ public final class FilePartUploader {
                 .addArgument(path) //
                 .log("Cancelled upload of part {} of '{}'");
             throw e;
-        } finally {
-            monitor.done();
         }
     }
 

@@ -62,6 +62,7 @@ import org.knime.core.node.util.CheckUtils;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
+@SuppressWarnings("javadoc")
 abstract class ChunkingOutputStream extends OutputStream {
 
     final long m_maxChunkSize;
