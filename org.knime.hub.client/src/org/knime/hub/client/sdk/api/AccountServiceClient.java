@@ -56,6 +56,7 @@ import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.ent.account.AccountIdentity;
 import org.knime.hub.client.sdk.ent.account.Billboard;
 
 import jakarta.ws.rs.core.GenericType;
@@ -77,6 +78,7 @@ public final class AccountServiceClient {
 
     /* Return types */
     private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
+    private static final GenericType<AccountIdentity> ACCOUNT_IDENTITY = new GenericType<AccountIdentity>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -105,6 +107,24 @@ public final class AccountServiceClient {
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.GET, null, BILLBOARD);
+    }
+
+    /**
+     * Returns the information of the account doing the request.
+     *
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<AccountIdentity> getAccountIdentity(final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
+        final var requestPath = IPath.forPosix(ACCOUNTS_API_PATH).append(PATH_PIECE_IDENTITY);
+
+        return m_apiClient.createApiRequest() //
+                .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+                .withHeaders(additionalHeaders) //
+                .invokeAPI(requestPath, Method.GET, null, ACCOUNT_IDENTITY);
     }
 
 }

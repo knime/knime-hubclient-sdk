@@ -57,8 +57,11 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
+import org.knime.hub.client.sdk.ent.account.AccountIdentity;
+import org.knime.hub.client.sdk.ent.account.AccountIdentity.AccountIdentityType;
 import org.knime.hub.client.sdk.ent.account.Billboard;
 import org.knime.hub.client.sdk.ent.account.Billboard.AuthenticationType;
+import org.knime.hub.client.sdk.ent.account.UserAccount;
 import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 
 /**
@@ -140,6 +143,29 @@ class AccountServiceEntityTest extends AbstractTest {
         assertEquals(0, version.getMinor(), "Unexpected minor version");
         assertTrue(version.getQualifier().isBlank(), "Unexpected qualifier");
         assertEquals(0, version.getRevision(), "Unexpected revision");
+    }
+
+    @Test
+    void testAccountIdentity() throws IOException, URISyntaxException {
+        var accounntIdenity = load(EntityFolders.ACCOUNT_ENTITIES,
+            "accountIdentityWithoutTeam.json", AccountIdentity.class);
+        var userAccountIdentity = (UserAccount)accounntIdenity;
+        assertEquals("account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+            userAccountIdentity.getId(), "Unexpected account ID");
+        assertEquals(AccountIdentityType.USER, userAccountIdentity.getType(), "Unexpected account type");
+        assertEquals("space_explorer_user", userAccountIdentity.getName(), "Unexpected account name");
+        assertTrue(userAccountIdentity.getTeams().isEmpty(), "Unexpected account teams");
+
+        accounntIdenity = load(EntityFolders.ACCOUNT_ENTITIES, "accountIdentityWithTeam.json", AccountIdentity.class);
+        userAccountIdentity = (UserAccount)accounntIdenity;
+        assertEquals("account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+            userAccountIdentity.getId(), "Unexpected account ID");
+        assertEquals(AccountIdentityType.USER, userAccountIdentity.getType(), "Unexpected account type");
+        assertEquals("space_explorer_user", userAccountIdentity.getName(), "Unexpected account name");
+        final var teams = userAccountIdentity.getTeams();
+        assertTrue(!teams.isEmpty(), "Expected teams");
+        final var team = teams.get(0);
+        assertEquals("Space Explorer Team", team.getName(), "Unexpected team name");
     }
 
 }

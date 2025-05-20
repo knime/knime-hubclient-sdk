@@ -1,0 +1,50 @@
+{
+	"@namespaces": {
+		"knime": {
+			"name": "http://www.knime.com/server/rels#"
+		}
+	},
+	"@controls": {
+		"self": {
+			"href": "https://api.hub.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:delete": {
+			"href": "https://api.hub.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+			"isHrefTemplate": true,
+			"method": "DELETE"
+		},
+		"knime:modify-user-account": {
+			"href": "https://api.hub.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+			"template": {
+				"email": "new@mail"
+			},
+			"isHrefTemplate": true,
+			"method": "PUT"
+		},
+		"knime:upload-avatar": {
+			"href": "https://api.hub.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d/avatar",
+			"isHrefTemplate": true,
+			"method": "PUT"
+		},
+		"knime:delete-avatar": {
+			"href": "https://api.hub.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d/avatar",
+			"isHrefTemplate": true,
+			"method": "DELETE"
+		}
+	},
+	"type": "USER",
+	"id": "account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+	"name": "space_explorer_user",
+	"creationDate": "2025-04-23T13:11:41Z",
+	"lastModificationDate": "2025-04-23T14:01:54Z",
+	"description": "",
+	"email": "space_explorer_user@knime.com",
+	"realName": "space_explorer_user space_explorer_user",
+	"teams": [],
+	"jwtGroupIdentifiers": [
+		"jwt:group:hubuser"
+	],
+	"active": true
+}
