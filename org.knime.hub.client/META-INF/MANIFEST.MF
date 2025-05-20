@@ -4,7 +4,6 @@ Bundle-Name: KNIME Hub Client SDK for the Space Explorer
 Bundle-SymbolicName: org.knime.hub.client;singleton:=true
 Bundle-Version: 0.0.1.qualifier
 Bundle-ClassPath: .
-Eclipse-BundleShape: dir
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
 Export-Package: org.knime.hub.client.sdk,
  org.knime.hub.client.sdk.api,
