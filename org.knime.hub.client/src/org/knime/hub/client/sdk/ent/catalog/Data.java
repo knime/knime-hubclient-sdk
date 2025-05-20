@@ -46,11 +46,12 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Map;
 import java.util.Objects;
 
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -60,33 +61,33 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a Component.
+ * POJO representing Data.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class Component extends RepositoryItem implements Sized {
+public final class Data extends RepositoryItem implements Sized {
 
-    static final String TYPE = "Component";
+    static final String TYPE = "Data";
 
     private static final String JSON_PROPERTY_SIZE = "size";
     private final long m_size;
 
     @JsonCreator
-    private Component(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+    private Data(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Component.JSON_PROPERTY_SIZE, required = true) final long size) {
+        @JsonProperty(value = Data.JSON_PROPERTY_SIZE, required = true) final long size) {
         super(path, canonicalPath, id, owner, description, details, masonControls);
         m_size = size;
     }
 
     /**
-     * Retrieves the compressed components file size in bytes.
+     * Retrieves the data files size in bytes.
      *
      * @return size
      */
@@ -99,7 +100,7 @@ public final class Component extends RepositoryItem implements Sized {
 
     @Override
     public RepositoryItemType getType() {
-        return RepositoryItemType.COMPONENT;
+        return RepositoryItemType.DATA;
     }
 
     @Override
@@ -110,8 +111,8 @@ public final class Component extends RepositoryItem implements Sized {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var component = (Component) o;
-        return Objects.equals(this.m_size, component.m_size) && super.equals(o);
+        var data = (Data) o;
+        return Objects.equals(this.m_size, data.m_size) && super.equals(o);
     }
 
     @Override

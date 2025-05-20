@@ -46,9 +46,8 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
-import java.util.Map;
 import java.util.Objects;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
@@ -60,48 +59,71 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the started upload process.
- * 
+ * POJO representing the request to upload a single item.
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class UploadStarted {
+public final class ItemUploadRequest {
 
-    private static final String JSON_PROPERTY_ITEMS = "items";
-    private final Map<String, ItemUploadInstructions> m_items;
+    private static final String JSON_PROPERTY_ITEM_CONTENT_TYPE = "itemContentType";
+    private final String m_itemContentType;
 
+    private static final String JSON_PROPERTY_INITIAL_PART_COUNT = "initialPartCount";
+    private final Integer m_initialPartCount;
+
+    /**
+     * Item upload request body
+     *
+     * @param itemContentType the content type of the uploaded item
+     * @param initialPartCount the initial part count of the uploaded item
+     */
     @JsonCreator
-    private UploadStarted(
-            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) Map<String, ItemUploadInstructions> items) {
-        this.m_items = items;
+    public ItemUploadRequest(
+            @JsonProperty(value = JSON_PROPERTY_ITEM_CONTENT_TYPE, required = true) final String itemContentType,
+            @JsonProperty(value = JSON_PROPERTY_INITIAL_PART_COUNT) final Integer initialPartCount) {
+        this.m_itemContentType = itemContentType;
+        this.m_initialPartCount = initialPartCount;
     }
 
     /**
-     * Retrieves the items which are going to be uploaded.
-     * 
-     * @return items
+     * Retrieves the media type of the item to upload
+     *
+     * @return itemContentType
      */
-    @JsonProperty(JSON_PROPERTY_ITEMS)
+    @JsonProperty(JSON_PROPERTY_ITEM_CONTENT_TYPE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public Map<String, ItemUploadInstructions> getItems() {
-        return m_items;
+    public String getItemContentType() {
+        return m_itemContentType;
+    }
+
+    /**
+     * Retrieves the number of initial upload parts (pre-signed URLs) minimum: 0
+     *
+     * @return initialPartCount
+     */
+    @JsonProperty(JSON_PROPERTY_INITIAL_PART_COUNT)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public Integer getInitialPartCount() {
+        return m_initialPartCount;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var uploadStarted = (UploadStarted) o;
-        return Objects.equals(this.m_items, uploadStarted.m_items);
+        var itemUploadRequest = (ItemUploadRequest) o;
+        return Objects.equals(this.m_itemContentType, itemUploadRequest.m_itemContentType)
+                && Objects.equals(this.m_initialPartCount, itemUploadRequest.m_initialPartCount);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_items);
+        return Objects.hash(m_itemContentType, m_initialPartCount);
     }
 
     @Override
@@ -112,5 +134,4 @@ public final class UploadStarted {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
-
 }

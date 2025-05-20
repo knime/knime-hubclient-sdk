@@ -46,13 +46,14 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;

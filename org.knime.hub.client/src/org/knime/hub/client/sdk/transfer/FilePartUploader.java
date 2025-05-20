@@ -53,7 +53,7 @@ import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.Result;
-import org.knime.hub.client.sdk.ent.UploadTarget;
+import org.knime.hub.client.sdk.ent.catalog.UploadTarget;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

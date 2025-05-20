@@ -46,7 +46,7 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.time.Instant;
 import java.util.Objects;

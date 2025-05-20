@@ -1,6 +1,5 @@
 /*
  * ------------------------------------------------------------------------
- *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -41,81 +40,56 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ---------------------------------------------------------------------
+ * -------------------------------------------------------------------
  *
  * History
- *   Apr 24, 2025 (magnus): created
+ *   Nov 6, 2024 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
 
-import java.net.URL;
+package org.knime.hub.client.sdk.ent.catalog;
+
+import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing OAuth authentication information
+ * POJO representing the upload manifest.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class OAuthAuthenticationInformation {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class UploadManifest {
 
-    private static final String JSON_PROPERTY_TOKEN_ENDPOINT = "tokenEndpoint";
-    private final URL m_tokenEndpoint;
+    private static final String JSON_PROPERTY_ITEMS = "items";
+    private final Map<String, ItemUploadRequest> m_items;
 
-    private static final String JSON_PROPERTY_CLIENT_ID = "clientId";
-    private final String m_clientId;
-
-    private static final String JSON_PROPERTY_AUTHORIZATION_ENDPOINT = "authorizationEndpoint";
-    private final URL m_authorizationEndpoint;
-
+    /**
+     * Upload manifest
+     *
+     * @param items the items which are uploaded
+     */
     @JsonCreator
-    private OAuthAuthenticationInformation(
-        @JsonProperty(value = JSON_PROPERTY_TOKEN_ENDPOINT, required = false) final URL tokenEndpoint,
-        @JsonProperty(value = JSON_PROPERTY_CLIENT_ID, required = false) final String clientId,
-        @JsonProperty(value = JSON_PROPERTY_AUTHORIZATION_ENDPOINT, required = false) final URL authorizationEndpoint) {
-        m_tokenEndpoint = tokenEndpoint;
-        m_clientId = clientId;
-        m_authorizationEndpoint = authorizationEndpoint;
+    public UploadManifest(
+            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) final Map<String, ItemUploadRequest> items) {
+        this.m_items = items;
     }
 
     /**
-     * Returns the token end point to obtain an OAuth access token.
+     * Retrieves the items which should be uploaded.
      *
-     * @return the token end point.
+     * @return items
      */
-    @JsonInclude(JsonInclude.Include.NON_ABSENT)
-    @JsonProperty(JSON_PROPERTY_TOKEN_ENDPOINT)
-    public Optional<URL> getTokenEndpoint() {
-        return Optional.ofNullable(m_tokenEndpoint);
-    }
-
-    /**
-     * Returns the client id that shall be used during OAuth authorization.
-     *
-     * @return the client id.
-     */
-    @JsonInclude(JsonInclude.Include.NON_ABSENT)
-    @JsonProperty(JSON_PROPERTY_CLIENT_ID)
-    public Optional<String> getClientId() {
-        return Optional.ofNullable(m_clientId);
-    }
-
-    /**
-     * Returns the authorization end point to initialize OAuth authentication.
-     *
-     * @return the authorization end point.
-     */
-    @JsonInclude(JsonInclude.Include.NON_ABSENT)
-    @JsonProperty(JSON_PROPERTY_AUTHORIZATION_ENDPOINT)
-    public Optional<URL> getAuthorizationEndpoint() {
-        return Optional.ofNullable(m_authorizationEndpoint);
+    @JsonProperty(JSON_PROPERTY_ITEMS)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public Map<String, ItemUploadRequest> getItems() {
+        return m_items;
     }
 
     @Override
@@ -126,15 +100,13 @@ public final class OAuthAuthenticationInformation {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var oAuthInfo = (OAuthAuthenticationInformation) o;
-        return Objects.equals(this.m_tokenEndpoint, oAuthInfo.m_tokenEndpoint)
-                && Objects.equals(this.m_clientId, oAuthInfo.m_clientId)
-                && Objects.equals(this.m_authorizationEndpoint, oAuthInfo.m_authorizationEndpoint);
+        var uploadManifest = (UploadManifest) o;
+        return Objects.equals(this.m_items, uploadManifest.m_items);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_tokenEndpoint, m_clientId, m_authorizationEndpoint);
+        return Objects.hash(m_items);
     }
 
     @Override

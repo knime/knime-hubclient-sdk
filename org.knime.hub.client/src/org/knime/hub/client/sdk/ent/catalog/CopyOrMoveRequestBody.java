@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,19 +41,17 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   May 9, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.ent.catalog;
 
-package org.knime.hub.client.sdk.ent;
-
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -62,145 +61,145 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the space request body.
- * 
+ * Request body for copy or move request.
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class SpaceRequestBody {
-    
-    private static final String JSON_PROPERTY_DESCRIPTION = "description";
-    private final String m_description;
+public final class CopyOrMoveRequestBody {
 
-    private static final String JSON_PROPERTY_TAGS = "tags";
-    private final List<String> m_tags;
+    private static final String JSON_PROPERTY_CANONICAL_PATH = "canonicalPath";
+    private final String m_canonicalPath;
 
-    private static final String JSON_PROPERTY_PRIVATE = "private";
-    private final Boolean m_private;
+    private static final String JSON_PROPERTY_FORCE = "force";
+    private final boolean m_force;
+
+    private static final String JSON_PROPERTY_IF_TARGET_MATCH = "If-Target-Match";
+    private final String m_ifTargetMatch;
 
     @JsonCreator
-    private SpaceRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = JSON_PROPERTY_TAGS) List<String> tags,
-            @JsonProperty(value = JSON_PROPERTY_PRIVATE) Boolean isPrivate) {
-        this.m_description = description;
-        this.m_tags = tags;
-        this.m_private = isPrivate;
+    private CopyOrMoveRequestBody(
+            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+            @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
+            @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
+        this.m_canonicalPath = canonicalPath;
+        this.m_force = force;
+        this.m_ifTargetMatch = ifTargetMatch;
     }
 
     /**
-     * Retrieves the optional description for this item.
-     * 
-     * @return description
+     * Retrieves the new canonical path of the repository item.
+     *
+     * @return canoncialPath
      */
-    @JsonProperty(JSON_PROPERTY_DESCRIPTION)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-    public Optional<String> getDescription() {
-        return Optional.ofNullable(m_description);
+    @JsonProperty(JSON_PROPERTY_CANONICAL_PATH)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getCanonicalPath() {
+        return m_canonicalPath;
     }
 
     /**
-     * Retrieves an array of tags for the space.
-     * 
+     * Whether to force the copy or move operation, i.e. overwrite existing items.
+     *
      * @return tags
      */
-    @JsonProperty(JSON_PROPERTY_TAGS)
-    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
-    public List<String> getTags() {
-        return Optional.ofNullable(m_tags).orElseGet(Collections::emptyList);
+    @JsonProperty(JSON_PROPERTY_FORCE)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public boolean isForce() {
+        return m_force;
     }
 
     /**
-     * Return {@code true} if the space is private otherwise {@code false}.
-     * 
-     * @return _private
+     * Returns the If-Target-Match header.
+     *
+     * @return If-Target-Match header
      */
-    @JsonProperty(JSON_PROPERTY_PRIVATE)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
-    public Optional<Boolean> getPrivate() {
-        return Optional.ofNullable(m_private);
+    @JsonProperty(JSON_PROPERTY_IF_TARGET_MATCH)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getIfTargetMatch() {
+        return Optional.ofNullable(m_ifTargetMatch);
     }
 
     /**
      * Creates a new {@link SpaceRequestBodyBuilder}.
-     * 
+     *
      * @return builder
      */
-    public static SpaceRequestBodyBuilder builder() {
-        return new SpaceRequestBodyBuilder();
+    public static CopyOrMoveRequestBodyBuilder builder() {
+        return new CopyOrMoveRequestBodyBuilder();
     }
 
     /**
-     * Builder for {@link SpaceRequestBody}.
+     * Builder for {@link CopyOrMoveRequestBody}.
      */
-    public static final class SpaceRequestBodyBuilder {
-        private String m_description;
-        private List<String> m_tags;
-        private Boolean m_private;
+    public static final class CopyOrMoveRequestBodyBuilder {
+        private String m_canonicalPath;
+        private boolean m_force;
+        private String m_ifTargetMatch;
 
-        private SpaceRequestBodyBuilder() {
+        private CopyOrMoveRequestBodyBuilder() {
         }
 
         /**
-         * Sets a description for the space.
-         * 
-         * @param description
+         * Sets the canonical path.
+         *
+         * @param canoncialPath the canonical path
          * @return this
          */
-        public SpaceRequestBodyBuilder withDescription(String description) {
-            m_description = description;
+        public CopyOrMoveRequestBodyBuilder withCanoncialPath(final String canoncialPath) {
+            m_canonicalPath = canoncialPath;
             return this;
         }
 
         /**
-         * Sets tags for the space.
-         * 
-         * @param tags
+         * Sets the force parameter.
+         *
+         * @param force the force parameter
          * @return this
          */
-        public SpaceRequestBodyBuilder withTags(List<String> tags) {
-            m_tags = tags;
+        public CopyOrMoveRequestBodyBuilder withForce(final boolean force) {
+            m_force = force;
             return this;
         }
 
         /**
-         * Sets a value for whether the space shall be private.
-         * 
-         * @param isPrivate
+         * Sets a value for the IF-Target-Match header.
+         *
+         * @param ifTargetMatch the if target match header value
          * @return this
          */
-        public SpaceRequestBodyBuilder setPrivate(Boolean isPrivate) {
-            m_private = isPrivate;
+        public CopyOrMoveRequestBodyBuilder withIfTargetMatch(final String ifTargetMatch) {
+            m_ifTargetMatch = ifTargetMatch;
             return this;
         }
 
         /**
-         * Builds a new {@link SpaceRequestBody}.
-         * 
-         * @return spaceRequestBody
+         * Builds a new {@link CopyOrMoveRequestBody}.
+         *
+         * @return copyOrMoveRequestBody
          */
-        public SpaceRequestBody build() {
-            return new SpaceRequestBody(m_description, m_tags, m_private);
+        public CopyOrMoveRequestBody build() {
+            return new CopyOrMoveRequestBody(m_canonicalPath, m_force, m_ifTargetMatch);
         }
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var spaceRequestBody = (SpaceRequestBody) o;
-        return Objects.equals(this.m_description, spaceRequestBody.m_description)
-                && Objects.equals(this.m_tags, spaceRequestBody.m_tags)
-                && Objects.equals(this.m_private, spaceRequestBody.m_private);
+        var copyOrMoveBody = (CopyOrMoveRequestBody) o;
+        return Objects.equals(this.m_canonicalPath, copyOrMoveBody.m_canonicalPath)
+                && Objects.equals(this.m_force, copyOrMoveBody.m_force)
+                && Objects.equals(this.m_ifTargetMatch, copyOrMoveBody.m_ifTargetMatch);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_description, m_tags, m_private);
+        return Objects.hash(m_canonicalPath, m_force, m_ifTargetMatch);
     }
 
     @Override

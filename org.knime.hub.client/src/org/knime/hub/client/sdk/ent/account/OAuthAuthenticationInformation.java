@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,72 +41,81 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Apr 24, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.ent.account;
 
-package org.knime.hub.client.sdk.ent;
-
+import java.net.URL;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the request to upload a single item.
+ * POJO representing OAuth authentication information
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class ItemUploadRequest {
+public final class OAuthAuthenticationInformation {
 
-    private static final String JSON_PROPERTY_ITEM_CONTENT_TYPE = "itemContentType";
-    private final String m_itemContentType;
+    private static final String JSON_PROPERTY_TOKEN_ENDPOINT = "tokenEndpoint";
+    private final URL m_tokenEndpoint;
 
-    private static final String JSON_PROPERTY_INITIAL_PART_COUNT = "initialPartCount";
-    private final Integer m_initialPartCount;
+    private static final String JSON_PROPERTY_CLIENT_ID = "clientId";
+    private final String m_clientId;
 
-    /**
-     * Item upload request body
-     *
-     * @param itemContentType the content type of the uploaded item
-     * @param initialPartCount the initial part count of the uploaded item
-     */
+    private static final String JSON_PROPERTY_AUTHORIZATION_ENDPOINT = "authorizationEndpoint";
+    private final URL m_authorizationEndpoint;
+
     @JsonCreator
-    public ItemUploadRequest(
-            @JsonProperty(value = JSON_PROPERTY_ITEM_CONTENT_TYPE, required = true) final String itemContentType,
-            @JsonProperty(value = JSON_PROPERTY_INITIAL_PART_COUNT) final Integer initialPartCount) {
-        this.m_itemContentType = itemContentType;
-        this.m_initialPartCount = initialPartCount;
+    private OAuthAuthenticationInformation(
+        @JsonProperty(value = JSON_PROPERTY_TOKEN_ENDPOINT, required = false) final URL tokenEndpoint,
+        @JsonProperty(value = JSON_PROPERTY_CLIENT_ID, required = false) final String clientId,
+        @JsonProperty(value = JSON_PROPERTY_AUTHORIZATION_ENDPOINT, required = false) final URL authorizationEndpoint) {
+        m_tokenEndpoint = tokenEndpoint;
+        m_clientId = clientId;
+        m_authorizationEndpoint = authorizationEndpoint;
     }
 
     /**
-     * Retrieves the media type of the item to upload
+     * Returns the token end point to obtain an OAuth access token.
      *
-     * @return itemContentType
+     * @return the token end point.
      */
-    @JsonProperty(JSON_PROPERTY_ITEM_CONTENT_TYPE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getItemContentType() {
-        return m_itemContentType;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonProperty(JSON_PROPERTY_TOKEN_ENDPOINT)
+    public Optional<URL> getTokenEndpoint() {
+        return Optional.ofNullable(m_tokenEndpoint);
     }
 
     /**
-     * Retrieves the number of initial upload parts (pre-signed URLs) minimum: 0
+     * Returns the client id that shall be used during OAuth authorization.
      *
-     * @return initialPartCount
+     * @return the client id.
      */
-    @JsonProperty(JSON_PROPERTY_INITIAL_PART_COUNT)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public Integer getInitialPartCount() {
-        return m_initialPartCount;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonProperty(JSON_PROPERTY_CLIENT_ID)
+    public Optional<String> getClientId() {
+        return Optional.ofNullable(m_clientId);
+    }
+
+    /**
+     * Returns the authorization end point to initialize OAuth authentication.
+     *
+     * @return the authorization end point.
+     */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonProperty(JSON_PROPERTY_AUTHORIZATION_ENDPOINT)
+    public Optional<URL> getAuthorizationEndpoint() {
+        return Optional.ofNullable(m_authorizationEndpoint);
     }
 
     @Override
@@ -116,14 +126,15 @@ public final class ItemUploadRequest {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var itemUploadRequest = (ItemUploadRequest) o;
-        return Objects.equals(this.m_itemContentType, itemUploadRequest.m_itemContentType)
-                && Objects.equals(this.m_initialPartCount, itemUploadRequest.m_initialPartCount);
+        var oAuthInfo = (OAuthAuthenticationInformation) o;
+        return Objects.equals(this.m_tokenEndpoint, oAuthInfo.m_tokenEndpoint)
+                && Objects.equals(this.m_clientId, oAuthInfo.m_clientId)
+                && Objects.equals(this.m_authorizationEndpoint, oAuthInfo.m_authorizationEndpoint);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_itemContentType, m_initialPartCount);
+        return Objects.hash(m_tokenEndpoint, m_clientId, m_authorizationEndpoint);
     }
 
     @Override
@@ -134,4 +145,5 @@ public final class ItemUploadRequest {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
+
 }

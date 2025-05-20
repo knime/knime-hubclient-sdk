@@ -43,79 +43,21 @@
  * -------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Dec 4, 2024 (jasper): created
  */
 
-package org.knime.hub.client.sdk.ent;
-
-import java.util.Map;
-import java.util.Objects;
-
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
+package org.knime.hub.client.sdk.ent.catalog;
 
 /**
- * POJO representing the upload manifest.
- *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * Implemented by entities that have a size.
+ * 
+ * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class UploadManifest {
-
-    private static final String JSON_PROPERTY_ITEMS = "items";
-    private final Map<String, ItemUploadRequest> m_items;
-
+public interface Sized {
     /**
-     * Upload manifest
-     *
-     * @param items the items which are uploaded
+     * Retrieves the size of the item.
+     * 
+     * @return size
      */
-    @JsonCreator
-    public UploadManifest(
-            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) final Map<String, ItemUploadRequest> items) {
-        this.m_items = items;
-    }
-
-    /**
-     * Retrieves the items which should be uploaded.
-     *
-     * @return items
-     */
-    @JsonProperty(JSON_PROPERTY_ITEMS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public Map<String, ItemUploadRequest> getItems() {
-        return m_items;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        var uploadManifest = (UploadManifest) o;
-        return Objects.equals(this.m_items, uploadManifest.m_items);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_items);
-    }
-
-    @Override
-    public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
-    }
-
+    long getSize();
 }

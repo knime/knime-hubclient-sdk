@@ -46,10 +46,12 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
+import java.util.Map;
 import java.util.Objects;
 
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -59,48 +61,63 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the space permission attributes.
- * 
+ * POJO representing a workflow
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class SpacePermissionAttributes {
+public final class Workflow extends RepositoryItem implements Sized {
 
-    private static final String JSON_PROPERTY_SPACE_ID = "spaceId";
-    private final String m_spaceId;
+    static final String TYPE = "Workflow";
+
+    private static final String JSON_PROPERTY_SIZE = "size";
+    private final long m_size;
 
     @JsonCreator
-    private SpacePermissionAttributes(
-            @JsonProperty(value = JSON_PROPERTY_SPACE_ID, required = true) String spaceId) {
-        this.m_spaceId = spaceId;
+    private Workflow(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = Workflow.JSON_PROPERTY_SIZE, required = true) final long size) {
+        super(path, canonicalPath, id, owner, description, details, masonControls);
+        m_size = size;
     }
 
     /**
-     * Retrieves the unique ID of the space.
-     * 
-     * @return spaceId
+     * Retrieves the compressed workflows file size in bytes.
+     *
+     * @return size
      */
-    @JsonProperty(JSON_PROPERTY_SPACE_ID)
+    @JsonProperty(JSON_PROPERTY_SIZE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getSpaceId() {
-        return m_spaceId;
+    @Override
+    public long getSize() {
+        return m_size;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public RepositoryItemType getType() {
+        return RepositoryItemType.WORKFLOW;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var spacePermissionAttributes = (SpacePermissionAttributes) o;
-        return Objects.equals(this.m_spaceId, spacePermissionAttributes.m_spaceId);
+        var workflow = (Workflow) o;
+        return Objects.equals(this.m_size, workflow.m_size) && super.equals(o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_spaceId);
+        return Objects.hash(m_size, super.hashCode());
     }
 
     @Override

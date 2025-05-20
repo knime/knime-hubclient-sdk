@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,17 +41,14 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Apr 28, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.ent.catalog;
 
-package org.knime.hub.client.sdk.ent;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.net.URL;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -60,73 +58,49 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a workflow group.
+ * POJO representing the prepared download
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonTypeInfo( //
-        use = JsonTypeInfo.Id.NAME, //
-        include = JsonTypeInfo.As.PROPERTY, //
-        property = RepositoryItem.JSON_PROPERTY_TYPE, //
-        visible = true, //
-        requireTypeIdForSubtypes = OptBoolean.TRUE
-)
-@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE) })
-public sealed class WorkflowGroup extends RepositoryItem permits Space {
+public final class PreparedDownload {
 
-    /** Type of a workflow group and space */
-    protected static final String TYPE = "WorkflowGroup";
+    private static final String JSON_PROPERTY_DOWNLOAD_ID = "downloadId";
+    private final String m_downloadId;
 
-    /** JSON key of the workflow groups children property */
-    protected static final String JSON_PROPERTY_CHILDREN = "children";
-    private final List<RepositoryItem> m_children;
+    private static final String JSON_PROPERTY_DOWNLOAD_URL = "downloadUrl";
+    private final URL m_downloadUrl;
 
-    /**
-     * Workflow group
-     *
-     * @param path the path of a workflow group
-     * @param canonicalPath the canonical path of the workflow group
-     * @param id the ID of a workflow group
-     * @param owner the owner of a workflow group
-     * @param description the description of a workflow group
-     * @param details the details of a workflow group
-     * @param masonControls the mason controls of a workflow group
-     * @param children the children of a workflow group
-     */
     @JsonCreator
-    protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
-        super(path, canonicalPath, id, owner, description, details, masonControls);
-        this.m_children = children;
+    private PreparedDownload(@JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID) final String downloadId,
+        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_URL) final URL downloadUrl) {
+        m_downloadId = downloadId;
+        m_downloadUrl = downloadUrl;
     }
 
     /**
-     * Retrieves the workflow groups children.
+     * Retrieves the download ID.
      *
-     * @return children
+     * @return downloadId
      */
-    @JsonProperty(JSON_PROPERTY_CHILDREN)
-    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
-    public List<RepositoryItem> getChildren() {
-        return Optional.ofNullable(m_children).orElseGet(Collections::emptyList);
+    @JsonProperty(JSON_PROPERTY_DOWNLOAD_ID)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDownloadId() {
+        return Optional.ofNullable(m_downloadId);
     }
 
-    @Override
-    public RepositoryItemType getType() {
-        return RepositoryItemType.WORKFLOW_GROUP;
+    /**
+     * Retrieves the download URL.
+     *
+     * @return downlopadUrl
+     */
+    @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<URL> getDownloadUrl() {
+        return Optional.ofNullable(m_downloadUrl);
     }
 
     @Override
@@ -137,13 +111,14 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var workflowGroup = (WorkflowGroup) o;
-        return Objects.equals(this.m_children, workflowGroup.m_children) && super.equals(o);
+        var preparedDownload = (PreparedDownload) o;
+        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId)
+                && Objects.equals(this.m_downloadUrl, preparedDownload.m_downloadUrl);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_children, super.hashCode());
+        return Objects.hash(m_downloadId, m_downloadUrl);
     }
 
     @Override
@@ -154,4 +129,5 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
+
 }

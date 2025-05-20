@@ -46,12 +46,13 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -61,51 +62,47 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the ID of the prepared upload, together with a specification of the request
- * to actually upload an item.
+ * POJO representing a Space.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class ItemUploadInstructions {
+public final class Space extends WorkflowGroup {
 
-    private static final String JSON_PROPERTY_UPLOAD_ID = "uploadId";
-    private final String m_uploadId;
+    @SuppressWarnings("hiding")
+    static final String TYPE = "Space";
 
-    private static final String JSON_PROPERTY_UPLOAD_PARTS = "parts";
-    private final Optional<Map<Integer, UploadTarget>> m_parts;
-
+    private static final String JSON_PROPERTY_PRIVATE = "private";
+    private final boolean m_private;
 
     @JsonCreator
-    private ItemUploadInstructions(
-            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID) final String uploadId,
-            @JsonProperty(value = JSON_PROPERTY_UPLOAD_PARTS) final
-            Map<Integer, UploadTarget> parts) {
-        this.m_uploadId = uploadId;
-        this.m_parts = Optional.ofNullable(parts);
+    private Space(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children,
+        @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
+        super(path, canonicalPath, id, owner, description, details, masonControls, children);
+        this.m_private = isPrivate.booleanValue();
     }
 
     /**
-     * Retrieves the ID of the upload; allows clients to track the status of the upload
-     * process.
+     * Returns {@code true} if the space is private, otherwise {@code false}.
      *
-     * @return uploadId
+     * @return private
      */
-    @JsonProperty(JSON_PROPERTY_UPLOAD_ID)
+    @JsonProperty(JSON_PROPERTY_PRIVATE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getUploadId() {
-        return m_uploadId;
+    public boolean isPrivate() {
+        return m_private;
     }
 
-    /**
-     * Retrieves the upload instructions per part upload.
-     *
-     * @return uploadUrl
-     */
-    @JsonProperty(JSON_PROPERTY_UPLOAD_PARTS)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<Map<Integer, UploadTarget>> getParts() {
-        return m_parts;
+    @Override
+    public RepositoryItemType getType() {
+        return RepositoryItemType.SPACE;
     }
 
     @Override
@@ -116,14 +113,13 @@ public final class ItemUploadInstructions {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var itemPartUploadInstructions = (ItemUploadInstructions) o;
-        return Objects.equals(this.m_uploadId, itemPartUploadInstructions.m_uploadId)
-                && Objects.equals(this.m_parts, itemPartUploadInstructions.m_parts);
+        var space = (Space) o;
+        return Objects.equals(this.m_private, space.m_private) && super.equals(o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_uploadId, m_parts);
+        return Objects.hash(m_private, super.hashCode());
     }
 
     @Override

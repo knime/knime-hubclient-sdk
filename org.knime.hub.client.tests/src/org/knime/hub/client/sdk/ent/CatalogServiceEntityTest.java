@@ -56,30 +56,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
-import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.Test;
-import org.knime.hub.client.sdk.ApiClient;
-import org.knime.hub.client.sdk.ent.Billboard.AuthenticationType;
-import org.knime.hub.client.sdk.testing.TestUtil;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.knime.hub.client.sdk.AbstractTest;
+import org.knime.hub.client.sdk.ent.catalog.Component;
+import org.knime.hub.client.sdk.ent.catalog.Data;
+import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
+import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
+import org.knime.hub.client.sdk.ent.catalog.Space;
+import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
+import org.knime.hub.client.sdk.ent.catalog.UploadStarted;
+import org.knime.hub.client.sdk.ent.catalog.UploadStatus;
+import org.knime.hub.client.sdk.ent.catalog.Workflow;
+import org.knime.hub.client.sdk.ent.catalog.WorkflowGroup;
+import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 
 /**
- * Tests creation via Jackson deserialization of the entities in {@link org.knime.hub.client.sdk.ent}.
+ * Tests creation via Jackson deserialization of the catalog service entities
+ * in {@link org.knime.hub.client.sdk.ent.catalog}.
  *
  * This class is in another package on purpose to test from outside package scope.
  *
  * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-class EntityCreationTest {
+class CatalogServiceEntityTest extends AbstractTest {
 
     /** Expected values from JSON files */
     private static final String EXPECTED_COMPONENT_ID = "*iMLnw_ejyqC_DiiE";
@@ -112,22 +117,9 @@ class EntityCreationTest {
     private static final long EXPECTED_SIZE = 1337L;
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
-    private static final ObjectMapper MAPPER =
-        new ApiClient(null, null, "junit-test", Duration.ofSeconds(0), Duration.ofSeconds(0)).getObjectMapper();
-
-    private static <T> T load(final String filename, final Class<T> clazz) throws IOException, URISyntaxException {
-        // Path to the file inside test file folder.
-        final var filePath =
-            IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append(TestUtil.TEST_FILE_FOLDER_NAME).append(filename);
-
-        // Obtain path object from bundle activator class.
-        final var url = TestUtil.resolveToURL(filePath);
-        return MAPPER.readValue(url, clazz);
-    }
-
     @Test
     void testCreateComponent() throws IOException, URISyntaxException {
-        final var component = load("component.json", Component.class);
+        final var component = load(EntityFolders.CATALOG_ENTITES, "component.json", Component.class);
         assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, component.getType(), "Unexpected type");
         assertEquals(EXPECTED_COMPONENT_PATH, component.getPath(), "Unexpected path");
         assertEquals(EXPECTED_COMPONENT_CANONICAL_PATH, component.getCanonicalPath(), "Unexpected canonical path");
@@ -138,7 +130,8 @@ class EntityCreationTest {
         assertFalse(component.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertEquals(EXPECTED_SIZE, component.getSize(), "Unexpected size");
 
-        final var componentWithDetails = load("componentWithDetails.json", Component.class);
+        final var componentWithDetails = load(EntityFolders.CATALOG_ENTITES,
+            "componentWithDetails.json", Component.class);
         assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, componentWithDetails.getType(), "Unexpected type");
         assertEquals(EXPECTED_COMPONENT_PATH, componentWithDetails.getPath(), "Unexpected path");
         assertEquals(EXPECTED_COMPONENT_CANONICAL_PATH,
@@ -154,7 +147,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateData() throws IOException, URISyntaxException {
-        final var data = load("data.json", Data.class);
+        final var data = load(EntityFolders.CATALOG_ENTITES, "data.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
         assertEquals(EXPECTED_DATA_PATH, data.getPath(), "Unexpected path");
         assertEquals(EXPECTED_DATA_CANONICAL_PATH, data.getCanonicalPath(), "Unexpected canonical path");
@@ -165,7 +158,7 @@ class EntityCreationTest {
         assertFalse(data.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertEquals(EXPECTED_SIZE, data.getSize(), "Unexpected size");
 
-        final var dataWithDetails = load("dataWithDetails.json", Data.class);
+        final var dataWithDetails = load(EntityFolders.CATALOG_ENTITES, "dataWithDetails.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
         assertEquals(EXPECTED_DATA_PATH, dataWithDetails.getPath(), "Unexpected path");
         assertEquals(EXPECTED_DATA_CANONICAL_PATH, dataWithDetails.getCanonicalPath(), "Unexpected canonical path");
@@ -179,7 +172,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateWorkflow() throws IOException, URISyntaxException {
-        final var workflow = load("workflow.json", Workflow.class);
+        final var workflow = load(EntityFolders.CATALOG_ENTITES, "workflow.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflow.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflow.getPath(), "Unexpected path");
         assertEquals(EXPECTED_WORKFLOW_CANONICAL_PATH, workflow.getCanonicalPath(), "Unexpected canonical path");
@@ -190,7 +183,7 @@ class EntityCreationTest {
         assertFalse(workflow.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertEquals(EXPECTED_SIZE, workflow.getSize(), "Unexpected size");
 
-        final var workflowWithDetails = load("workflowWithDetails.json", Workflow.class);
+        final var workflowWithDetails = load(EntityFolders.CATALOG_ENTITES, "workflowWithDetails.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflowWithDetails.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflowWithDetails.getPath(), "Unexpected path");
         assertEquals(EXPECTED_WORKFLOW_CANONICAL_PATH,
@@ -206,17 +199,17 @@ class EntityCreationTest {
 
     @Test
     void testCreateLargeSizedItems() throws IOException, URISyntaxException {
-        final var largeComponent = load("largeComponent.json", Component.class);
+        final var largeComponent = load(EntityFolders.CATALOG_ENTITES, "largeComponent.json", Component.class);
         assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize(), "Unexpected size");
-        final var largeData = load("largeData.json", Data.class);
+        final var largeData = load(EntityFolders.CATALOG_ENTITES, "largeData.json", Data.class);
         assertEquals(EXPECTED_LARGE_SIZE, largeData.getSize(), "Unexpected size");
-        final var largeWorkflow = load("largeWorkflow.json", Workflow.class);
+        final var largeWorkflow = load(EntityFolders.CATALOG_ENTITES, "largeWorkflow.json", Workflow.class);
         assertEquals(EXPECTED_LARGE_SIZE, largeWorkflow.getSize(), "Unexpected size");
     }
 
     @Test
     void testCreateWorkflowGroup() throws IOException, URISyntaxException {
-        final var workflowGroup = load("workflowGroup.json", WorkflowGroup.class);
+        final var workflowGroup = load(EntityFolders.CATALOG_ENTITES, "workflowGroup.json", WorkflowGroup.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroup.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroup.getPath(), "Unexpected path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_CANONICAL_PATH,
@@ -228,7 +221,8 @@ class EntityCreationTest {
         assertFalse(workflowGroup.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertFalse(workflowGroup.getChildren().isEmpty(), "Children are missing");
 
-        final var workflowGroupWithDetails = load("workflowGroupWithDetails.json", WorkflowGroup.class);
+        final var workflowGroupWithDetails = load(EntityFolders.CATALOG_ENTITES,
+            "workflowGroupWithDetails.json", WorkflowGroup.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroupWithDetails.getType(),
             "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroupWithDetails.getPath(), "Unexpected path");
@@ -245,7 +239,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateSpace() throws IOException, URISyntaxException {
-        final var space = load("space.json", Space.class);
+        final var space = load(EntityFolders.CATALOG_ENTITES, "space.json", Space.class);
         assertEquals(RepositoryItem.RepositoryItemType.SPACE, space.getType(), "Unexpected type");
         assertEquals(EXPECTED_SPACE_PATH, space.getPath(), "Unexpected path");
         assertEquals(EXPECTED_SPACE_CANONICAL_PATH, space.getCanonicalPath(), "Unexpected canonical path");
@@ -259,7 +253,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateUploadManifest() throws IOException, URISyntaxException {
-        final var uploadManifest = load("uploadManifest.json", UploadManifest.class);
+        final var uploadManifest = load(EntityFolders.CATALOG_ENTITES, "uploadManifest.json", UploadManifest.class);
         final var items = uploadManifest.getItems();
         assertEquals(3, items.size(), "Unexpected number of items");
         assertTrue(items.containsKey("/my-workflow"), "Expected key");
@@ -281,7 +275,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateUploadStarted() throws IOException, URISyntaxException {
-        final var uploadStarted = load("uploadStarted.json", UploadStarted.class);
+        final var uploadStarted = load(EntityFolders.CATALOG_ENTITES, "uploadStarted.json", UploadStarted.class);
         final var items = uploadStarted.getItems();
         assertEquals(3, items.size(), "Unexpected number of items");
 
@@ -328,7 +322,7 @@ class EntityCreationTest {
 
     @Test
     void testCreateUploadStatus() throws IOException, URISyntaxException {
-        final var uploadStatus = load("uploadStatus.json", UploadStatus.class);
+        final var uploadStatus = load(EntityFolders.CATALOG_ENTITES, "uploadStatus.json", UploadStatus.class);
         assertEquals("d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0",
             uploadStatus.getUploadId(), "Unexpected upload ID");
         assertEquals("account:user:c1df863a-0410-4b27-97fc-5ceb3a515176", uploadStatus.getInitiatorAccountId(),
@@ -343,86 +337,17 @@ class EntityCreationTest {
     }
 
     @Test
-    void testCreateBillboardWithoutAuth() throws IOException, URISyntaxException {
-        final var billboard = load("billboard.json", Billboard.class);
-        assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
-        assertTrue(billboard.isEnableResetOnUploadCheckbox().isEmpty(), "Unexpected enabled");
-        assertTrue(billboard.getOAuthInformation().isEmpty(), "Unexpected OAuth information");
-        assertTrue(billboard.isForceResetOnUpload().isEmpty(), "Unexpected enabled");
-        assertTrue(billboard.getClientExplorerFetchTimeout().isEmpty(), "Unexpected fetch timeout");
-        assertTrue(billboard.getClientExplorerFetchInterval().isEmpty(), "Unexpected fetch interval");
-
-        final var masonControls = billboard.getMasonControls();
-        assertTrue(!masonControls.isEmpty(), "Expected mason controls");
-        assertTrue(masonControls.containsKey("self"), "Expected self control");
-        assertEquals("https://api.hub.com/knime/rest", masonControls.get("self").getHref(),
-            "Unexpected href for self control");
-        assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
-
-        assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
-
-        final var version = billboard.getVersion();
-        assertEquals(5, version.getMajor(), "Unexpected major version");
-        assertEquals(0, version.getMinor(), "Unexpected minor version");
-        assertTrue(version.getQualifier().isBlank(), "Unexpected qualifier");
-        assertEquals(0, version.getRevision(), "Unexpected revision");
-    }
-
-    @Test
-    void testCreateBillboardWithAuth() throws IOException, URISyntaxException {
-        final var billboard = load("billboardWithAuth.json", Billboard.class);
-        assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
-
-        assertTrue(billboard.isEnableResetOnUploadCheckbox().isPresent(), "Expected enbaled reset on upload checkbox");
-        assertTrue(billboard.isEnableResetOnUploadCheckbox().get(), "Unexpected disabled");
-
-        final var oAuthInfo = billboard.getOAuthInformation();
-        assertTrue(billboard.getOAuthInformation().isPresent(), "Expected OAuth information");
-        assertTrue(oAuthInfo.get().getTokenEndpoint().isPresent(), "Expected token endpoint");
-        assertEquals("https://auth.hub.com/auth/realms/knime/protocol/openid-connect/token",
-            oAuthInfo.get().getTokenEndpoint().get().toString(), "Unexpected token endpoint");
-        assertTrue(oAuthInfo.get().getClientId().isPresent(), "Expected client ID");
-        assertEquals("analytics-platform", oAuthInfo.get().getClientId().get(), "Unexpected client ID");
-        assertTrue(oAuthInfo.get().getAuthorizationEndpoint().isPresent(), "Expected authorization endpoint");
-        assertEquals("https://auth.hub.com/auth/realms/knime/protocol/openid-connect/auth",
-            oAuthInfo.get().getAuthorizationEndpoint().get().toString(), "Unexpected authorization endpoint");
-
-        assertTrue(billboard.isForceResetOnUpload().isPresent(), "Expected force reset on upload");
-        assertTrue(billboard.isForceResetOnUpload().get(), "Unexpected disabled");
-
-        assertTrue(billboard.getClientExplorerFetchTimeout().isPresent(), "Expected fetch timeout");
-        assertEquals(billboard.getClientExplorerFetchTimeout().get(),
-            Duration.ofMinutes(3), "Unexpected fetch timeout");
-        assertTrue(billboard.getClientExplorerFetchInterval().isPresent(), "Expected fetch interval");
-        assertEquals(billboard.getClientExplorerFetchInterval().get(),
-            Duration.ofSeconds(2), "Unexpected fetch interval");
-
-        final var masonControls = billboard.getMasonControls();
-        assertTrue(!masonControls.isEmpty(), "Expected mason controls");
-        assertTrue(masonControls.containsKey("self"), "Expected self control");
-        assertEquals("https://api.hub.com/knime/rest", masonControls.get("self").getHref(),
-            "Unexpected href for self control");
-        assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
-
-        assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
-
-        final var version = billboard.getVersion();
-        assertEquals(5, version.getMajor(), "Unexpected major version");
-        assertEquals(0, version.getMinor(), "Unexpected minor version");
-        assertTrue(version.getQualifier().isBlank(), "Unexpected qualifier");
-        assertEquals(0, version.getRevision(), "Unexpected revision");
-    }
-
-    @Test
     void testPreparedDownloadCreation() throws IOException, URISyntaxException {
-        final var preparedDownloadWithId = load("preparedDownloadWithId.json", PreparedDownload.class);
+        final var preparedDownloadWithId =
+                load(EntityFolders.CATALOG_ENTITES, "preparedDownloadWithId.json", PreparedDownload.class);
         var downloadIdOpt = preparedDownloadWithId.getDownloadId();
         var downloadUrlOpt = preparedDownloadWithId.getDownloadUrl();
         assertTrue(downloadIdOpt.isPresent(), "Expected download Id");
         assertTrue(downloadUrlOpt.isEmpty(), "Unexpected download url");
         assertEquals("f9226530-f9e6-4e1c-9944-82baf1d43cb3", downloadIdOpt.get(), "Unexpected download ID");
 
-        final var preparedDownloadWithUrl = load("preparedDownloadWithURL.json", PreparedDownload.class);
+        final var preparedDownloadWithUrl =
+                load(EntityFolders.CATALOG_ENTITES, "preparedDownloadWithURL.json", PreparedDownload.class);
         downloadIdOpt = preparedDownloadWithUrl.getDownloadId();
         downloadUrlOpt = preparedDownloadWithUrl.getDownloadUrl();
         assertTrue(downloadIdOpt.isEmpty(), "Unexpected download Id");
@@ -432,7 +357,7 @@ class EntityCreationTest {
 
     @Test
     void testDownloadStatusCreation() throws IOException, URISyntaxException {
-        final var downloadStatus = load("downloadStatus.json", DownloadStatus.class);
+        final var downloadStatus = load(EntityFolders.CATALOG_ENTITES, "downloadStatus.json", DownloadStatus.class);
         assertEquals("f9226530-f9e6-4e1c-9944-82baf1d43cb3",
                 downloadStatus.getDownloadId(), "Unexpected download ID");
         assertEquals(DownloadStatus.StatusEnum.READY,
@@ -446,38 +371,4 @@ class EntityCreationTest {
             downloadStatus.getDownloadUrl().get().toString(), "Unexpected download url");
     }
 
-    @Test
-    void testCreateRFC9457ErrorResponse() throws IOException, URISyntaxException {
-        final var basic = load("rfc9457.json", ProblemDescription.class);
-        assertEquals(Optional.empty(), basic.getType(), "Unexpected type");
-        assertEquals(Optional.empty(), basic.getStatus(), "Unexpected status");
-        assertEquals("Item '*k9uLSSInH1xt2UHo' does not exist.", basic.getTitle(), "Unexpected title");
-        assertEquals(Optional.empty(), basic.getInstance(), "Unexpected instance");
-        assertEquals(List.of(), basic.getDetails(), "Unexpected details");
-        assertEquals(Optional.empty(), basic.getCode(), "Unexpected code");
-        assertEquals(Map.of(), basic.getAdditionalProperties(), "Unexpected additional properties");
-
-        final var additional = load("rfc9457AdditionalProps.json", ProblemDescription.class);
-        assertEquals(Optional.of("https://example.com/probs/out-of-credit"), additional.getType(), "Unexpected type");
-        assertEquals(Optional.empty(), additional.getStatus(), "Unexpected status");
-        assertEquals("You do not have enough credit.", additional.getTitle(), "Unexpected title");
-        assertEquals(Optional.of("/account/12345/msgs/abc"), additional.getInstance(), "Unexpected instance");
-        assertEquals(List.of(), additional.getDetails(), "Unexpected details");
-        assertEquals(Optional.empty(), additional.getCode(), "Unexpected code");
-        final var additionalProps = Map.of("balance", 30, "accounts", List.of("/account/12345", "/account/67890"),
-            "detail", "Your current balance is 30, but that costs 50.");
-        assertEquals(additionalProps, additional.getAdditionalProperties(), "Unexpected additional properties");
-
-        final var withCode = load("rfc9457WithCode.json", ProblemDescription.class);
-        assertEquals(Optional.of("https://example.net/permission-error"), withCode.getType(), "Unexpected type");
-        assertEquals(Optional.empty(), withCode.getStatus(), "Unexpected status");
-        assertEquals("User does not have permission to see the requested workflow.", withCode.getTitle(),
-            "Unexpected title");
-        assertEquals(Optional.of("/workflows/blub"), withCode.getInstance(), "Unexpected instance");
-        assertEquals(List.of("User '4711' does not have permission 'read-item' on resource 'blub'."),
-            withCode.getDetails(), "Unexpected details");
-        assertEquals(Optional.of("PermissionError"), withCode.getCode(), "Unexpected code");
-        assertEquals(Map.of("foo", Map.of("bar", List.of("blub", "blah")), "fuddel", 1),
-            withCode.getAdditionalProperties(), "Unexpected additional properties");
-    }
 }

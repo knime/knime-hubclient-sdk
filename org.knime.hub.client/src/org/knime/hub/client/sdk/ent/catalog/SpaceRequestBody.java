@@ -1,6 +1,5 @@
 /*
  * ------------------------------------------------------------------------
- *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -41,17 +40,19 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ---------------------------------------------------------------------
+ * -------------------------------------------------------------------
  *
  * History
- *   May 9, 2025 (magnus): created
+ *   Nov 6, 2024 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
 
+package org.knime.hub.client.sdk.ent.catalog;
+
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.knime.hub.client.sdk.ent.SpaceRequestBody.SpaceRequestBodyBuilder;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -61,145 +62,145 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Request body for space rename request.
- *
+ * POJO representing the space request body.
+ * 
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class SpaceRenameRequestBody {
+public final class SpaceRequestBody {
+    
+    private static final String JSON_PROPERTY_DESCRIPTION = "description";
+    private final String m_description;
 
-    private static final String JSON_PROPERTY_NAME = "name";
-    private final String m_name;
+    private static final String JSON_PROPERTY_TAGS = "tags";
+    private final List<String> m_tags;
 
-    private static final String JSON_PROPERTY_FORCE = "force";
-    private final boolean m_force;
-
-    private static final String JSON_PROPERTY_IF_TARGET_MATCH = "If-Target-Match";
-    private final String m_ifTargetMatch;
+    private static final String JSON_PROPERTY_PRIVATE = "private";
+    private final Boolean m_private;
 
     @JsonCreator
-    private SpaceRenameRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_NAME) final String canonicalPath,
-            @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
-            @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
-        this.m_name = canonicalPath;
-        this.m_force = force;
-        this.m_ifTargetMatch = ifTargetMatch;
+    private SpaceRequestBody(
+            @JsonProperty(value = JSON_PROPERTY_DESCRIPTION) String description,
+            @JsonProperty(value = JSON_PROPERTY_TAGS) List<String> tags,
+            @JsonProperty(value = JSON_PROPERTY_PRIVATE) Boolean isPrivate) {
+        this.m_description = description;
+        this.m_tags = tags;
+        this.m_private = isPrivate;
     }
 
     /**
-     * Retrieves the new name of the space.
-     *
-     * @return name
+     * Retrieves the optional description for this item.
+     * 
+     * @return description
      */
-    @JsonProperty(JSON_PROPERTY_NAME)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getName() {
-        return m_name;
+    @JsonProperty(JSON_PROPERTY_DESCRIPTION)
+    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    public Optional<String> getDescription() {
+        return Optional.ofNullable(m_description);
     }
 
     /**
-     * Whether to force the rename operation.
-     *
+     * Retrieves an array of tags for the space.
+     * 
      * @return tags
      */
-    @JsonProperty(JSON_PROPERTY_FORCE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public boolean isForce() {
-        return m_force;
+    @JsonProperty(JSON_PROPERTY_TAGS)
+    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
+    public List<String> getTags() {
+        return Optional.ofNullable(m_tags).orElseGet(Collections::emptyList);
     }
 
     /**
-     * Returns the If-Target-Match header.
-     *
-     * @return If-Target-Match header
+     * Return {@code true} if the space is private otherwise {@code false}.
+     * 
+     * @return _private
      */
-    @JsonProperty(JSON_PROPERTY_IF_TARGET_MATCH)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<String> getIfTargetMatch() {
-        return Optional.ofNullable(m_ifTargetMatch);
+    @JsonProperty(JSON_PROPERTY_PRIVATE)
+    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    public Optional<Boolean> getPrivate() {
+        return Optional.ofNullable(m_private);
     }
 
     /**
      * Creates a new {@link SpaceRequestBodyBuilder}.
-     *
+     * 
      * @return builder
      */
-    public static CopyOrMoveRequestBodyBuilder builder() {
-        return new CopyOrMoveRequestBodyBuilder();
+    public static SpaceRequestBodyBuilder builder() {
+        return new SpaceRequestBodyBuilder();
     }
 
     /**
-     * Builder for {@link SpaceRenameRequestBody}.
+     * Builder for {@link SpaceRequestBody}.
      */
-    public static final class CopyOrMoveRequestBodyBuilder {
-        private String m_name;
-        private boolean m_force;
-        private String m_ifTargetMatch;
+    public static final class SpaceRequestBodyBuilder {
+        private String m_description;
+        private List<String> m_tags;
+        private Boolean m_private;
 
-        private CopyOrMoveRequestBodyBuilder() {
+        private SpaceRequestBodyBuilder() {
         }
 
         /**
-         * Sets the space name.
-         *
-         * @param name the name
+         * Sets a description for the space.
+         * 
+         * @param description
          * @return this
          */
-        public CopyOrMoveRequestBodyBuilder withName(final String name) {
-            m_name = name;
+        public SpaceRequestBodyBuilder withDescription(String description) {
+            m_description = description;
             return this;
         }
 
         /**
-         * Sets the force parameter.
-         *
-         * @param force the force parameter
+         * Sets tags for the space.
+         * 
+         * @param tags
          * @return this
          */
-        public CopyOrMoveRequestBodyBuilder withForce(final boolean force) {
-            m_force = force;
+        public SpaceRequestBodyBuilder withTags(List<String> tags) {
+            m_tags = tags;
             return this;
         }
 
         /**
-         * Sets a value for the IF-Target-Match header.
-         *
-         * @param ifTargetMatch the if target match header value
+         * Sets a value for whether the space shall be private.
+         * 
+         * @param isPrivate
          * @return this
          */
-        public CopyOrMoveRequestBodyBuilder withIfTargetMatch(final String ifTargetMatch) {
-            m_ifTargetMatch = ifTargetMatch;
+        public SpaceRequestBodyBuilder setPrivate(Boolean isPrivate) {
+            m_private = isPrivate;
             return this;
         }
 
         /**
-         * Builds a new {@link SpaceRenameRequestBody}.
-         *
-         * @return spaceRenameRequestBody
+         * Builds a new {@link SpaceRequestBody}.
+         * 
+         * @return spaceRequestBody
          */
-        public SpaceRenameRequestBody build() {
-            return new SpaceRenameRequestBody(m_name, m_force, m_ifTargetMatch);
+        public SpaceRequestBody build() {
+            return new SpaceRequestBody(m_description, m_tags, m_private);
         }
     }
 
     @Override
-    public boolean equals(final Object o) {
+    public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var spaceRenameBody = (SpaceRenameRequestBody) o;
-        return Objects.equals(this.m_name, spaceRenameBody.m_name)
-                && Objects.equals(this.m_force, spaceRenameBody.m_force)
-                && Objects.equals(this.m_ifTargetMatch, spaceRenameBody.m_ifTargetMatch);
+        var spaceRequestBody = (SpaceRequestBody) o;
+        return Objects.equals(this.m_description, spaceRequestBody.m_description)
+                && Objects.equals(this.m_tags, spaceRequestBody.m_tags)
+                && Objects.equals(this.m_private, spaceRequestBody.m_private);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_name, m_force, m_ifTargetMatch);
+        return Objects.hash(m_description, m_tags, m_private);
     }
 
     @Override

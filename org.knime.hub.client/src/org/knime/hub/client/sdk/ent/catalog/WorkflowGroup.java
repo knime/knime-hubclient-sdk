@@ -46,79 +46,88 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
-import java.net.URL;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.OptBoolean;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a upload target.
+ * POJO representing a workflow group.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class UploadTarget {
+@JsonTypeInfo( //
+        use = JsonTypeInfo.Id.NAME, //
+        include = JsonTypeInfo.As.PROPERTY, //
+        property = RepositoryItem.JSON_PROPERTY_TYPE, //
+        visible = true, //
+        requireTypeIdForSubtypes = OptBoolean.TRUE
+)
+@JsonSubTypes({ @JsonSubTypes.Type(value = Space.class, name = Space.TYPE) })
+public sealed class WorkflowGroup extends RepositoryItem permits Space {
 
-    private static final String JSON_PROPERTY_METHOD = "method";
-    private final String m_method;
+    /** Type of a workflow group and space */
+    protected static final String TYPE = "WorkflowGroup";
 
-    private static final String JSON_PROPERTY_URL = "url";
-    private final URL m_url;
+    /** JSON key of the workflow groups children property */
+    protected static final String JSON_PROPERTY_CHILDREN = "children";
+    private final List<RepositoryItem> m_children;
 
-    private static final String JSON_PROPERTY_HEADER = "header";
-    private final Map<String, List<String>> m_header;
-
+    /**
+     * Workflow group
+     *
+     * @param path the path of a workflow group
+     * @param canonicalPath the canonical path of the workflow group
+     * @param id the ID of a workflow group
+     * @param owner the owner of a workflow group
+     * @param description the description of a workflow group
+     * @param details the details of a workflow group
+     * @param masonControls the mason controls of a workflow group
+     * @param children the children of a workflow group
+     */
     @JsonCreator
-    private UploadTarget(
-            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) final String method,
-            @JsonProperty(value = JSON_PROPERTY_URL, required = true) final URL url,
-            @JsonProperty(value = JSON_PROPERTY_HEADER, required = true) final Map<String, List<String>> header) {
-        this.m_method = method;
-        this.m_url = url;
-        this.m_header = header;
+    protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
+        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
+        super(path, canonicalPath, id, owner, description, details, masonControls);
+        this.m_children = children;
     }
 
     /**
-     * Retrieves the HTTP method of the upload instruction.
+     * Retrieves the workflow groups children.
      *
-     * @return itemContentType
+     * @return children
      */
-    @JsonProperty(JSON_PROPERTY_METHOD)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getMethod() {
-        return m_method;
+    @JsonProperty(JSON_PROPERTY_CHILDREN)
+    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
+    public List<RepositoryItem> getChildren() {
+        return Optional.ofNullable(m_children).orElseGet(Collections::emptyList);
     }
 
-    /**
-     * Retrieves the url of the upload instruction.
-     *
-     * @return itemContentType
-     */
-    @JsonProperty(JSON_PROPERTY_URL)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public URL getUrl() {
-        return m_url;
-    }
-
-    /**
-     * Retrieves the header of the upload instruction.
-     *
-     * @return itemContentType
-     */
-    @JsonProperty(JSON_PROPERTY_HEADER)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public Map<String, List<String>> getHeader() {
-        return m_header;
+    @Override
+    public RepositoryItemType getType() {
+        return RepositoryItemType.WORKFLOW_GROUP;
     }
 
     @Override
@@ -129,15 +138,13 @@ public final class UploadTarget {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var uploadTarget = (UploadTarget) o;
-        return Objects.equals(this.m_method, uploadTarget.m_method)
-                && Objects.equals(this.m_url, uploadTarget.m_url)
-                && Objects.equals(this.m_header, uploadTarget.m_header);
+        var workflowGroup = (WorkflowGroup) o;
+        return Objects.equals(this.m_children, workflowGroup.m_children) && super.equals(o);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_method, m_url, m_header);
+        return Objects.hash(m_children, super.hashCode());
     }
 
     @Override
@@ -148,5 +155,4 @@ public final class UploadTarget {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
-
 }

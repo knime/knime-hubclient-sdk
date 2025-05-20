@@ -46,10 +46,8 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
@@ -61,64 +59,48 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a Space.
- *
+ * POJO representing the space permission attributes.
+ * 
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class Space extends WorkflowGroup {
+public final class SpacePermissionAttributes {
 
-    @SuppressWarnings("hiding")
-    static final String TYPE = "Space";
-
-    private static final String JSON_PROPERTY_PRIVATE = "private";
-    private final boolean m_private;
+    private static final String JSON_PROPERTY_SPACE_ID = "spaceId";
+    private final String m_spaceId;
 
     @JsonCreator
-    private Space(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children,
-        @JsonProperty(value = Space.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
-        super(path, canonicalPath, id, owner, description, details, masonControls, children);
-        this.m_private = isPrivate.booleanValue();
+    private SpacePermissionAttributes(
+            @JsonProperty(value = JSON_PROPERTY_SPACE_ID, required = true) String spaceId) {
+        this.m_spaceId = spaceId;
     }
 
     /**
-     * Returns {@code true} if the space is private, otherwise {@code false}.
-     *
-     * @return private
+     * Retrieves the unique ID of the space.
+     * 
+     * @return spaceId
      */
-    @JsonProperty(JSON_PROPERTY_PRIVATE)
+    @JsonProperty(JSON_PROPERTY_SPACE_ID)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public boolean isPrivate() {
-        return m_private;
+    public String getSpaceId() {
+        return m_spaceId;
     }
 
     @Override
-    public RepositoryItemType getType() {
-        return RepositoryItemType.SPACE;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
+    public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var space = (Space) o;
-        return Objects.equals(this.m_private, space.m_private) && super.equals(o);
+        var spacePermissionAttributes = (SpacePermissionAttributes) o;
+        return Objects.equals(this.m_spaceId, spacePermissionAttributes.m_spaceId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_private, super.hashCode());
+        return Objects.hash(m_spaceId);
     }
 
     @Override

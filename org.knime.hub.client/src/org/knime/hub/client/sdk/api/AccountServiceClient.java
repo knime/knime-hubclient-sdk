@@ -48,7 +48,6 @@
  */
 package org.knime.hub.client.sdk.api;
 
-import java.io.IOException;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IPath;
@@ -56,7 +55,8 @@ import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.ent.Billboard;
+import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.ent.account.Billboard;
 
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
@@ -68,8 +68,14 @@ import jakarta.ws.rs.core.MediaType;
  */
 public final class AccountServiceClient {
 
+    /* API Paths */
     private static final String BILLBOARD_API_PATH = "knime/rest";
+    private static final String ACCOUNTS_API_PATH = "accounts";
 
+    /* Path pieces */
+    private static final String PATH_PIECE_IDENTITY = "identity";
+
+    /* Return types */
     private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
 
     private final @NotOwning ApiClient m_apiClient;
@@ -89,13 +95,16 @@ public final class AccountServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws IOException if an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<Billboard> getBillboard(final Map<String, String> additionalHeaders) throws IOException {
+    public ApiResponse<Billboard> getBillboard(final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
         final var requestPath = IPath.forPosix(BILLBOARD_API_PATH);
+
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.GET, null, BILLBOARD);
     }
+
 }

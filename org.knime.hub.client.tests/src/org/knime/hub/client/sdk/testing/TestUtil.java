@@ -48,15 +48,26 @@
  */
 package org.knime.hub.client.sdk.testing;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
+import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
 
 /**
  * Test utility class for unit tests.
@@ -65,8 +76,31 @@ import org.osgi.framework.FrameworkUtil;
  */
 public class TestUtil {
 
+    /** resource folder name */
     public static final String RESOURCE_FOLDER_NAME = "resources";
-    public static final String TEST_FILE_FOLDER_NAME = "repositoryMetaDataTestFiles";
+
+    /**
+     * Repository item type enum.
+     */
+    public enum EntityFolders {
+        /** Catalog entity folder */
+        CATALOG_ENTITES("catalogEntities"), //
+        /** Account entity folder */
+        ACCOUNT_ENTITIES("accountEntities"), //
+        /** API entity folder */
+        API_ENTITES("apiEntities"); //
+
+        private final String m_value;
+
+        EntityFolders(final String value) {
+            this.m_value = value;
+        }
+
+        @Override
+        public String toString() {
+            return String.valueOf(m_value);
+        }
+    }
 
     /**
      * Resolves a path relative to the plug-in or any fragment's root into an absolute path.
@@ -84,4 +118,32 @@ public class TestUtil {
         // allow for local OSGi-free testing
         return Path.of(relativePath.toOSString()).toUri().toURL();
     }
+
+    /**
+     * Asserts the JSON properties of the API response entity given expected JSON paths.
+     *
+     * @param <R> response entity type
+     * @param actualApiResponse the actual API response
+     * @param knimeHubJSONResponse the real hub response
+     * @param expectedJsonPaths the expected JSON paths
+     * @param mapper {@link ObjectMapper} used in the {@link ApiClient}
+     * @param jsonConfig The JSON configuration needed to query the JSON objects
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse,
+        final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths, final ObjectMapper mapper,
+        final Configuration jsonConfig) throws HubFailureIOException {
+        // Create the actual JSON node response object.
+        var responseEntity = actualApiResponse.checkSuccessful();
+        JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);
+
+        // Compare the JSON properties queried using the expected JSON paths.
+        for (var jsonPath : expectedJsonPaths) {
+            var actualJSONProperties = JsonPath.using(jsonConfig).parse(actualJSONResponse).read(jsonPath);
+            var expectedJSONProperties = JsonPath.using(jsonConfig).parse(knimeHubJSONResponse).read(jsonPath);
+            assertEquals(expectedJSONProperties, actualJSONProperties,
+                "Unexpected properties for JSON path '%s'".formatted(jsonPath));
+        }
+    }
+
 }

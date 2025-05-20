@@ -46,7 +46,7 @@
  * History
  *   Apr 28, 2025 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.net.URL;
 import java.time.Instant;

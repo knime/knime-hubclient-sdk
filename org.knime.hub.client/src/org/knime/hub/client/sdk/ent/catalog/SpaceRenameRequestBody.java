@@ -46,12 +46,12 @@
  * History
  *   May 9, 2025 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Objects;
 import java.util.Optional;
 
-import org.knime.hub.client.sdk.ent.SpaceRequestBody.SpaceRequestBodyBuilder;
+import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -61,15 +61,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Request body for copy or move request.
+ * Request body for space rename request.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class CopyOrMoveRequestBody {
+public final class SpaceRenameRequestBody {
 
-    private static final String JSON_PROPERTY_CANONICAL_PATH = "canonicalPath";
-    private final String m_canonicalPath;
+    private static final String JSON_PROPERTY_NAME = "name";
+    private final String m_name;
 
     private static final String JSON_PROPERTY_FORCE = "force";
     private final boolean m_force;
@@ -78,28 +78,28 @@ public final class CopyOrMoveRequestBody {
     private final String m_ifTargetMatch;
 
     @JsonCreator
-    private CopyOrMoveRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+    private SpaceRenameRequestBody(
+            @JsonProperty(value = JSON_PROPERTY_NAME) final String canonicalPath,
             @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
             @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
-        this.m_canonicalPath = canonicalPath;
+        this.m_name = canonicalPath;
         this.m_force = force;
         this.m_ifTargetMatch = ifTargetMatch;
     }
 
     /**
-     * Retrieves the new canonical path of the repository item.
+     * Retrieves the new name of the space.
      *
-     * @return canoncialPath
+     * @return name
      */
-    @JsonProperty(JSON_PROPERTY_CANONICAL_PATH)
+    @JsonProperty(JSON_PROPERTY_NAME)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getCanonicalPath() {
-        return m_canonicalPath;
+    public String getName() {
+        return m_name;
     }
 
     /**
-     * Whether to force the copy or move operation, i.e. overwrite existing items.
+     * Whether to force the rename operation.
      *
      * @return tags
      */
@@ -130,10 +130,10 @@ public final class CopyOrMoveRequestBody {
     }
 
     /**
-     * Builder for {@link CopyOrMoveRequestBody}.
+     * Builder for {@link SpaceRenameRequestBody}.
      */
     public static final class CopyOrMoveRequestBodyBuilder {
-        private String m_canonicalPath;
+        private String m_name;
         private boolean m_force;
         private String m_ifTargetMatch;
 
@@ -141,13 +141,13 @@ public final class CopyOrMoveRequestBody {
         }
 
         /**
-         * Sets the canonical path.
+         * Sets the space name.
          *
-         * @param canoncialPath the canonical path
+         * @param name the name
          * @return this
          */
-        public CopyOrMoveRequestBodyBuilder withCanoncialPath(final String canoncialPath) {
-            m_canonicalPath = canoncialPath;
+        public CopyOrMoveRequestBodyBuilder withName(final String name) {
+            m_name = name;
             return this;
         }
 
@@ -174,12 +174,12 @@ public final class CopyOrMoveRequestBody {
         }
 
         /**
-         * Builds a new {@link CopyOrMoveRequestBody}.
+         * Builds a new {@link SpaceRenameRequestBody}.
          *
-         * @return copyOrMoveRequestBody
+         * @return spaceRenameRequestBody
          */
-        public CopyOrMoveRequestBody build() {
-            return new CopyOrMoveRequestBody(m_canonicalPath, m_force, m_ifTargetMatch);
+        public SpaceRenameRequestBody build() {
+            return new SpaceRenameRequestBody(m_name, m_force, m_ifTargetMatch);
         }
     }
 
@@ -191,15 +191,15 @@ public final class CopyOrMoveRequestBody {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var copyOrMoveBody = (CopyOrMoveRequestBody) o;
-        return Objects.equals(this.m_canonicalPath, copyOrMoveBody.m_canonicalPath)
-                && Objects.equals(this.m_force, copyOrMoveBody.m_force)
-                && Objects.equals(this.m_ifTargetMatch, copyOrMoveBody.m_ifTargetMatch);
+        var spaceRenameBody = (SpaceRenameRequestBody) o;
+        return Objects.equals(this.m_name, spaceRenameBody.m_name)
+                && Objects.equals(this.m_force, spaceRenameBody.m_force)
+                && Objects.equals(this.m_ifTargetMatch, spaceRenameBody.m_ifTargetMatch);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_canonicalPath, m_force, m_ifTargetMatch);
+        return Objects.hash(m_name, m_force, m_ifTargetMatch);
     }
 
     @Override

@@ -70,7 +70,7 @@ import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
-import org.knime.hub.client.sdk.ent.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
 import org.knime.hub.client.sdk.transfer.AbstractHubTransfer.PollingCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

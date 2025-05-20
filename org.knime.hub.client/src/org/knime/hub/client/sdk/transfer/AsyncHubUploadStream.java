@@ -73,9 +73,9 @@ import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
-import org.knime.hub.client.sdk.ent.ItemUploadInstructions;
-import org.knime.hub.client.sdk.ent.ItemUploadRequest;
-import org.knime.hub.client.sdk.ent.UploadManifest;
+import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
+import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
+import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
 

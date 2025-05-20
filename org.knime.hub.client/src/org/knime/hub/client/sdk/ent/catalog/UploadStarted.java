@@ -43,21 +43,74 @@
  * -------------------------------------------------------------------
  *
  * History
- *   Dec 4, 2024 (jasper): created
+ *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
+
+import java.util.Map;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Implemented by entities that have a size.
+ * POJO representing the started upload process.
  * 
- * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
+ * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public interface Sized {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class UploadStarted {
+
+    private static final String JSON_PROPERTY_ITEMS = "items";
+    private final Map<String, ItemUploadInstructions> m_items;
+
+    @JsonCreator
+    private UploadStarted(
+            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) Map<String, ItemUploadInstructions> items) {
+        this.m_items = items;
+    }
+
     /**
-     * Retrieves the size of the item.
+     * Retrieves the items which are going to be uploaded.
      * 
-     * @return size
+     * @return items
      */
-    long getSize();
+    @JsonProperty(JSON_PROPERTY_ITEMS)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public Map<String, ItemUploadInstructions> getItems() {
+        return m_items;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var uploadStarted = (UploadStarted) o;
+        return Objects.equals(this.m_items, uploadStarted.m_items);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_items);
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
+        }
+    }
+
 }

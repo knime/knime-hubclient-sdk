@@ -46,7 +46,7 @@
  * History
  *   Apr 24, 2025 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.account;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -55,6 +55,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.core.util.Version;
+import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;

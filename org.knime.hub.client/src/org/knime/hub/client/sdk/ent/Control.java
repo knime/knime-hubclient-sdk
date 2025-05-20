@@ -50,6 +50,7 @@ package org.knime.hub.client.sdk.ent;
 
 import java.util.Objects;
 
+import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;

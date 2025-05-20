@@ -1,6 +1,5 @@
 /*
  * ------------------------------------------------------------------------
- *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -41,16 +40,18 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * ---------------------------------------------------------------------
+ * -------------------------------------------------------------------
  *
  * History
- *   Apr 28, 2025 (magnus): created
+ *   Nov 6, 2024 (magnus): created
  */
-package org.knime.hub.client.sdk.ent;
+
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.net.URL;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
@@ -61,46 +62,63 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the prepared download
+ * POJO representing a upload target.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class PreparedDownload {
+public final class UploadTarget {
 
-    private static final String JSON_PROPERTY_DOWNLOAD_ID = "downloadId";
-    private final String m_downloadId;
+    private static final String JSON_PROPERTY_METHOD = "method";
+    private final String m_method;
 
-    private static final String JSON_PROPERTY_DOWNLOAD_URL = "downloadUrl";
-    private final URL m_downloadUrl;
+    private static final String JSON_PROPERTY_URL = "url";
+    private final URL m_url;
+
+    private static final String JSON_PROPERTY_HEADER = "header";
+    private final Map<String, List<String>> m_header;
 
     @JsonCreator
-    private PreparedDownload(@JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID) final String downloadId,
-        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_URL) final URL downloadUrl) {
-        m_downloadId = downloadId;
-        m_downloadUrl = downloadUrl;
+    private UploadTarget(
+            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) final String method,
+            @JsonProperty(value = JSON_PROPERTY_URL, required = true) final URL url,
+            @JsonProperty(value = JSON_PROPERTY_HEADER, required = true) final Map<String, List<String>> header) {
+        this.m_method = method;
+        this.m_url = url;
+        this.m_header = header;
     }
 
     /**
-     * Retrieves the download ID.
+     * Retrieves the HTTP method of the upload instruction.
      *
-     * @return downloadId
+     * @return itemContentType
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_ID)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<String> getDownloadId() {
-        return Optional.ofNullable(m_downloadId);
+    @JsonProperty(JSON_PROPERTY_METHOD)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getMethod() {
+        return m_method;
     }
 
     /**
-     * Retrieves the download URL.
+     * Retrieves the url of the upload instruction.
      *
-     * @return downlopadUrl
+     * @return itemContentType
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<URL> getDownloadUrl() {
-        return Optional.ofNullable(m_downloadUrl);
+    @JsonProperty(JSON_PROPERTY_URL)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public URL getUrl() {
+        return m_url;
+    }
+
+    /**
+     * Retrieves the header of the upload instruction.
+     *
+     * @return itemContentType
+     */
+    @JsonProperty(JSON_PROPERTY_HEADER)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public Map<String, List<String>> getHeader() {
+        return m_header;
     }
 
     @Override
@@ -111,14 +129,15 @@ public final class PreparedDownload {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var preparedDownload = (PreparedDownload) o;
-        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId)
-                && Objects.equals(this.m_downloadUrl, preparedDownload.m_downloadUrl);
+        var uploadTarget = (UploadTarget) o;
+        return Objects.equals(this.m_method, uploadTarget.m_method)
+                && Objects.equals(this.m_url, uploadTarget.m_url)
+                && Objects.equals(this.m_header, uploadTarget.m_header);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_downloadId, m_downloadUrl);
+        return Objects.hash(m_method, m_url, m_header);
     }
 
     @Override

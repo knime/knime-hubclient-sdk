@@ -46,10 +46,11 @@
  *   Nov 6, 2024 (magnus): created
  */
 
-package org.knime.hub.client.sdk.ent;
+package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
@@ -60,46 +61,51 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a workflow
+ * POJO representing the ID of the prepared upload, together with a specification of the request
+ * to actually upload an item.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public final class Workflow extends RepositoryItem implements Sized {
+public final class ItemUploadInstructions {
 
-    static final String TYPE = "Workflow";
+    private static final String JSON_PROPERTY_UPLOAD_ID = "uploadId";
+    private final String m_uploadId;
 
-    private static final String JSON_PROPERTY_SIZE = "size";
-    private final long m_size;
+    private static final String JSON_PROPERTY_UPLOAD_PARTS = "parts";
+    private final Optional<Map<Integer, UploadTarget>> m_parts;
+
 
     @JsonCreator
-    private Workflow(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Workflow.JSON_PROPERTY_SIZE, required = true) final long size) {
-        super(path, canonicalPath, id, owner, description, details, masonControls);
-        m_size = size;
+    private ItemUploadInstructions(
+            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID) final String uploadId,
+            @JsonProperty(value = JSON_PROPERTY_UPLOAD_PARTS) final
+            Map<Integer, UploadTarget> parts) {
+        this.m_uploadId = uploadId;
+        this.m_parts = Optional.ofNullable(parts);
     }
 
     /**
-     * Retrieves the compressed workflows file size in bytes.
+     * Retrieves the ID of the upload; allows clients to track the status of the upload
+     * process.
      *
-     * @return size
+     * @return uploadId
      */
-    @JsonProperty(JSON_PROPERTY_SIZE)
+    @JsonProperty(JSON_PROPERTY_UPLOAD_ID)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    @Override
-    public long getSize() {
-        return m_size;
+    public String getUploadId() {
+        return m_uploadId;
     }
 
-    @Override
-    public RepositoryItemType getType() {
-        return RepositoryItemType.WORKFLOW;
+    /**
+     * Retrieves the upload instructions per part upload.
+     *
+     * @return uploadUrl
+     */
+    @JsonProperty(JSON_PROPERTY_UPLOAD_PARTS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<Map<Integer, UploadTarget>> getParts() {
+        return m_parts;
     }
 
     @Override
@@ -110,13 +116,14 @@ public final class Workflow extends RepositoryItem implements Sized {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var workflow = (Workflow) o;
-        return Objects.equals(this.m_size, workflow.m_size) && super.equals(o);
+        var itemPartUploadInstructions = (ItemUploadInstructions) o;
+        return Objects.equals(this.m_uploadId, itemPartUploadInstructions.m_uploadId)
+                && Objects.equals(this.m_parts, itemPartUploadInstructions.m_parts);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_size, super.hashCode());
+        return Objects.hash(m_uploadId, m_parts);
     }
 
     @Override

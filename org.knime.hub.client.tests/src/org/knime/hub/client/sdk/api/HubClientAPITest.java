@@ -48,52 +48,23 @@
 
 package org.knime.hub.client.sdk.api;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.when;
-
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.net.URL;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
-import org.apache.commons.lang3.StringUtils;
-import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.core.util.hub.ItemVersion;
-import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.HubFailureIOException;
-import org.knime.hub.client.sdk.ent.RepositoryItem;
-import org.knime.hub.client.sdk.testing.HttpMockServiceFactory;
+import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.testing.TestUtil;
-import org.mockito.Mockito;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.tomakehurst.wiremock.WireMockServer;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
-import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
-
-import jakarta.ws.rs.core.HttpHeaders;
-import jakarta.ws.rs.core.MediaType;
 
 /**
  * Integration tests for {@link HubClientAPI}.
@@ -102,7 +73,8 @@ import jakarta.ws.rs.core.MediaType;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-class HubClientAPITest {
+@SuppressWarnings("resource") // Mocked hub API client is closed after all tests ran through.
+class HubClientAPITest extends AbstractTest {
 
 	public static final String DEFAULT_USERNAME = "knime";
 	public static final String DEFAULT_PUBLIC_SPACE_NAME = "PublicSpace";
@@ -132,69 +104,10 @@ class HubClientAPITest {
     public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD =
     		"$['children'][*]['@controls'][*]['method']";
 
-    private static ApiClient apiClient;
-    private static ObjectMapper mapper;
-
-	private static WireMockServer serverMock;
-	private static HubClientAPI hubClientAPIMock;
-	private static Configuration jsonPathConfig;
-	private static String authToken;
-
 	@BeforeAll
 	static void startServerMock() throws CouldNotAuthorizeException {
-	    // Initialize wiremock server.
-	    serverMock = HttpMockServiceFactory.createMockServer();
-	    serverMock.start();
-	    final var serverAdress = HttpMockServiceFactory.getBaseUri(serverMock);
-
-	    // Create the HUB client API.
-	    final var authMock = Mockito.mock(Authenticator.class);
-	    authToken = UUID.randomUUID().toString();
-	    when(authMock.getAuthorization()).thenReturn(authToken);
-        apiClient = new ApiClient(serverAdress, authMock, "junit-test", Duration.ofSeconds(0), Duration.ofSeconds(0));
-        mapper = apiClient.getObjectMapper();
-	    hubClientAPIMock = new HubClientAPI(apiClient);
-
-	    // Configure JsonPath to use Jackson for JsonNode compatibility
-	    // Returns a null node if a JSON property is missing.
-	    jsonPathConfig = Configuration.builder()
-                .jsonProvider(new JacksonJsonNodeJsonProvider())
-                .mappingProvider(new JacksonMappingProvider())
-                .options(Option.DEFAULT_PATH_LEAF_TO_NULL)
-                .build();
+	    initializeServerMockTests();
 	}
-
-	private static JsonNode retrieveRepositoryItemMetaData(final String testFileName, final String repoItemPathOrId,
-	        final Map<String, String> queryParams) throws IOException, URISyntaxException {
-        // Path to the file inside test file folder.
-	    final var filePath = IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME)
-	            .append(TestUtil.TEST_FILE_FOLDER_NAME).append(testFileName);
-
-        // Obtain file object from bundle activator class.
-        final URL resourceUrl = TestUtil.resolveToURL(filePath);
-
-        try (final InputStream is = resourceUrl.openStream()) {
-            // Create a json node from the resource.
-            JsonNode jsonNode = mapper.readTree(is);
-
-            // Create query parameter string.
-            String queryParamString = StringUtils.EMPTY;
-            if (!queryParams.isEmpty()) {
-                var queryParamPairs = queryParams.keySet().stream()
-                        .map(key -> "%s=%s".formatted(key, queryParams.get(key))).toList();
-                queryParamString = "?%s".formatted(String.join("&", queryParamPairs));
-            }
-
-            // Create a stub for the getRepositoryItemMetaData request.
-            serverMock.stubFor(get(urlEqualTo("/repository/%s%s".formatted(repoItemPathOrId, queryParamString)))
-                    .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-                        .withBody(jsonNode.toString())));
-
-            return jsonNode;
-        }
-    }
 
 	/**
 	 * Tests that the response entities are deserialized
@@ -228,7 +141,7 @@ class HubClientAPITest {
                 retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = getHubClientAPIMock().catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
@@ -236,7 +149,8 @@ class HubClientAPITest {
                 JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
                 JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
                 JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD);
-        assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
+            expectedJsonPaths, getMapper(), getJsonPathConfig());
 	}
 
 	/**
@@ -273,7 +187,7 @@ class HubClientAPITest {
         final var knimeHubJSONResponse = retrieveRepositoryItemMetaData(testFileName, path, queryParams);
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = getHubClientAPIMock().catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
@@ -281,7 +195,8 @@ class HubClientAPITest {
                 JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
                 JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
                 JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_DETAILS_SPACE_ID);
-        assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
+            expectedJsonPaths, getMapper(), getJsonPathConfig());
     }
 
 	/**
@@ -313,7 +228,7 @@ class HubClientAPITest {
                 retrieveRepositoryItemMetaData(testFileName, path, new HashMap<String, String>());
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = getHubClientAPIMock().catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
@@ -322,7 +237,8 @@ class HubClientAPITest {
                 JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF,
                 JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
                 JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION);
-        assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
+            expectedJsonPaths, getMapper(), getJsonPathConfig());
 	}
 
 	/**
@@ -351,7 +267,7 @@ class HubClientAPITest {
         		path, queryParams);
 
         // Perform actual API call.
-        ApiResponse<RepositoryItem> response = hubClientAPIMock.catalog().getRepositoryItemByPath(
+        ApiResponse<RepositoryItem> response = getHubClientAPIMock().catalog().getRepositoryItemByPath(
         		new Path(path), details, deep, spaceDetails, contribSpaces, version, null);
 
         // Assert required json paths.
@@ -361,28 +277,13 @@ class HubClientAPITest {
                 JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
                 JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION,
                 JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF, JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD);
-        assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths);
-    }
-
-	private static <R> void assertJSONProperties(final ApiResponse<R> actualApiResponse,
-			final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths) throws HubFailureIOException {
-	    // Create the actual JSON node response object.
-	    var responseEntity = actualApiResponse.checkSuccessful();
-        JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);
-
-        // Compare the JSON properties queried using the expected JSON paths.
-        for (var jsonPath : expectedJsonPaths) {
-            var actualJSONProperties = JsonPath.using(jsonPathConfig).parse(actualJSONResponse).read(jsonPath);
-            var expectedJSONProperties = JsonPath.using(jsonPathConfig).parse(knimeHubJSONResponse).read(jsonPath);
-            assertEquals(expectedJSONProperties, actualJSONProperties,
-            		"Unexpected properties for JSON path '%s'".formatted(jsonPath));
-        }
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
+            expectedJsonPaths, getMapper(), getJsonPathConfig());
     }
 
     @AfterAll
 	static void stopServerMock() {
-	    serverMock.stop();
-	    hubClientAPIMock.getApiClient().close();
+        terminateServerMockTests();
 	}
 
 }
