@@ -5,8 +5,9 @@ library "knime-pipeline@$BN"
 
 properties([
 	pipelineTriggers([
-        upstream("knime-core/${env.BRANCH_NAME.replaceAll('/', '%2F')}")
+        upstream("knime-shared/${env.BRANCH_NAME.replaceAll('/', '%2F')}")
     ]),
+    parameters([p2Tools.getP2pruningParameter()]),
     buildDiscarder(logRotator(numToKeepStr: '5')),
     disableConcurrentBuilds()
 ])
