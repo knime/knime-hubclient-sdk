@@ -61,8 +61,11 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient.Method;
+import org.knime.hub.client.sdk.FailureType;
+import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
+import org.knime.hub.client.sdk.util.ResponseUtils;
 
 import jakarta.ws.rs.core.Response;
 
@@ -99,9 +102,18 @@ public final class ResponseDownloadStream extends FilterInputStream {
             final var response = catalogClient.getApiClient().createApiRequest() //
                 .withHeaders(clientHeaders) //
                 .withQueryParam(CatalogServiceClient.getQueryParameter(version).orElse(null)) //
-                .invokeAPIRaw(path, Method.GET, null, //
-                    msg -> String.format("Could not open download stream to %s: %s", path, msg));
-            return new ResponseDownloadStream(response);
+                .invokeAPIRaw(path, Method.GET, null);
+
+            if (response.getStatusInfo().getFamily() == Response.Status.Family.SUCCESSFUL) {
+                return new ResponseDownloadStream(response);
+            }
+
+            try (response) {
+                final var problem = ResponseUtils.toProblemDescription(response);
+                final var message = String.format("Could not open download stream to %s: %s", path, problem.getTitle());
+                throw new HubFailureIOException(message, FailureValue.fromRFC9457(
+                    FailureType.DOWNLOAD_STREAM_OPEN_FAILED, response.getStatus(), response.getHeaders(), problem));
+            }
         }
     }
 

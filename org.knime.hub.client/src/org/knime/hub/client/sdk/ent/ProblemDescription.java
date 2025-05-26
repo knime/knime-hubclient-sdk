@@ -76,7 +76,7 @@ public final class ProblemDescription {
     private final String m_type;
 
     private static final String JSON_PROPERTY_STATUS = "status";
-    private final String m_status;
+    private final Integer m_status;
 
     private static final String JSON_PROPERTY_TITLE = "title";
     private final String m_title;
@@ -101,11 +101,12 @@ public final class ProblemDescription {
      * @param instance the instance
      * @param details the details
      * @param code the code
+     * @since 0.2
      */
     @JsonCreator
     public ProblemDescription(
             @JsonProperty(value = JSON_PROPERTY_TYPE, required = false) final String type,
-            @JsonProperty(value = JSON_PROPERTY_STATUS, required = false) final String status,
+            @JsonProperty(value = JSON_PROPERTY_STATUS, required = false) final Integer status,
             @JsonProperty(value = JSON_PROPERTY_TITLE, required = true) final String title,
             @JsonProperty(value = JSON_PROPERTY_INSTANCE, required = false) final String instance,
             @JsonProperty(value = JSON_PROPERTY_DETAILS, required = false) final List<String> details,
@@ -136,7 +137,7 @@ public final class ProblemDescription {
      */
     @JsonProperty(JSON_PROPERTY_STATUS)
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<String> getStatus() {
+    public Optional<Integer> getStatus() {
         return Optional.ofNullable(m_status);
     }
 

@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -56,12 +57,14 @@ import org.knime.core.util.exception.ResourceAccessException;
 import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
@@ -309,7 +312,7 @@ class AbstractHubTransfer {
     static Result<Optional<TaggedRepositoryItem>, FailureValue> fetchRepositoryItem(
         final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders,
         final String itemIDOrPath, final Map<String, String> queryParams, final ItemVersion version,
-        final EntityTag ifNoneMatch, final EntityTag ifMatch) throws HubFailureIOException {
+        final EntityTag ifNoneMatch, final EntityTag ifMatch) {
 
         Map<String, String> headers = new HashMap<>(additionalHeaders);
         headers.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
@@ -341,8 +344,16 @@ class AbstractHubTransfer {
                 return Result.success(Optional.empty());
             }
 
-            return response.result() //
-                .map(item -> Optional.of(new TaggedRepositoryItem(item, response.etag().orElse(null))));
+            if (response.result() instanceof Success<RepositoryItem, ?> success) {
+                return Result.success( //
+                    Optional.of(new TaggedRepositoryItem(success.value(), response.etag().orElse(null))));
+            }
+
+            final var problem = response.result().asFailure().failure();
+            return Result.failure(FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, response.statusCode(),
+                response.headers(), problem));
+        } catch (final HubFailureIOException hubEx) { // NOSONAR
+            return hubEx.asFailure();
         }
     }
 
@@ -453,8 +464,10 @@ class AbstractHubTransfer {
             } else if (thrw instanceof CouldNotAuthorizeException cnae) {
                 return Result.failure(FailureValue.fromAuthFailure(cnae));
             } else {
-                return Result
-                    .failure(FailureValue.fromUnexpectedThrowable("Unexpected exception: " + thrw.getMessage(), thrw));
+                return Result.failure(FailureValue.fromUnexpectedThrowable("Operation failed",
+                    List.of(
+                        "Unexpected exception (%s): %s".formatted(thrw.getClass().getSimpleName(), thrw.getMessage())),
+                    thrw));
             }
         });
     }
@@ -501,13 +514,14 @@ class AbstractHubTransfer {
             final T state;
             try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
                 final var response = callable.poll();
-                final Result<T, FailureValue> result = response.result();
+                final Result<T, ProblemDescription> result = response.result();
                 if (!(result instanceof Success<T, ?> success)) {
-                    return result;
+                    return Result.failure(FailureValue.fromRFC9457(FailureType.POLLING_CALL_FAILURE,
+                        response.statusCode(), response.headers(), result.asFailure().failure()));
                 }
                 state = success.value();
             } catch (final HubFailureIOException ex) { // NOSONAR
-                return Result.failure(ex.getValue());
+                return ex.asFailure();
             }
 
             if (callable.accept(state)) {

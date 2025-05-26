@@ -48,7 +48,6 @@ import org.apache.commons.io.input.RandomAccessFileInputStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
-import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
@@ -79,10 +78,9 @@ public final class FilePartUploader {
          * @param partNo part number
          * @return fetched upload target specification
          * @throws IOException if an error occurs while fetching
-         * @throws CouldNotAuthorizeException if a Hub call could not be authorized
          * @since 0.1
          */
-        UploadTarget fetch(int partNo) throws IOException, CouldNotAuthorizeException;
+        UploadTarget fetch(int partNo) throws IOException;
     }
 
     /**
@@ -212,8 +210,10 @@ public final class FilePartUploader {
                 final InputStreamSupplier inputSupplier = () -> newFileRangeInputStream(file, offset, length);
                 return uploadWithRetries(path, partNum, targetFetcher, inputSupplier, length, md5Hash, monitor);
             } catch (final IOException ex) {
+                final var detail =
+                    "Could not calculate hash for part %d of '%s': %s".formatted(partNum, path, ex.getMessage());
                 return Result.failure(FailureValue.fromThrowable(FailureType.UPLOAD_PART_UNREADABLE,
-                    "Could not calculate hash for part %d of '%s': %s".formatted(partNum, path, ex.getMessage()), ex));
+                    "Failed to upload part", List.of(detail), ex));
             }
         });
     }
@@ -316,18 +316,12 @@ public final class FilePartUploader {
                 .log("Ending upload of part {} of '{}'");
 
             return Result.success(eTag);
-        } catch (final IOException | CouldNotAuthorizeException e) {
+        } catch (final IOException e) {
             LOGGER.atDebug().setCause(e) //
                 .addArgument(partNumber) //
                 .addArgument(path) //
                 .log("Failed to upload part {} of '{}'");
-
-            if (e instanceof IOException ioe) {
-                // rethrow so that we can retry
-                throw ioe;
-            }
-
-            return Result.failure(FailureValue.fromAuthFailure((CouldNotAuthorizeException)e));
+            throw e;
         } catch (final CancelationException e) {
             LOGGER.atDebug() //
                 .addArgument(partNumber) //
@@ -339,7 +333,9 @@ public final class FilePartUploader {
 
     private Result<Pair<Integer, EntityTag>, FailureValue> retriesExhaustedResult(final String path,
         final IOException e) {
+        final var detail =
+            "Part upload for '%s' failed after %d retries: %s".formatted(path, m_numRetries, e.getMessage());
         return Result.failure(FailureValue.fromThrowable(FailureType.PART_UPLOAD_EXHAUSTED_RETRIES,
-            "Part upload for '%s' failed after %d retries: %s".formatted(path, m_numRetries, e.getMessage()), e));
+            "Failed to upload part", List.of(detail), e));
     }
 }

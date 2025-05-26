@@ -60,25 +60,33 @@ import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.NullOutputStream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.hub.client.sdk.CancelationException;
+import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.Result.Failure;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
 import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.MediaType;
@@ -89,6 +97,8 @@ import jakarta.ws.rs.core.MediaType;
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 public final class AsyncHubUploadStream extends OutputStream {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AsyncHubUploadStream.class);
 
     private static final int NUMBER_OF_INITIAL_PARTS = 1;
     private static final int NUMBER_OF_PART_UPLOAD_RETRIES = 2;
@@ -225,8 +235,10 @@ public final class AsyncHubUploadStream extends OutputStream {
             for (var i = 0; i < reduceBy && !m_pendingUploads.isEmpty(); i++) {
                 final var pending = m_pendingUploads.removeFirst();
                 final var result = AbstractHubTransfer.waitForCancellable(pending, m_cancelled::get,
-                    throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
-                        "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
+                    thrw -> Result.failure(FailureValue.fromUnexpectedThrowable( //
+                        "Failed to upload item", List.of("Unexpected error while uploading item (%s): %s" //
+                            .formatted(thrw.getClass().getSimpleName(), thrw.getMessage())),
+                        thrw)));
                 final var finishedPart = result.orElseThrow(HubFailureIOException::new);
                 m_finishedParts.put(finishedPart.getKey(),
                     AbstractHubTransfer.ETAG_DELEGATE.toString(finishedPart.getValue()));
@@ -267,9 +279,13 @@ public final class AsyncHubUploadStream extends OutputStream {
 
         // notify Hub of the cancellation
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            m_hubClient.cancelUpload(m_uploadId, m_clientHeaders) //
-                .result() //
-                .orElseThrow(HubFailureIOException::new);
+            final var response = m_hubClient.cancelUpload(m_uploadId, m_clientHeaders);
+            if (response.result() instanceof Failure<?, ProblemDescription> failure) {
+                final ProblemDescription problem = failure.failure();
+                final var userText = Stream.concat(Stream.of(problem.getTitle()), problem.getDetails().stream()) //
+                        .filter(StringUtils::isNotBlank).collect(Collectors.joining(" "));
+                LOGGER.atDebug().log("Hub request to cancel upload failed: {} {}", response.statusCode(), userText);
+            }
         }
     }
 
@@ -317,7 +333,7 @@ public final class AsyncHubUploadStream extends OutputStream {
         }
 
         try {
-            // await that last upload(s)
+            // await all pending part uploads
             awaitPartsFinished(MAX_PARALLEL_UPLOADS);
         } catch (final IOException ioe) {
             throw cancelAfter(ioe);
@@ -325,8 +341,13 @@ public final class AsyncHubUploadStream extends OutputStream {
 
         // report back to catalog
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            m_hubClient.reportUploadFinished(m_uploadId, m_finishedParts, m_clientHeaders).result() //
-                .orElseThrow(HubFailureIOException::new);
+            final var response = m_hubClient.reportUploadFinished(m_uploadId, m_finishedParts, m_clientHeaders);
+            if (response.result() instanceof Failure<Void, ProblemDescription> failure) {
+                final var problem = failure.failure();
+                throw new HubFailureIOException(new FailureValue(FailureType.UPLOAD_FINISHED_CALL_FAILED,
+                    response.statusCode(), response.headers(),
+                    "Hub failed to acknowledge finished upload: " + problem.getTitle(), problem.getDetails(), null));
+            }
         }
 
         // wait for the upload to be completed server-side

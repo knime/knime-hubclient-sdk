@@ -63,9 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
-import java.util.function.UnaryOperator;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -75,6 +73,7 @@ import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
+import org.knime.hub.client.sdk.util.ResponseUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +95,6 @@ import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.Response.Status.Family;
 
 /**
  * API client used to make REST requests.
@@ -478,7 +476,8 @@ public class ApiClient implements AutoCloseable {
             try {
                 m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
             } catch (final ProcessingException pe) {
-                throw new HubFailureIOException(FailureValue.fromProcessingException(pe));
+                throw new HubFailureIOException(
+                    FailureValue.fromProcessingException("Failed to authorize Hub request", pe));
             } catch (CouldNotAuthorizeException cnae) {
                 throw new HubFailureIOException(FailureValue.fromAuthFailure(cnae));
             }
@@ -522,7 +521,7 @@ public class ApiClient implements AutoCloseable {
                     case GET, DELETE, HEAD -> builder.build(method.name()).invoke();
                 };
             } catch (ProcessingException e) {
-                throw new HubFailureIOException(FailureValue.fromProcessingException(e));
+                throw new HubFailureIOException(FailureValue.fromProcessingException("Hub request failed", e));
             }
         }
 
@@ -567,7 +566,7 @@ public class ApiClient implements AutoCloseable {
                 return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> returnType == null ? Result.success(null)
                         : readEntity(method, uri, returnType, response);
-                    default -> Result.failure(createFailureValue(response));
+                    default -> Result.failure(ResponseUtils.toProblemDescription(response));
                 });
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
@@ -580,28 +579,18 @@ public class ApiClient implements AutoCloseable {
          * @param path              The sub-path of the HTTP URL.
          * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
          * @param body              The request body object - if it is not binary, otherwise null.
-         * @param messageCallback   A callback to modify the error message, receiving the message from the response
          *
          * @return {@link Response}, with the responsibility to close it
          *
-         * @throws HubFailureIOException if the request failed (non-2xx response code)
+         * @throws HubFailureIOException if the request failed
          * @since 0.2
          */
-        public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body,
-                final UnaryOperator<String> messageCallback) throws HubFailureIOException {
+        public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body)
+            throws HubFailureIOException {
             final var uri = buildUrl(path);
-
             final var t0 = System.currentTimeMillis();
             try {
-                final var response = getAPIResponse(uri, method, body);
-                if (response.getStatusInfo().getFamily() == Family.SUCCESSFUL) {
-                    return response;
-                }
-
-                try (response) {
-                    final var failureValue = createFailureValue(response);
-                    throw new HubFailureIOException(messageCallback.apply(failureValue.title()), failureValue);
-                }
+                return getAPIResponse(uri, method, body);
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
@@ -629,7 +618,7 @@ public class ApiClient implements AutoCloseable {
             try (final var response = getAPIResponse(uri, method, body)) {
                 return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> downloadContent(method, uri, response, contentHandler);
-                    default -> Result.failure(createFailureValue(response));
+                    default -> Result.failure(ResponseUtils.toProblemDescription(response));
                 });
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
@@ -662,14 +651,14 @@ public class ApiClient implements AutoCloseable {
         }
 
         private static <R> ApiResponse<R> toApiResponse(final @NotOwning Response response,
-            final Result<R, FailureValue> result) {
+            final Result<R, ProblemDescription> result) {
             final var httpStatus = response.getStatusInfo();
             return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(), httpStatus.getReasonPhrase(),
                 Optional.ofNullable(response.getEntityTag()), result);
         }
 
-        private static <R> Result<R, FailureValue> readEntity(final Method method, final URI uri,
-            final GenericType<R> returnType, final @NotOwning Response response) {
+        private static <R> Result<R, ProblemDescription> readEntity(final Method method, final URI uri,
+            final GenericType<R> returnType, final @NotOwning Response response) throws HubFailureIOException {
             if (!response.hasEntity()) {
                 throw new IllegalStateException("Hub response with missing body: %s %s".formatted(method, uri));
             }
@@ -677,11 +666,12 @@ public class ApiClient implements AutoCloseable {
             try {
                 return Result.success(response.readEntity(returnType));
             } catch (final ProcessingException pe) {
-                return Result.failure(FailureValue.fromProcessingException(pe));
+                throw new HubFailureIOException(
+                    FailureValue.fromProcessingException("Failed to read Hub response", pe));
             }
         }
 
-        private static <R> Result<R, FailureValue> downloadContent(final Method method, final URI uri,
+        private static <R> Result<R, ProblemDescription> downloadContent(final Method method, final URI uri,
             final @NotOwning Response response, final DownloadContentHandler<R> contentHandler)
             throws IOException, CancelationException {
             if (!response.hasEntity()) {
@@ -693,64 +683,6 @@ public class ApiClient implements AutoCloseable {
                 final var contentLength = length < 0 ? OptionalLong.empty() : OptionalLong.of(length);
                 return Result.success(contentHandler.handleDownload(inStream, contentLength));
             }
-        }
-
-        private static FailureValue createFailureValue(final Response response) {
-            final var status = response.getStatusInfo();
-            return switch (status.getFamily()) {
-                case SUCCESSFUL -> throw new IllegalStateException("Unexpected successful response");
-                case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                    .formatted(status.getStatusCode(), status.getReasonPhrase()));
-            };
-        }
-
-        private static FailureValue createFailureForResponse(final Response response) {
-            final var contentType = response.getMediaType();
-            final var responseStatusInfo = response.getStatusInfo();
-            final var statusCode = responseStatusInfo.getStatusCode();
-            if (contentType != null && contentType.isCompatible(APPLICATION_PROBLEM_JSON_TYPE)
-                    && response.hasEntity()) {
-                try {
-                    final var problemDesc = response.readEntity(ProblemDescription.class);
-                    return FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc);
-                } catch (final ProcessingException pe) {
-                    LOGGER.atError() //
-                        .setCause(pe) //
-                        .addArgument(responseStatusInfo.getStatusCode()) //
-                        .addArgument(responseStatusInfo.getReasonPhrase()) //
-                        .log("Hub request failed: {} {}");
-                    return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
-                            "Hub request failed: " + responseStatusInfo.getReasonPhrase());
-                }
-            }
-
-            // Create a exception failure value
-            final var message = StringUtils.getIfBlank(response.hasEntity() ?
-                response.readEntity(String.class) : null, responseStatusInfo::getReasonPhrase);
-            if (statusCode >= 500 && LOGGER.isErrorEnabled()) {
-                LOGGER.atError() //
-                    .setCause(new IOException()) //
-                    .addArgument(statusCode) //
-                    .addArgument(message) //
-                    .log("Hub request failed: {} {}");
-            }
-            return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
-                "Hub request failed: " + message);
-        }
-
-        private static FailureValue createFailureForRedirect(final Response response) {
-            // A redirect is not a failure response, so we don't expect `application/problem+json` here
-            final String message;
-            if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
-                final var location = cxfResponse.getOutMessage().get("transport.retransmit.url");
-                message = "Redirect failed (firewall?): '%s'".formatted(location);
-            } else {
-                message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
-                    null, () -> response.getStatusInfo().getReasonPhrase());
-            }
-            return FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message);
         }
 
         private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {

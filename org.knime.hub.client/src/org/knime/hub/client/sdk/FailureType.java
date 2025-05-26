@@ -67,7 +67,22 @@ public enum FailureType {
     DOWNLOAD_ITEM_IMPORT_FAILED,
     /** THe download stream could not be opened. */
     DOWNLOAD_STREAM_OPEN_FAILED,
+    /**
+     * The download could not be initiated.
+     * @since 0.2
+     */
+    DOWNLOAD_PREPARATION_FAILED,
+    /**
+     * An item could not be downloaded from Catalog.
+     * @since 0.2
+     */
+    DOWNLOAD_ITEM_FAILED,
 
+    /**
+     * Upload could not be initiated.
+     * @since 0.2
+     */
+    UPLOAD_INITIATION_FAILED,
     /** A part of the multi-part upload could not be uploaded. */
     UPLOAD_PART_FAILED,
     /** The upload was aborted while processing on the Hub side. */
@@ -82,12 +97,31 @@ public enum FailureType {
     UPLOAD_LIMIT_EXCEEDED,
     /** Upload of a part was aborted after exhausting its retries. */
     PART_UPLOAD_EXHAUSTED_RETRIES,
-    /** The upload connection could not be created.
-     * @since 0.2*/
+    /**
+     * The upload connection could not be created.
+     * @since 0.2
+     */
     UPLOAD_CONNECTION_CREATION_FAILED,
-    /** The upload stream could not be created.
-     * @since 0.2*/
+    /**
+     * The upload stream could not be created.
+     * @since 0.2
+     */
     UPLOAD_STREAM_CREATION_FAILED,
+    /**
+     * The Hub call to report the upload as finished failed.
+     * @since 0.2
+     */
+    UPLOAD_FINISHED_CALL_FAILED,
+    /**
+     * The Hub failed to return an upload part URL.
+     * @since 0.2
+     */
+    UPLOAD_PART_REQUEST_FAILED,
+    /**
+     * The Hub returned a failure when trying to finish the upload.
+     * @since 0.2
+     */
+    UPLOAD_FINISHING_FAILED,
 
     /** A Hub REST call returned a non-successful response code. */
     HUB_FAILURE_RESPONSE,
@@ -99,4 +133,9 @@ public enum FailureType {
     COULD_NOT_AUTHORIZE,
     /** An unexpected error occurred. */
     UNEXPECTED_ERROR,
+    /**
+     * Hub returned a failure result while polling.
+     * @since 0.2
+     */
+    POLLING_CALL_FAILURE
 }

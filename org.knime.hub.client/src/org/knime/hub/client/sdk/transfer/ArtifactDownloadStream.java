@@ -69,8 +69,10 @@ import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
 import org.knime.hub.client.sdk.transfer.AbstractHubTransfer.PollingCallable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,9 +121,14 @@ public final class ArtifactDownloadStream extends FilterInputStream {
         final Optional<URL> downloadUrlOpt;
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = catalogClient.prepareDownload(itemId.id(), version, clientHeaders);
-            final var result = response.result().orElseThrow(HubFailureIOException::new);
-            downloadIdOpt = result.getDownloadId();
-            downloadUrlOpt = result.getDownloadUrl();
+            if (!(response.result() instanceof Success<PreparedDownload, ?> success)) {
+                final var problem = response.result().asFailure().failure();
+                throw new HubFailureIOException(new FailureValue(FailureType.DOWNLOAD_PREPARATION_FAILED,
+                    response.statusCode(), response.headers(), "Download could not be initiated: " + problem.getTitle(),
+                    List.copyOf(problem.getDetails()), null));
+            }
+            downloadIdOpt = success.value().getDownloadId();
+            downloadUrlOpt = success.value().getDownloadUrl();
         }
 
         // if the download ID is available poll the download status until it's ready
@@ -130,7 +137,7 @@ public final class ArtifactDownloadStream extends FilterInputStream {
             downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadIdOpt.get(), cancelChecker);
         } else {
             downloadUrl = downloadUrlOpt.orElseThrow(() -> new HubFailureIOException(
-                FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_PREP_FAILED,
+                FailureValue.withDetails(FailureType.DOWNLOAD_ITEM_PREP_FAILED, "Download initiation failed",
                 "Prepared download response doesn't contain a download ID or URL")));
         }
 
@@ -183,7 +190,8 @@ public final class ArtifactDownloadStream extends FilterInputStream {
 
         return switch (finalState.getStatus()) {
             case ABORTED -> throw new CancelationException();
-            case FAILED -> throw new HubFailureIOException(FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_PREP_FAILED,
+            case FAILED -> throw new HubFailureIOException(
+                FailureValue.withDetails(FailureType.DOWNLOAD_ITEM_PREP_FAILED, "Failed to download item",
                 "Item with ID %s could not be downloaded: %s".formatted(itemId.id(), finalState.getStatusMessage())));
             case PREPARING, ZIPPING -> throw new IllegalStateException(
                 "Stopped polling download early even though no timeout was provided");
@@ -202,8 +210,9 @@ public final class ArtifactDownloadStream extends FilterInputStream {
                 final String errContent = response.hasEntity() ? response.readEntity(String.class) : "";
                 final String message = "Could not open download stream to %s: %s".formatted(response,
                     errContent.isBlank() ? reason : (reason + ": " + errContent));
-                throw new HubFailureIOException(FailureValue.fromHTTP(FailureType.DOWNLOAD_STREAM_OPEN_FAILED,
-                    statusInfo.getStatusCode(), message));
+                throw new HubFailureIOException(
+                    new FailureValue(FailureType.DOWNLOAD_STREAM_OPEN_FAILED, statusInfo.getStatusCode(),
+                        response.getHeaders(), "Failed to initiate download", List.of(message), null));
             }
         }
         return new ArtifactDownloadStream(response);

@@ -61,7 +61,10 @@ import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.IPath;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.FailureType;
+import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
@@ -141,8 +144,13 @@ public class TestUtil {
         final JsonNode knimeHubJSONResponse, final List<String> expectedJsonPaths, final ObjectMapper mapper,
         final Configuration jsonConfig) throws HubFailureIOException {
         // Create the actual JSON node response object.
-        var responseEntity = actualApiResponse.checkSuccessful();
-        JsonNode actualJSONResponse = mapper.valueToTree(responseEntity);
+        if (!(actualApiResponse.result() instanceof Success<R, ?> success)) {
+            final var problem = actualApiResponse.result().asFailure().failure();
+            throw new HubFailureIOException(FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE,
+                actualApiResponse.statusCode(), actualApiResponse.headers(), problem));
+        }
+
+        final var actualJSONResponse = mapper.valueToTree(success.value());
 
         // Compare the JSON properties queried using the expected JSON paths.
         for (var jsonPath : expectedJsonPaths) {

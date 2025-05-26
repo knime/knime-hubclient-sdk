@@ -51,9 +51,9 @@ package org.knime.hub.client.sdk;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.UnaryOperator;
 
 import org.knime.hub.client.sdk.Result.Success;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
 
 import jakarta.ws.rs.core.EntityTag;
 
@@ -76,30 +76,5 @@ public record ApiResponse<R> (
         int statusCode,
         String statusMessage,
         Optional<EntityTag> etag,
-        Result<R, FailureValue> result) {
-
-    /**
-     * Checks that the given response signals success (via a 2XX HTTP status code).
-     *
-     * @return the response body
-     * @throws HubFailureIOException if the request was unsuccessful
-     */
-    public R checkSuccessful() throws HubFailureIOException {
-        return checkSuccessful(msg -> msg);
-    }
-
-    /**
-     * Checks that the given response signals success (via a 2XX HTTP status code).
-     *
-     * @param messageCallback callback for modifying the error message, receiving the message from the response
-     * @return the response body
-     * @throws HubFailureIOException if the request was unsuccessful
-     */
-    public R checkSuccessful(final UnaryOperator<String> messageCallback) throws HubFailureIOException {
-        if (result instanceof Result.Success<R, FailureValue> success) {
-            return success.value();
-        }
-        final var failure = result.asFailure().failure();
-        throw new HubFailureIOException(messageCallback.apply(failure.title()), failure);
-    }
+        Result<R, ProblemDescription> result) {
 }

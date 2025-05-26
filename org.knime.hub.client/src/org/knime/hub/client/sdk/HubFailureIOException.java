@@ -62,13 +62,21 @@ public class HubFailureIOException extends IOException {
 
     private final FailureValue m_failure;
 
+    private static String createMessage(final FailureValue failure) {
+        final var sb = new StringBuilder(failure.title());
+        for (final var detail : failure.details()) {
+            sb.append("\n * ").append(detail);
+        }
+        return sb.toString();
+    }
+
     /**
      * Constructor.
      *
      * @param failure the wrapped failure
      */
     public HubFailureIOException(final FailureValue failure) {
-        this(failure.title(), failure);
+        this(createMessage(failure), failure);
     }
 
     /**

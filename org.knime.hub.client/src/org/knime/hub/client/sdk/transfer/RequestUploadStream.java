@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
@@ -116,7 +117,7 @@ public final class RequestUploadStream extends OutputStream {
         } catch (IOException ex) {
             throw new HubFailureIOException(
                 FailureValue.fromThrowable(FailureType.UPLOAD_CONNECTION_CREATION_FAILED,
-                    "Could not create upload connection", ex));
+                    "Could not create upload connection", List.of(ex.getMessage()), ex));
         }
     }
 
@@ -129,7 +130,7 @@ public final class RequestUploadStream extends OutputStream {
         } catch (IOException ex) {
             throw new HubFailureIOException(
                 FailureValue.fromThrowable(FailureType.UPLOAD_STREAM_CREATION_FAILED,
-                    "Could not create upload stream", ex));
+                    "Could not create upload stream", List.of(ex.getMessage()), ex));
         }
     }
 

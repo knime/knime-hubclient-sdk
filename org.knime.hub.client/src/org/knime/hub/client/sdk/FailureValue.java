@@ -50,7 +50,9 @@ package org.knime.hub.client.sdk;
 
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
@@ -66,6 +68,7 @@ import jakarta.ws.rs.client.ResponseProcessingException;
  *
  * @param type failure type
  * @param status HTTP status, {@code -1} if not applicable
+ * @param headers response headers, empty if not applicable
  * @param title error title for the failure category
  * @param details list of details (user-oriented explanation/hint)
  * @param cause throwable cause of the failure, {@code null} if not applicable
@@ -73,6 +76,7 @@ import jakarta.ws.rs.client.ResponseProcessingException;
 public record FailureValue ( //
     FailureType type,
     int status,
+    Map<String, List<Object>> headers,
     String title, //
     List<String> details, //
     Throwable cause) {
@@ -82,11 +86,14 @@ public record FailureValue ( //
      *
      * @param type failure type
      * @param status HTTP status
+     * @param headers response headers
      * @param problem problem description
      * @return failure value
+     * @since 0.2
      */
-    public static FailureValue fromRFC9457(final FailureType type, final int status, final ProblemDescription problem) {
-        return new FailureValue(type, status, problem.getTitle(), problem.getDetails(), null);
+    public static FailureValue fromRFC9457(final FailureType type, final int status,
+        final Map<String, List<Object>> headers, final ProblemDescription problem) {
+        return new FailureValue(type, status, headers, problem.getTitle(), problem.getDetails(), null);
     }
 
     /**
@@ -95,20 +102,38 @@ public record FailureValue ( //
      * @param type failure type
      * @param title problem title
      * @return failure value
+     * @deprecated use {@link #withDetails(FailureType, String, String...)} instead
      */
+    @Deprecated(forRemoval = true)
     public static FailureValue withTitle(final FailureType type, final String title) {
-        return new FailureValue(type, -1, title, List.of(), null);
+        return new FailureValue(type, -1, Map.of(), title, List.of(), null);
+    }
+
+    /**
+     * Creates a failure value with the given type, title and details.
+     *
+     * @param type failure type
+     * @param title error title for the failure category
+     * @param details list of details (user-oriented explanation/hint)
+     * @return failure value
+     * @since 0.2
+     */
+    public static FailureValue withDetails(final FailureType type, final String title, final String... details) {
+        return new FailureValue(type, -1, Map.of(), title, Arrays.asList(details), null);
     }
 
     /**
      * Creates a failure value for an unexpected {@link Throwable}.
      *
      * @param title problem title
+     * @param details list of details (user-oriented explanation/hint)
      * @param thrw throwable cause
      * @return failure value
+     * @since 0.2
      */
-    public static FailureValue fromUnexpectedThrowable(final String title, final Throwable thrw) {
-        return new FailureValue(FailureType.UNEXPECTED_ERROR, -1, title, List.of(), thrw);
+    public static FailureValue fromUnexpectedThrowable(final String title, final List<String> details,
+        final Throwable thrw) {
+        return new FailureValue(FailureType.UNEXPECTED_ERROR, -1, Map.of(), title, details, thrw);
     }
 
     /**
@@ -116,11 +141,14 @@ public record FailureValue ( //
      *
      * @param type failure type
      * @param title problem title
+     * @param details list of details (user-oriented explanation/hint)
      * @param thrw throwable cause
      * @return failure value
+     * @since 0.2
      */
-    public static FailureValue fromThrowable(final FailureType type, final String title, final Throwable thrw) {
-        return new FailureValue(type, -1, title, List.of(), thrw);
+    public static FailureValue fromThrowable(final FailureType type, final String title, final List<String> details,
+        final Throwable thrw) {
+        return new FailureValue(type, -1, Map.of(), title, details, thrw);
     }
 
     /**
@@ -132,7 +160,7 @@ public record FailureValue ( //
     public static FailureValue forConnectivityProblem(final Throwable thrw) {
         final var message = thrw.getMessage();
         final var title = "Network connectivity problem" + (StringUtils.isBlank(message) ? "" : (": " + message));
-        return new FailureValue(FailureType.NETWORK_CONNECTIVITY_ERROR, -1, title, List.of(), thrw);
+        return new FailureValue(FailureType.NETWORK_CONNECTIVITY_ERROR, -1, Map.of(), title, List.of(), thrw);
     }
 
     /**
@@ -142,19 +170,21 @@ public record FailureValue ( //
      * @param status HTTP status
      * @param title failure title
      * @return failure value
+     * @deprecated use {@link #fromRFC9457(FailureType, int, Map, ProblemDescription)} instead
      */
+    @Deprecated(forRemoval = true)
     public static FailureValue fromHTTP(final FailureType type, final int status, final String title) {
-        return new FailureValue(type, status, title, List.of(), null);
+        return new FailureValue(type, status, Map.of(), title, List.of(), null);
     }
 
     /**
      * Creates a failure value for a logged-out authenticator.
      *
-     * @param cnae cause
+     * @param ex cause
      * @return failure value
      */
-    public static FailureValue fromAuthFailure(final CouldNotAuthorizeException cnae) {
-        return new FailureValue(FailureType.COULD_NOT_AUTHORIZE, -1, "Network connectivity problem", List.of(), cnae);
+    public static FailureValue fromAuthFailure(final CouldNotAuthorizeException ex) {
+        return new FailureValue(FailureType.COULD_NOT_AUTHORIZE, -1, Map.of(), "You are not logged in", List.of(), ex);
     }
 
     /**
@@ -162,8 +192,23 @@ public record FailureValue ( //
      *
      * @param e processing exception
      * @return failure value
+     * @since 0.1
+     * @deprecated use {@link #fromProcessingException(String, ProcessingException)} instead
      */
+    @Deprecated(forRemoval = true)
     public static FailureValue fromProcessingException(final ProcessingException e) {
+        return fromProcessingException("Hub request failed", e);
+    }
+
+    /**
+     * Creates a failure value for problem processing an HTTP request or response.
+     *
+     * @param title failure title
+     * @param e processing exception
+     * @return failure value
+     * @since 0.2
+     */
+    public static FailureValue fromProcessingException(final String title, final ProcessingException e) {
         final var cause = e.getCause();
         if (cause instanceof SocketException || cause instanceof SocketTimeoutException) {
             return forConnectivityProblem(cause);
@@ -172,6 +217,7 @@ public record FailureValue ( //
         final var prefix =
             "Error while processing " + (e instanceof ResponseProcessingException ? "response" : "request");
         final var message = StringUtils.getIfBlank(e.getMessage(), cause::getMessage);
-        return fromUnexpectedThrowable(prefix + (StringUtils.isBlank(message) ? "" : (": " + message)), e.getCause());
+        return FailureValue.fromUnexpectedThrowable(title,
+            List.of(prefix + (StringUtils.isBlank(message) ? "" : (": " + message))), e.getCause());
     }
 }

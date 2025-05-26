@@ -67,6 +67,7 @@ import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.api.HubClientAPI;
 import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
@@ -426,8 +427,10 @@ public final class HubUploader extends AbstractHubTransfer {
                         LOGGER.atDebug().setCause(throwable) //
                             .addArgument(path) //
                             .log("Unexpected exception during upload job for \"{}\"");
-                        return Result.failure(FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR,
-                            throwable.getMessage(), throwable));
+                        return Result.failure(FailureValue.fromUnexpectedThrowable("Upload job failed",
+                            List.of("Unexpected exception (%s): %s"
+                                .formatted(throwable.getClass().getSimpleName(), throwable.getMessage())),
+                            throwable));
                     }
                 });
                 uploaded.put(path, uploadResult);
@@ -473,7 +476,8 @@ public final class HubUploader extends AbstractHubTransfer {
                     size = Files.size(fsPath);
                 }
             } catch (final IOException ioe) {
-                return Result.failure(FailureValue.fromUnexpectedThrowable("Could not read file size", ioe));
+                return Result.failure(FailureValue.fromUnexpectedThrowable("Failed to upload item(s)",
+                    List.of("Could not read file size: " + ioe.getMessage()), ioe));
             }
 
             sizes.put(pathStr, size);
@@ -515,10 +519,10 @@ public final class HubUploader extends AbstractHubTransfer {
             case COMPLETED -> Result.success(finalStatus.getStatusMessage());
             case ANALYSIS_PENDING, PREPARED -> throw new IllegalStateException(
                 "Stopped polling upload early even though no timeout was provided");
-            case ABORTED -> Result
-            .failure(FailureValue.withTitle(FailureType.UPLOAD_ABORTED_BY_HUB, finalStatus.getStatusMessage()));
-            case FAILED -> Result.failure(
-                FailureValue.withTitle(FailureType.UPLOAD_PROCESSING_FAILED, finalStatus.getStatusMessage()));
+            case ABORTED -> Result.failure(FailureValue.withDetails(FailureType.UPLOAD_ABORTED_BY_HUB,
+                "Upload processing aborted", "Response from Hub: " + finalStatus.getStatusMessage()));
+            case FAILED -> Result.failure(FailureValue.withDetails(FailureType.UPLOAD_PROCESSING_FAILED,
+                "Upload processing failed", "Response from Hub: " + finalStatus.getStatusMessage()));
         };
     }
 
@@ -581,8 +585,9 @@ public final class HubUploader extends AbstractHubTransfer {
             } catch (final HubFailureIOException ex) { // NOSONAR
                 return ex.asFailure();
             } catch (final IOException ex) {
-                return Result.failure(FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED,
-                    "Upload of '%s' failed: %s".formatted(path, ex.getMessage()), ex));
+                return Result.failure(
+                    FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED, "Failed to upload workflow",
+                        List.of("Upload of '%s' failed: %s".formatted(path, ex.getMessage())), ex));
             }
 
             final var uploadResult =
@@ -606,8 +611,8 @@ public final class HubUploader extends AbstractHubTransfer {
         try {
             numBytes = Files.size(dataFile);
         } catch (final IOException ioe) {
-            return Result.failure( //
-                FailureValue.fromUnexpectedThrowable("Could not read file size: " + ioe.getMessage(), ioe));
+            return Result.failure(FailureValue.fromUnexpectedThrowable("Failed to upload file",
+                List.of("Could not read file size: " + ioe.getMessage()), ioe));
         }
 
         final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads = new ArrayDeque<>();
@@ -646,10 +651,12 @@ public final class HubUploader extends AbstractHubTransfer {
             }
 
             try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-                final Result<Void, FailureValue> result = m_catalogClient.reportUploadFinished( //
-                    uploadId, partsSuccess.value(), m_clientHeaders).result();
+                final var response =
+                        m_catalogClient.reportUploadFinished(uploadId, partsSuccess.value(), m_clientHeaders);
+                final Result<Void, ProblemDescription> result = response.result();
                 success = result.successful();
-                return result;
+                return result.mapFailure(problem -> FailureValue.fromRFC9457(FailureType.UPLOAD_FINISHING_FAILED,
+                    response.statusCode(), response.headers(), problem));
             } catch (final HubFailureIOException ex) { // NOSONAR failure is propagated
                 return ex.asFailure();
             }
@@ -692,8 +699,8 @@ public final class HubUploader extends AbstractHubTransfer {
         final SortedMap<Integer, String> finished = new TreeMap<>();
         while (!pendingUploads.isEmpty()) {
             final var result = waitForCancellable(pendingUploads.getFirst(), cancelChecker,
-                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
-                    "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
+                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable("Failed to upload item",
+                    List.of("Unexpected error while uploading item: " + throwable.getMessage()), throwable)));
 
             // only remove after the future has finished, otherwise it can't be cleaned up
             pendingUploads.removeFirst();
@@ -719,8 +726,8 @@ public final class HubUploader extends AbstractHubTransfer {
         awaitPartFinished(final Future<Result<Pair<Integer, EntityTag>, FailureValue>> pendingUpload) {
         try {
             return waitForCancellable(pendingUpload, () -> false,
-                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable(
-                    "Unexpected error while uploading item: " + throwable.getMessage(), throwable)));
+                throwable -> Result.failure(FailureValue.fromUnexpectedThrowable("Failed to upload item",
+                    List.of("Unexpected error while uploading item: " + throwable.getMessage()), throwable)));
         } catch (CancelationException ex) {
             // can't be canceled, so this would be a bug
             throw new IllegalStateException("Upload was canceled unexpectedly", ex);
@@ -751,8 +758,12 @@ public final class HubUploader extends AbstractHubTransfer {
                 catalogClient.initiateUpload(parentId.id(), manifest, SLOW_OPERATION_READ_TIMEOUT, headers);
             if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
                 return Result.success(Optional.empty());
+            } else if (response.result() instanceof Success<UploadStarted, ?> success) {
+                return Result.success(Optional.of(success.value()));
             } else {
-                return response.result().map(Optional::of);
+                final var problem = response.result().asFailure().failure();
+                throw new HubFailureIOException(FailureValue.fromRFC9457(FailureType.UPLOAD_INITIATION_FAILED,
+                    response.statusCode(), response.headers(), problem));
             }
         }
     }
@@ -821,7 +832,7 @@ public final class HubUploader extends AbstractHubTransfer {
         }
 
         @Override
-        public UploadTarget fetch(final int partNo) throws IOException, CouldNotAuthorizeException {
+        public UploadTarget fetch(final int partNo) throws IOException {
             // get and remove initial part, a new one will be requested if this one didn't work
             final var initial = m_initialParts.remove(partNo);
             if (initial != null) {
@@ -830,7 +841,12 @@ public final class HubUploader extends AbstractHubTransfer {
 
             try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
                 final var response = m_client.requestPartUpload(m_uploadId, partNo, m_clientHeaders);
-                return response.checkSuccessful();
+                if (response.result() instanceof Success<UploadTarget, ?> success) {
+                    return success.value();
+                }
+
+                throw new HubFailureIOException(FailureValue.fromRFC9457(FailureType.UPLOAD_PART_REQUEST_FAILED,
+                    response.statusCode(), response.headers(), response.result().asFailure().failure()));
             }
         }
     }

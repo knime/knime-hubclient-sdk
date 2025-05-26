@@ -171,12 +171,12 @@ public final class HubDownloader extends AbstractHubTransfer {
                 var repositoryItem = deepListedItems.get(itemId.id());
                 if (repositoryItem == null) {
                     final var message = "Item '%s' could not be found".formatted(itemId.id());
-                    notDownloadable.put(IPath.forPosix(itemId.id()),
-                        FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_NOT_FOUND, message));
+                    notDownloadable.put(IPath.forPosix(itemId.id()), FailureValue.withDetails(
+                        FailureType.DOWNLOAD_ITEM_NOT_FOUND, "Failed to initiate download", message));
                 } else if (!firstParent.getMasonControls().containsKey(DOWNLOAD)) {
                     final var message = "Item at '" + repositoryItem.getPath() + "' cannot be downloaded.";
-                    notDownloadable.put(IPath.forPosix(itemId.id()),
-                        FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_NOT_DOWNLOADABLE, message));
+                    notDownloadable.put(IPath.forPosix(itemId.id()), FailureValue.withDetails(
+                        FailureType.DOWNLOAD_ITEM_NOT_DOWNLOADABLE, "Failed to initiate download", message));
                 } else {
                     final var rootPath = IPath.forPosix(repositoryItem.getPath());
                     progMon.subTask("Analyzing '%s'".formatted(
@@ -298,7 +298,9 @@ public final class HubDownloader extends AbstractHubTransfer {
                             .addArgument(thrw.getMessage()) //
                             .log("Unexpected error while downloading item \"{}\": {}");
                         return Result.failure(FailureValue.fromUnexpectedThrowable(
-                            "Failed to download item '" + pathInTarget + "': " + thrw.getMessage(), thrw));
+                            "Failed to download item", List.of("Exception while downloading '%s' (%s): %s"
+                                .formatted(pathInTarget, thrw.getClass().getSimpleName(), thrw.getMessage())),
+                            thrw));
                     }
                 };
 
@@ -370,8 +372,8 @@ public final class HubDownloader extends AbstractHubTransfer {
             try {
                 tempFile = new AtomicReference<>(m_tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
             } catch (final IOException ex) {
-                return Result.failure(
-                    FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR, "Could not create temporary file", ex));
+                return Result.failure(FailureValue.fromUnexpectedThrowable("Failed to download item",
+                    List.of("Could not create temporary file: " + ex.getMessage()), ex));
             }
 
             final var hubItem = m_download.item();
@@ -389,8 +391,8 @@ public final class HubDownloader extends AbstractHubTransfer {
                 } catch (HubFailureIOException ex) { // NOSONAR
                     return ex.asFailure();
                 } catch (IOException ex) {
-                    return Result.failure(
-                        FailureValue.fromThrowable(FailureType.UNEXPECTED_ERROR, "Failed to download item", ex));
+                    return Result.failure(FailureValue.fromUnexpectedThrowable("Failed to download item",
+                        List.of("Unexpected I/O exception: " + ex.getMessage()), ex));
                 }
             } finally {
                 LOGGER.atDebug() //
@@ -413,7 +415,8 @@ public final class HubDownloader extends AbstractHubTransfer {
                     writeStreamToFileWithProgress(in, numBytes, tempFile.get(), m_monitor);
                     return tempFile.getAndSet(null);
                 });
-            return response.result();
+            return response.result().mapFailure(problem -> FailureValue.fromRFC9457(FailureType.DOWNLOAD_ITEM_FAILED,
+                response.statusCode(), response.headers(), problem));
         }
 
         private Result<Path, FailureValue> performArtifactDownload(final AtomicReference<Path> tempFile)
@@ -455,7 +458,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         } else {
             final var message = "Unexpected item type at '" + itemPath + "': " + repositoryItem.getType();
             results.put(targetPath, Pair.of(hubItem,
-                Result.failure(FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_UNKNOWN_TYPE, message))));
+                Result.failure(FailureValue.withDetails(FailureType.DOWNLOAD_ITEM_UNKNOWN_TYPE, message))));
             return 0L;
         }
         return size;
