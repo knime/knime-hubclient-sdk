@@ -674,13 +674,15 @@ public final class CatalogServiceClient {
      *            item is renamed or moved. (required)
      * @param canonicalPath The new canonical path of the repository item
      * @param force Whether to force the copy or move operation, i.e. overwrite existing items
+     * @param ifTargetMatch the If-Target-Match header
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final IPath canonicalPath,
-        final boolean force, final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        final boolean force, final String ifTargetMatch, final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(canonicalPath);
 
@@ -690,8 +692,10 @@ public final class CatalogServiceClient {
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.POST,
-                new CopyOrMoveRequestBody(canonicalPath.toString(), force), REPOSITORY_ITEM);
+            .invokeAPI(requestPath, Method.POST, CopyOrMoveRequestBody.builder()
+                    .withCanoncialPath(canonicalPath.toString()).withForce(force)
+                    .withIfTargetMatch(ifTargetMatch)
+                    .build(), REPOSITORY_ITEM);
     }
 
     /**
@@ -742,13 +746,15 @@ public final class CatalogServiceClient {
      *            item is renamed or moved. (required)
      * @param canonicalPath The new canonical path of the repository item
      * @param force Whether to force the copy or move operation, i.e. overwrite existing items
+     * @param ifTargetMatch The If-Target-Match header
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final IPath canonicalPath,
-        final boolean force, final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        final boolean force, final String ifTargetMatch, final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(canonicalPath);
 
@@ -758,8 +764,10 @@ public final class CatalogServiceClient {
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE)//
             .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, Method.PUT,
-                new CopyOrMoveRequestBody(canonicalPath.toString(), force), REPOSITORY_ITEM);
+            .invokeAPI(requestPath, Method.PUT, CopyOrMoveRequestBody.builder()
+                .withCanoncialPath(canonicalPath.toString()).withForce(force)
+                .withIfTargetMatch(ifTargetMatch)
+                .build(), REPOSITORY_ITEM);
     }
 
     /**
@@ -1105,13 +1113,14 @@ public final class CatalogServiceClient {
      * @param id The ID of the space to rename
      * @param name The new name of the space
      * @param force Whether to force the space rename, i.e. overwrite existing items
+     * @param ifTargetMatch The If-Target-Match header
      * @param additionalHeaders additional header parameters
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<RepositoryItem> renameSpace(final String id, final String name, final boolean force,
-        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        final String ifTargetMatch, final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
         CheckUtils.checkArgumentNotNull(name);
 
@@ -1121,7 +1130,11 @@ public final class CatalogServiceClient {
                 .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
                 .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
                 .withHeaders(additionalHeaders) //
-                .invokeAPI(requestPath, Method.PUT, new SpaceRenameRequestBody(name, force), REPOSITORY_ITEM);
+                .invokeAPI(requestPath, Method.PUT, SpaceRenameRequestBody.builder()
+                    .withName(name)
+                    .withForce(force)
+                    .withIfTargetMatch(ifTargetMatch)
+                    .build(), REPOSITORY_ITEM);
     }
 
     /**

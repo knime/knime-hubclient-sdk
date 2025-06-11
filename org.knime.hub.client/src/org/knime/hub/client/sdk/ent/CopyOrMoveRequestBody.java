@@ -48,14 +48,166 @@
  */
 package org.knime.hub.client.sdk.ent;
 
+import java.util.Objects;
+import java.util.Optional;
+
+import org.knime.hub.client.sdk.ent.SpaceRequestBody.SpaceRequestBodyBuilder;
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+
 /**
  * Request body for copy or move request.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- *
- * @param canonicalPath The new canonical path of the repository item
- * @param force Whether to force the copy or move operation, i.e. overwrite existing items
  */
-public record CopyOrMoveRequestBody(
-    String canonicalPath,
-    boolean force) {}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class CopyOrMoveRequestBody {
+
+    private static final String JSON_PROPERTY_CANONICAL_PATH = "canonicalPath";
+    private final String m_canonicalPath;
+
+    private static final String JSON_PROPERTY_FORCE = "force";
+    private final boolean m_force;
+
+    private static final String JSON_PROPERTY_IF_TARGET_MATCH = "If-Target-Match";
+    private final String m_ifTargetMatch;
+
+    @JsonCreator
+    private CopyOrMoveRequestBody(
+            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+            @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
+            @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
+        this.m_canonicalPath = canonicalPath;
+        this.m_force = force;
+        this.m_ifTargetMatch = ifTargetMatch;
+    }
+
+    /**
+     * Retrieves the new canonical path of the repository item.
+     *
+     * @return canoncialPath
+     */
+    @JsonProperty(JSON_PROPERTY_CANONICAL_PATH)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public String getCanonicalPath() {
+        return m_canonicalPath;
+    }
+
+    /**
+     * Whether to force the copy or move operation, i.e. overwrite existing items.
+     *
+     * @return tags
+     */
+    @JsonProperty(JSON_PROPERTY_FORCE)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public boolean isForce() {
+        return m_force;
+    }
+
+    /**
+     * Returns the If-Target-Match header.
+     *
+     * @return If-Target-Match header
+     */
+    @JsonProperty(JSON_PROPERTY_IF_TARGET_MATCH)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public Optional<String> getIfTargetMatch() {
+        return Optional.ofNullable(m_ifTargetMatch);
+    }
+
+    /**
+     * Creates a new {@link SpaceRequestBodyBuilder}.
+     *
+     * @return builder
+     */
+    public static CopyOrMoveRequestBodyBuilder builder() {
+        return new CopyOrMoveRequestBodyBuilder();
+    }
+
+    /**
+     * Builder for {@link CopyOrMoveRequestBody}.
+     */
+    public static final class CopyOrMoveRequestBodyBuilder {
+        private String m_canonicalPath;
+        private boolean m_force;
+        private String m_ifTargetMatch;
+
+        private CopyOrMoveRequestBodyBuilder() {
+        }
+
+        /**
+         * Sets the canonical path.
+         *
+         * @param canoncialPath the canonical path
+         * @return this
+         */
+        public CopyOrMoveRequestBodyBuilder withCanoncialPath(final String canoncialPath) {
+            m_canonicalPath = canoncialPath;
+            return this;
+        }
+
+        /**
+         * Sets the force parameter.
+         *
+         * @param force the force parameter
+         * @return this
+         */
+        public CopyOrMoveRequestBodyBuilder withForce(final boolean force) {
+            m_force = force;
+            return this;
+        }
+
+        /**
+         * Sets a value for the IF-Target-Match header.
+         *
+         * @param ifTargetMatch the if target match header value
+         * @return this
+         */
+        public CopyOrMoveRequestBodyBuilder withIfTargetMatch(final String ifTargetMatch) {
+            m_ifTargetMatch = ifTargetMatch;
+            return this;
+        }
+
+        /**
+         * Builds a new {@link CopyOrMoveRequestBody}.
+         *
+         * @return copyOrMoveRequestBody
+         */
+        public CopyOrMoveRequestBody build() {
+            return new CopyOrMoveRequestBody(m_canonicalPath, m_force, m_ifTargetMatch);
+        }
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var copyOrMoveBody = (CopyOrMoveRequestBody) o;
+        return Objects.equals(this.m_canonicalPath, copyOrMoveBody.m_canonicalPath)
+                && Objects.equals(this.m_force, copyOrMoveBody.m_force)
+                && Objects.equals(this.m_ifTargetMatch, copyOrMoveBody.m_ifTargetMatch);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_canonicalPath, m_force, m_ifTargetMatch);
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
+        }
+    }
+}
