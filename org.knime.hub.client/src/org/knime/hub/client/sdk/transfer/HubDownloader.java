@@ -69,6 +69,8 @@ import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.ws.rs.core.MediaType;
+
 /**
  * Downloader for sets of items from a Hub.
  *
@@ -285,6 +287,11 @@ public final class HubDownloader extends AbstractHubTransfer {
                     } else if (thrw instanceof CouldNotAuthorizeException cnae) {
                         return Result.failure(FailureValue.fromAuthFailure(cnae));
                     } else {
+                        LOGGER.atError() //
+                            .setCause(thrw) //
+                            .addArgument(pathInTarget) //
+                            .addArgument(thrw.getMessage()) //
+                            .log("Unexpected error while downloading item \"{}\": {}");
                         return Result.failure(FailureValue.fromUnexpectedThrowable(
                             "Failed to download item '" + pathInTarget + "': " + thrw.getMessage(), thrw));
                     }
@@ -394,7 +401,7 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private Result<Path, FailureValue> performDownload(final AtomicReference<Path> tempFile)
             throws IOException, CancelationException {
-            final var response = m_catalogClient.downloadItemById(m_download.id().id(), null, null,
+            final var response = m_catalogClient.downloadItemById(m_download.id().id(), null, MediaType.WILDCARD_TYPE,
                 m_clientHeaders, (in, contentLength) -> {
                     // prefer size from the HTTP request if available, fall back to Catalog information otherwise
                     final var numBytes = contentLength.orElse(m_download.size().orElse(-1));
