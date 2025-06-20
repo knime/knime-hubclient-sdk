@@ -140,7 +140,7 @@ public final class Billboard {
      *
      * @return <code>true</code> if the checkbox should be enabled, <code>false</code> otherwise.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_ENABLE_RESET_ON_UPLOAD_CHECKBOX)
     public Optional<Boolean> isEnableResetOnUploadCheckbox() {
         return Optional.ofNullable(m_enableResetOnUploadCheckbox);
@@ -151,7 +151,7 @@ public final class Billboard {
      *
      * @return the necessary information.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_OAUTH_INFORMATION)
     public Optional<OAuthAuthenticationInformation> getOAuthInformation() {
         return Optional.ofNullable(m_oAuthInformation);
@@ -162,7 +162,7 @@ public final class Billboard {
      *
      * @return <code>true</code> if the workflow should be reset, <code>false</code> otherwise.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_FORCE_RESET_ON_UPLOAD)
     public Optional<Boolean> isForceResetOnUpload() {
         return Optional.ofNullable(m_forceResetOnUpload);
@@ -173,7 +173,7 @@ public final class Billboard {
      *
      * @return the timeout
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_FETCH_TIMEOUT)
     public Optional<Duration> getClientExplorerFetchTimeout() {
         return Optional.ofNullable(m_fetchTimeout);
@@ -184,7 +184,7 @@ public final class Billboard {
      *
      * @return the refresh interval
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_FETCH_INTERVAL)
     public Optional<Duration> getClientExplorerFetchInterval() {
         return Optional.ofNullable(m_fetchInterval);

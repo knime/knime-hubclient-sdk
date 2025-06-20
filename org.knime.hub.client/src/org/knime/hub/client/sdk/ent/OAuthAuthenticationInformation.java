@@ -90,7 +90,7 @@ public final class OAuthAuthenticationInformation {
      *
      * @return the token end point.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_TOKEN_ENDPOINT)
     public Optional<URL> getTokenEndpoint() {
         return Optional.ofNullable(m_tokenEndpoint);
@@ -101,7 +101,7 @@ public final class OAuthAuthenticationInformation {
      *
      * @return the client id.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_CLIENT_ID)
     public Optional<String> getClientId() {
         return Optional.ofNullable(m_clientId);
@@ -112,7 +112,7 @@ public final class OAuthAuthenticationInformation {
      *
      * @return the authorization end point.
      */
-    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonProperty(JSON_PROPERTY_AUTHORIZATION_ENDPOINT)
     public Optional<URL> getAuthorizationEndpoint() {
         return Optional.ofNullable(m_authorizationEndpoint);

@@ -78,6 +78,8 @@ import jakarta.ws.rs.core.MediaType;
  */
 public final class HubDownloader extends AbstractHubTransfer {
 
+    private static final String DISABLE_ARTIFACT_DOWNLOAD_PROPERTY = "knime.hub.client.disableArtifactDownload";
+
     /**
      * Reference to an item in the Hub repository.
      *
@@ -209,6 +211,9 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static boolean supportsArtifactDownload(final Map<String, Control> spaceParentControls) {
+        if (Boolean.parseBoolean(System.getProperty(DISABLE_ARTIFACT_DOWNLOAD_PROPERTY))) {
+            return false;
+        }
         return spaceParentControls.containsKey(INITIATE_DOWNLOAD);
     }
 

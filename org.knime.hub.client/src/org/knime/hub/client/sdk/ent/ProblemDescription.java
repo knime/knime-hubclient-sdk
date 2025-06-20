@@ -125,7 +125,7 @@ public final class ProblemDescription {
      * @return type
      */
     @JsonProperty(JSON_PROPERTY_TYPE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getType() {
         return Optional.ofNullable(m_type);
     }
@@ -136,7 +136,7 @@ public final class ProblemDescription {
      * @return status
      */
     @JsonProperty(JSON_PROPERTY_STATUS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getStatus() {
         return Optional.ofNullable(m_status);
     }
@@ -158,7 +158,7 @@ public final class ProblemDescription {
      * @return instance
      */
     @JsonProperty(JSON_PROPERTY_INSTANCE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getInstance() {
         return Optional.ofNullable(m_instance);
     }
@@ -169,7 +169,7 @@ public final class ProblemDescription {
      * @return details
      */
     @JsonProperty(JSON_PROPERTY_DETAILS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public List<String> getDetails() {
         return Optional.ofNullable(m_details).orElseGet(Collections::emptyList);
     }
@@ -180,7 +180,7 @@ public final class ProblemDescription {
      * @return code
      */
     @JsonProperty(JSON_PROPERTY_CODE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getCode() {
         return Optional.ofNullable(m_code);
     }

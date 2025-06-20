@@ -115,7 +115,7 @@ public final class SpaceRenameRequestBody {
      * @return If-Target-Match header
      */
     @JsonProperty(JSON_PROPERTY_IF_TARGET_MATCH)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getIfTargetMatch() {
         return Optional.ofNullable(m_ifTargetMatch);
     }
