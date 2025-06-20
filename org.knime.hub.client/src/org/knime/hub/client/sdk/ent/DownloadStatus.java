@@ -202,7 +202,7 @@ public final class DownloadStatus {
      * @return download URL
      */
     @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<URL> getDownloadUrl() {
         return Optional.ofNullable(m_downloadUrl);
     }

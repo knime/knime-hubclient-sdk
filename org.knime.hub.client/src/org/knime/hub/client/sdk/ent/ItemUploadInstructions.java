@@ -63,7 +63,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 /**
  * POJO representing the ID of the prepared upload, together with a specification of the request
  * to actually upload an item.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -78,8 +78,8 @@ public final class ItemUploadInstructions {
 
     @JsonCreator
     private ItemUploadInstructions(
-            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID) String uploadId,
-            @JsonProperty(value = JSON_PROPERTY_UPLOAD_PARTS) 
+            @JsonProperty(value = JSON_PROPERTY_UPLOAD_ID) final String uploadId,
+            @JsonProperty(value = JSON_PROPERTY_UPLOAD_PARTS) final
             Map<Integer, UploadTarget> parts) {
         this.m_uploadId = uploadId;
         this.m_parts = Optional.ofNullable(parts);
@@ -88,7 +88,7 @@ public final class ItemUploadInstructions {
     /**
      * Retrieves the ID of the upload; allows clients to track the status of the upload
      * process.
-     * 
+     *
      * @return uploadId
      */
     @JsonProperty(JSON_PROPERTY_UPLOAD_ID)
@@ -99,17 +99,17 @@ public final class ItemUploadInstructions {
 
     /**
      * Retrieves the upload instructions per part upload.
-     * 
+     *
      * @return uploadUrl
      */
     @JsonProperty(JSON_PROPERTY_UPLOAD_PARTS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<Map<Integer, UploadTarget>> getParts() {
         return m_parts;
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

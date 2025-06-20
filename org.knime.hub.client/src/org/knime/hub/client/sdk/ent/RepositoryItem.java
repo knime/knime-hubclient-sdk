@@ -258,7 +258,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @return description
      */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDescription() {
         return Optional.ofNullable(m_description);
     }
