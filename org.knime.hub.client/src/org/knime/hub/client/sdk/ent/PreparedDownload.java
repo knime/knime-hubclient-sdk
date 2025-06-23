@@ -48,7 +48,9 @@
  */
 package org.knime.hub.client.sdk.ent;
 
+import java.net.URL;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
@@ -69,21 +71,36 @@ public final class PreparedDownload {
     private static final String JSON_PROPERTY_DOWNLOAD_ID = "downloadId";
     private final String m_downloadId;
 
+    private static final String JSON_PROPERTY_DOWNLOAD_URL = "downloadUrl";
+    private final URL m_downloadUrl;
+
     @JsonCreator
-    private PreparedDownload(
-        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID, required = true) final String downloadId) {
+    private PreparedDownload(@JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID) final String downloadId,
+        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_URL) final URL downloadUrl) {
         m_downloadId = downloadId;
+        m_downloadUrl = downloadUrl;
     }
 
     /**
-     * Retrieves the HTTP method of the upload instruction.
+     * Retrieves the download ID.
      *
-     * @return itemContentType
+     * @return downloadId
      */
     @JsonProperty(JSON_PROPERTY_DOWNLOAD_ID)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
-    public String getDownloadId() {
-        return m_downloadId;
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDownloadId() {
+        return Optional.ofNullable(m_downloadId);
+    }
+
+    /**
+     * Retrieves the download URL.
+     *
+     * @return downlopadUrl
+     */
+    @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<URL> getDownloadUrl() {
+        return Optional.ofNullable(m_downloadUrl);
     }
 
     @Override
@@ -95,12 +112,13 @@ public final class PreparedDownload {
             return false;
         }
         var preparedDownload = (PreparedDownload) o;
-        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId);
+        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId)
+                && Objects.equals(this.m_downloadUrl, preparedDownload.m_downloadUrl);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_downloadId);
+        return Objects.hash(m_downloadId, m_downloadUrl);
     }
 
     @Override

@@ -415,9 +415,19 @@ class EntityCreationTest {
 
     @Test
     void testPreparedDownloadCreation() throws IOException, URISyntaxException {
-        final var preparedDownload = load("preparedDownload.json", PreparedDownload.class);
-        assertEquals("f9226530-f9e6-4e1c-9944-82baf1d43cb3",
-                preparedDownload.getDownloadId(), "Unexpected download ID");
+        final var preparedDownloadWithId = load("preparedDownloadWithId.json", PreparedDownload.class);
+        var downloadIdOpt = preparedDownloadWithId.getDownloadId();
+        var downloadUrlOpt = preparedDownloadWithId.getDownloadUrl();
+        assertTrue(downloadIdOpt.isPresent(), "Expected download Id");
+        assertTrue(downloadUrlOpt.isEmpty(), "Unexpected download url");
+        assertEquals("f9226530-f9e6-4e1c-9944-82baf1d43cb3", downloadIdOpt.get(), "Unexpected download ID");
+
+        final var preparedDownloadWithUrl = load("preparedDownloadWithURL.json", PreparedDownload.class);
+        downloadIdOpt = preparedDownloadWithUrl.getDownloadId();
+        downloadUrlOpt = preparedDownloadWithUrl.getDownloadUrl();
+        assertTrue(downloadIdOpt.isEmpty(), "Unexpected download Id");
+        assertTrue(downloadUrlOpt.isPresent(), "Expected download url");
+        assertEquals("https://s3.us-east-1.amazonaws.com/", downloadUrlOpt.get().toString(), "Unexpected download URL");
     }
 
     @Test

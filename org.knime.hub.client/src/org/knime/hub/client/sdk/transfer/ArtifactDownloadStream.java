@@ -115,14 +115,24 @@ public final class ArtifactDownloadStream extends FilterInputStream {
             .addArgument(itemId.id()) //
             .log("Preparing download of item with ID: {}");
 
-        final String downloadId;
+        final Optional<String> downloadIdOpt;
+        final Optional<URL> downloadUrlOpt;
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response = catalogClient.prepareDownload(itemId.id(), version, clientHeaders);
-            downloadId = response.result().orElseThrow(HubFailureIOException::new).getDownloadId();
+            final var result = response.result().orElseThrow(HubFailureIOException::new);
+            downloadIdOpt = result.getDownloadId();
+            downloadUrlOpt = result.getDownloadUrl();
         }
 
-        // poll the download status until it's ready
-        final var downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadId, cancelChecker);
+        // if the download ID is available poll the download status until it's ready
+        final URL downloadUrl;
+        if (downloadIdOpt.isPresent()) {
+            downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadIdOpt.get(), cancelChecker);
+        } else {
+            downloadUrl = downloadUrlOpt.orElseThrow(() -> new HubFailureIOException(
+                FailureValue.withTitle(FailureType.DOWNLOAD_ITEM_PREP_FAILED,
+                "Prepared download response doesn't contain a download ID or URL")));
+        }
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
