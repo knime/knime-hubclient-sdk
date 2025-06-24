@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,12 +41,11 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Jul 1, 2025 (magnus): created
  */
-
 package org.knime.hub.client.sdk.ent.catalog;
 
 import java.time.ZonedDateTime;
@@ -56,27 +56,24 @@ import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing a Component.
+ * POJO representing a metanode or subnode template in the server repository.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class Component extends RepositoryItem implements Sized {
+public final class Template extends RepositoryItem implements Sized {
 
-    static final String TYPE = "Component";
+    static final String TYPE = "WorkflowTemplate";
 
     private static final String JSON_PROPERTY_SIZE = "size";
     private final long m_size;
 
     @JsonCreator
-    private Component(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
+    private Template(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
@@ -86,14 +83,14 @@ public final class Component extends RepositoryItem implements Sized {
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Component.JSON_PROPERTY_SIZE) final long size) {
-        super(path, canonicalPath, id, owner, ownerAccountId,
-            createdOn, description, lastUploadedOn, details, masonControls);
+        @JsonProperty(value = Template.JSON_PROPERTY_SIZE) final long size) {
+        super(path, canonicalPath, id, owner, ownerAccountId, createdOn, description, lastUploadedOn, details,
+            masonControls);
         m_size = size;
     }
 
     /**
-     * Retrieves the compressed components file size in bytes.
+     * Retrieves the compressed template file size in bytes.
      *
      * @return size
      */
@@ -106,7 +103,7 @@ public final class Component extends RepositoryItem implements Sized {
 
     @Override
     public RepositoryItemType getType() {
-        return RepositoryItemType.COMPONENT;
+        return RepositoryItemType.WORKFLOW_TEMPLATE;
     }
 
     @Override
@@ -117,8 +114,8 @@ public final class Component extends RepositoryItem implements Sized {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var component = (Component) o;
-        return Objects.equals(this.m_size, component.m_size) && super.equals(o);
+        var template = (Template) o;
+        return Objects.equals(this.m_size, template.m_size) && super.equals(o);
     }
 
     @Override
@@ -134,4 +131,5 @@ public final class Component extends RepositoryItem implements Sized {
             throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
     }
+
 }

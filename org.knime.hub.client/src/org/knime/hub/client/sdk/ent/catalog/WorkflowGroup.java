@@ -48,6 +48,7 @@
 
 package org.knime.hub.client.sdk.ent.catalog;
 
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -97,21 +98,28 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * @param canonicalPath the canonical path of the workflow group
      * @param id the ID of a workflow group
      * @param owner the owner of a workflow group
+     * @param ownerAccountId the owner account ID of a workflow group
+     * @param createdOn the time of creation
      * @param description the description of a workflow group
+     * @param lastUploadedOn the time of last upload/overwrite
      * @param details the details of a workflow group
      * @param masonControls the mason controls of a workflow group
      * @param children the children of a workflow group
      */
     @JsonCreator
     protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CREATED_ON) final ZonedDateTime createdOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
         @JsonProperty(value = WorkflowGroup.JSON_PROPERTY_CHILDREN) final List<RepositoryItem> children) {
-        super(path, canonicalPath, id, owner, description, details, masonControls);
+        super(path, canonicalPath, id, owner, ownerAccountId,
+            createdOn, description, lastUploadedOn, details, masonControls);
         this.m_children = children;
     }
 

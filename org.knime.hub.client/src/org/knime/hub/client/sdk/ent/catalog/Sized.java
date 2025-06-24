@@ -60,5 +60,5 @@ public interface Sized {
      *
      * @return size
      */
-    long getSize();
+    Long getSize();
 }

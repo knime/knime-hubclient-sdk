@@ -84,19 +84,26 @@ class HubClientAPITest extends AbstractTest {
     		formatted(DEFAULT_USERNAME, DEFAULT_PRIVATE_SPACE_NAME);
 
     public static final String JSON_PATH_PATH = "$['path']";
+    public static final String JSON_PATH_CANONICAL_PATH =  "$['canonicalPath']";
     public static final String JSON_PATH_ID = "$['id']";
     public static final String JSON_PATH_TYPE = "$['type']";
     public static final String JSON_PATH_OWNER = "$['owner']";
+    public static final String JSON_PATH_OWNER_ACCOUNT_ID = "$['ownerAccountId']";
+    public static final String JSON_PATH_CREATED_ON = "$['createdOn']";
     public static final String JSON_PATH_DESCRIPTION = "$['description']";
+    public static final String JSON_PATH_LAST_UPLOADED_ON = "$['lastUploadedOn']";
     public static final String JSON_PATH_DETAILS_SPACE_ID = "$['details']['space']['spaceId']";
     public static final String JSON_PATH_MASON_CONTROLS_HREF = "$['@controls'][*]['href']";
     public static final String JSON_PATH_MASON_CONTROLS_METHOD = "$['@controls'][*]['method']";
 
     public static final String JSON_PATH_CHILD_ITEM_PATH = "$['children'][*]['path']";
+    public static final String JSON_PATH_CHILD_ITEM_CANONICAL_PATH = "$['children'][*]['canonicalPath']";
     public static final String JSON_PATH_CHILD_ITEM_ID = "$['children'][*]['id']";
     public static final String JSON_PATH_CHILD_ITEM_TYPE = "$['children'][*]['type']";
     public static final String JSON_PATH_CHILD_ITEM_OWNER = "$['children'][*]['owner']";
+    public static final String JSON_PATH_CHILD_ITEM_CREATED_ON = "$['children'][*]['createdOn']";
     public static final String JSON_PATH_CHILD_ITEM_DESCRIPTION = "$['children'][*]['description']";
+    public static final String JSON_PATH_CHILD_ITEM_LAST_UPLOADED_ON = "$['children'][*]['lastUploadedOn']";
 
     public static final String JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF =
     		"$['children'][*]['@controls'][*]['href']";
@@ -143,9 +150,9 @@ class HubClientAPITest extends AbstractTest {
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
-                JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD);
+                JSON_PATH_PATH, JSON_PATH_CANONICAL_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_OWNER_ACCOUNT_ID, JSON_PATH_CREATED_ON, JSON_PATH_DESCRIPTION,
+                JSON_PATH_LAST_UPLOADED_ON, JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD);
         TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
             expectedJsonPaths, getMapper(), getJsonPathConfig());
 	}
@@ -187,9 +194,10 @@ class HubClientAPITest extends AbstractTest {
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION,
-                JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_DETAILS_SPACE_ID);
+                JSON_PATH_PATH, JSON_PATH_CANONICAL_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_OWNER_ACCOUNT_ID, JSON_PATH_CREATED_ON, JSON_PATH_DESCRIPTION,
+                JSON_PATH_LAST_UPLOADED_ON, JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD,
+                JSON_PATH_DETAILS_SPACE_ID);
         TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
             expectedJsonPaths, getMapper(), getJsonPathConfig());
     }
@@ -226,12 +234,14 @@ class HubClientAPITest extends AbstractTest {
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF,
-                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
-                JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION);
-        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
-            expectedJsonPaths, getMapper(), getJsonPathConfig());
+                JSON_PATH_PATH, JSON_PATH_CANONICAL_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+                JSON_PATH_OWNER, JSON_PATH_OWNER_ACCOUNT_ID, JSON_PATH_CREATED_ON, JSON_PATH_DESCRIPTION,
+                JSON_PATH_LAST_UPLOADED_ON, JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD,
+                JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_CANONICAL_PATH, JSON_PATH_CHILD_ITEM_ID,
+                JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_CREATED_ON,
+                JSON_PATH_CHILD_ITEM_DESCRIPTION, JSON_PATH_CHILD_ITEM_LAST_UPLOADED_ON);
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths,
+            getMapper(), getJsonPathConfig());
 	}
 
 	/**
@@ -262,13 +272,14 @@ class HubClientAPITest extends AbstractTest {
 
         // Assert required json paths.
         final var expectedJsonPaths = List.of(
-                JSON_PATH_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
-                JSON_PATH_OWNER, JSON_PATH_DESCRIPTION, JSON_PATH_MASON_CONTROLS_HREF,
-                JSON_PATH_MASON_CONTROLS_METHOD, JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_ID,
-                JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_DESCRIPTION,
-                JSON_PATH_CHILD_ITEM_MASON_CONTROLS_HREF, JSON_PATH_CHILD_ITEM_MASON_CONTROLS_METHOD);
-        TestUtil.assertJSONProperties(response, knimeHubJSONResponse,
-            expectedJsonPaths, getMapper(), getJsonPathConfig());
+            JSON_PATH_PATH, JSON_PATH_CANONICAL_PATH, JSON_PATH_ID, JSON_PATH_TYPE,
+            JSON_PATH_OWNER, JSON_PATH_OWNER_ACCOUNT_ID, JSON_PATH_CREATED_ON, JSON_PATH_DESCRIPTION,
+            JSON_PATH_LAST_UPLOADED_ON, JSON_PATH_MASON_CONTROLS_HREF, JSON_PATH_MASON_CONTROLS_METHOD,
+            JSON_PATH_CHILD_ITEM_PATH, JSON_PATH_CHILD_ITEM_CANONICAL_PATH, JSON_PATH_CHILD_ITEM_ID,
+            JSON_PATH_CHILD_ITEM_TYPE, JSON_PATH_CHILD_ITEM_OWNER, JSON_PATH_CHILD_ITEM_CREATED_ON,
+            JSON_PATH_CHILD_ITEM_DESCRIPTION, JSON_PATH_CHILD_ITEM_LAST_UPLOADED_ON);
+        TestUtil.assertJSONProperties(response, knimeHubJSONResponse, expectedJsonPaths,
+            getMapper(), getJsonPathConfig());
     }
 
     @AfterAll

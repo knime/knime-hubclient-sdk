@@ -70,12 +70,12 @@ import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
+import org.knime.hub.client.sdk.ent.catalog.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.ent.catalog.UploadStarted;
 import org.knime.hub.client.sdk.ent.catalog.UploadStatus;
 import org.knime.hub.client.sdk.ent.catalog.UploadTarget;
 import org.knime.hub.client.sdk.ent.catalog.WorkflowGroup;
-import org.knime.hub.client.sdk.ent.catalog.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.ProgressPoller;
@@ -262,6 +262,7 @@ public final class HubUploader extends AbstractHubTransfer {
         case WORKFLOW, COMPONENT -> newType == ItemType.WORKFLOW_LIKE;
         case WORKFLOW_GROUP, SPACE -> newType == ItemType.WORKFLOW_GROUP;
         case DATA -> newType == ItemType.DATA_FILE;
+        default -> throw new IllegalArgumentException("Unexpected repository item type");
         };
     }
 

@@ -48,6 +48,7 @@
 
 package org.knime.hub.client.sdk.ent.catalog;
 
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Objects;
 
@@ -76,14 +77,18 @@ public final class Data extends RepositoryItem implements Sized {
 
     @JsonCreator
     private Data(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CREATED_ON) final ZonedDateTime createdOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Data.JSON_PROPERTY_SIZE, required = true) final long size) {
-        super(path, canonicalPath, id, owner, description, details, masonControls);
+        @JsonProperty(value = Data.JSON_PROPERTY_SIZE) final long size) {
+        super(path, canonicalPath, id, owner, ownerAccountId,
+            createdOn, description, lastUploadedOn, details, masonControls);
         m_size = size;
     }
 
@@ -95,7 +100,7 @@ public final class Data extends RepositoryItem implements Sized {
     @JsonProperty(JSON_PROPERTY_SIZE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
     @Override
-    public long getSize() {
+    public Long getSize() {
         return m_size;
     }
 
