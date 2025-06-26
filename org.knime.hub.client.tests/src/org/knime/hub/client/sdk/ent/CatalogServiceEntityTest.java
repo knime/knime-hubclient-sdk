@@ -64,6 +64,7 @@ import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ent.catalog.Component;
 import org.knime.hub.client.sdk.ent.catalog.Data;
 import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.NamedItemVersionList;
 import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.ent.catalog.Space;
@@ -368,6 +369,36 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertTrue(downloadStatus.getDownloadUrl().isPresent(), "Expected download url");
         assertEquals("https://s3.us-east-1.amazonaws.com/",
             downloadStatus.getDownloadUrl().get().toString(), "Unexpected download url");
+    }
+
+    @Test
+    void testNamedItemVersionsListCreation() throws IOException, URISyntaxException {
+        var namedItemVersionsList =
+                load(EntityFolders.CATALOG_ENTITES, "emptyNamedItemVersionsList.json", NamedItemVersionList.class);
+        assertEquals(List.of(), namedItemVersionsList.getVersions(), "Unexpected versions");
+        assertEquals(0, namedItemVersionsList.getTotalCount(), "Unexpected total count");
+
+        namedItemVersionsList =
+                load(EntityFolders.CATALOG_ENTITES, "nonEmptyNamedItemVersionsList.json", NamedItemVersionList.class);
+        assertEquals(2, namedItemVersionsList.getTotalCount(), "Unexpected total count");
+        final var versions = namedItemVersionsList.getVersions();
+        assertEquals(2, versions.size(), "Unexpected number of named item versions");
+        var version = versions.get(0);
+        assertEquals(2, version.getVersion(), "Unexpected version");
+        assertEquals("2", version.getTitle(), "Unexpected title");
+        assertEquals("This is a description", version.getDescription().get(), "Unexpected description");
+        assertEquals("jdoe", version.getAuthor(), "Unexpected author");
+        assertEquals("account:team:a885bb42-d808-4557-9a7f-9f10c5777739", version.getAuthorAccountId(),
+            "Unexpected authorAccountId");
+        assertEquals(Instant.parse("2025-06-23T08:55:42+00:00"), version.getCreatedOn(), "Unexpected createdOn");
+        version = versions.get(1);
+        assertEquals(1, version.getVersion(), "Unexpected version");
+        assertEquals("1", version.getTitle(), "Unexpected title");
+        assertEquals("", version.getDescription().get(), "Unexpected description");
+        assertEquals("jdoe", version.getAuthor(), "Unexpected author");
+        assertEquals("account:team:a885bb42-d808-4557-9a7f-9f10c5777739", version.getAuthorAccountId(),
+            "Unexpected authorAccountId");
+        assertEquals(Instant.parse("2025-06-23T08:55:16+00:00"), version.getCreatedOn(), "Unexpected createdOn");
     }
 
 }

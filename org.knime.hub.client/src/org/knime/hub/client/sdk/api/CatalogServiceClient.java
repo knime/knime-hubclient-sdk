@@ -70,7 +70,10 @@ import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.ent.catalog.CopyOrMoveRequestBody;
+import org.knime.hub.client.sdk.ent.catalog.CreateNamedItemVersionRequestBody;
 import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.NamedItemVersion;
+import org.knime.hub.client.sdk.ent.catalog.NamedItemVersionList;
 import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.ent.catalog.SpaceRenameRequestBody;
@@ -116,6 +119,7 @@ public final class CatalogServiceClient {
     private static final String PATH_PIECE_PATH = "path";
     private static final String PATH_PIECE_NAME = "name";
     private static final String PATH_PIECE_WORKING_AREA = "workingArea";
+    private static final String PATH_PIECE_VERSIONS = "versions";
 
     /* Query parameters */
     private static final String QUERY_PARAM_FROM_VERSION = "fromVersion";
@@ -128,6 +132,7 @@ public final class CatalogServiceClient {
     private static final String QUERY_PARAM_SPACE_DETAILS = "spaceDetails";
     private static final String QUERY_PARAM_CONTRIB_SPACES = "contribSpaces";
     private static final String QUERY_PARAM_PART_NUMBER = "partNumber";
+    private static final String QUERY_PARAM_LIMIT = "limit";
 
 
     /* Return Types */
@@ -137,6 +142,9 @@ public final class CatalogServiceClient {
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
     private static final GenericType<PreparedDownload> PREPARED_DOWNLOAD = new GenericType<PreparedDownload>() {};
     private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<DownloadStatus>() {};
+    private static final GenericType<NamedItemVersion> NAMED_ITEM_VERSION = new GenericType<NamedItemVersion>() {};
+    private static final GenericType<NamedItemVersionList> NAMED_ITEM_VERSION_LIST =
+            new GenericType<NamedItemVersionList>() {};
 
     /* Item version query parameter "special" values */
     private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
@@ -521,6 +529,57 @@ public final class CatalogServiceClient {
         queryParams.put(QUERY_PARAM_SPACE_DETAILS, spaceDetails ? Boolean.toString(spaceDetails) : null);
         queryParams.put(QUERY_PARAM_CONTRIB_SPACES, contribSpaces);
         return queryParams;
+    }
+
+    /**
+     * List all versions for a certain repository item.
+     *
+     * @param id The items unique ID. It always starts with a * and does not change even if the repository item is
+     *            renamed or moved. May also be a concatenation of path followed by the "~"; character and the ID
+     *            without the leading "*" character. This occurs when the request originates from an older AP that
+     *            cannot handle the new URI format which adds the ID to the end of the path. (required)
+     * @param limit Maximum number of versions returned in the response. All versions will be returned by using -1.
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<NamedItemVersionList> getItemVersions(final String id, final Integer limit,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_VERSIONS);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_LIMIT, Integer.toString(limit)) //
+            .invokeAPI(requestPath, Method.GET, null, NAMED_ITEM_VERSION_LIST);
+    }
+
+    /**
+     * Creates a new version for the repository item with the given ID.
+     *
+     * @param id The items unique ID. It always starts with a * and does not change even if the repository item is
+     *            renamed or moved. May also be a concatenation of path followed by the "~"; character and the ID
+     *            without the leading "*" character. This occurs when the request originates from an older AP that
+     *            cannot handle the new URI format which adds the ID to the end of the path. (required)
+     * @param createNamedItemVersionRequestBody The request body to create a new named item version
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<NamedItemVersion> createItemVersion(final String id,
+        final CreateNamedItemVersionRequestBody createNamedItemVersionRequestBody,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+        CheckUtils.checkArgumentNotNull(createNamedItemVersionRequestBody);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_VERSIONS);
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.POST, createNamedItemVersionRequestBody, NAMED_ITEM_VERSION);
     }
 
     /**
