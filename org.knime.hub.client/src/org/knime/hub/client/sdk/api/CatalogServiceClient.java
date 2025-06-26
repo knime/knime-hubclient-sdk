@@ -50,6 +50,7 @@ package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,6 +86,8 @@ import org.knime.hub.client.sdk.ent.catalog.UploadTarget;
 import org.knime.hub.client.sdk.transfer.ArtifactDownloadStream;
 import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
 import org.knime.hub.client.sdk.transfer.ItemID;
+import org.knime.hub.client.sdk.transfer.RequestUploadStream;
+import org.knime.hub.client.sdk.transfer.ResponseDownloadStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -412,6 +415,27 @@ public final class CatalogServiceClient {
             .withHeaders(additionalHeaders) //
             .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
+    }
+
+    /**
+     * Creates an response download stream from a hub. This downloads single repository items.
+     *
+     * @param path the path of the repository item to download
+     * @param version the {@link ItemVersion} of the repository item
+     * @param additionalHeaders additional headers for the download process
+
+     * @return {@link InputStream}
+     * @throws IOException if an I/O error occurred
+     * @deprecated use {@link #createArtifactDownloadStream(ItemID, ItemVersion, Map, BooleanSupplier)}
+     */
+    @Deprecated
+    public @Owning InputStream createResponseDownloadStream(final IPath path, final ItemVersion version,
+        final Map<String, String> additionalHeaders) throws IOException {
+        CheckUtils.checkArgumentNotNull(path);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
+
+        return ResponseDownloadStream.create(this, additionalHeaders, requestPath, version);
     }
 
     /**
@@ -965,6 +989,24 @@ public final class CatalogServiceClient {
     }
 
     /**
+     * Creates an {@link OutputStream} to the given HTTP URL sub-path.
+     *
+     * @param path The absolute path to the repository item. (required)
+     * @param contentType The content type for the upload stream. (required)
+     * @param additionalHeaders Map of additional headers
+     * @return The {@link OutputStream} to upload to
+     *
+     * @throws HubFailureIOException If an I/O error occurred during the creation of the upload stream
+     * @deprecated use {@link #createAsyncHubUploadStream(String, boolean, String, EntityTag, Map)}
+     */
+    @Deprecated
+    public @Owning OutputStream createRequestUploadStream(final IPath path, final MediaType contentType,
+        final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
+        return RequestUploadStream.create(this, path, contentType, additionalHeaders);
+    }
+
+    /**
      * Request that the upload process be cancelled.
      *
      * @param uploadId The ID of the upload process (required)
@@ -1240,6 +1282,26 @@ public final class CatalogServiceClient {
                 () -> new HTTPQueryParameter(queryParameter, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
                 sv -> new HTTPQueryParameter(queryParameter, Integer.toString(sv)) //
             ));
+    }
+
+    /**
+     * Returns the given item version for the Catalog service,
+     * or {@link Optional#empty()} if the argument was {@code null}.
+     *
+     * @param version {@code null}-able version to map to its {@link ItemVersion} representation
+     * @return {@link ItemVersion} or {@link Optional#empty()} if argument was {@code null} or does not define a version
+     */
+    public static Optional<ItemVersion> getItemVersion(final String version) {
+        if (ITEM_VERSION_CURRENT_STATE_IDENTIFIER.equals(version)) {
+            return Optional.of(ItemVersion.currentState());
+        } else if (ITEM_VERSION_MOST_RECENT_IDENTIFIER.equals(version)) {
+            return Optional.of(ItemVersion.mostRecent());
+        }
+        try {
+            return Optional.of(ItemVersion.of(Integer.parseInt(version)));
+        } catch (NumberFormatException ex) {
+            return Optional.empty();
+        }
     }
 
 }

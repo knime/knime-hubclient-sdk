@@ -54,6 +54,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -75,7 +76,7 @@ import jakarta.ws.rs.core.Response.Status.Family;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
 
-final class URLConnectionUploader implements StreamingUploader {
+public final class URLConnectionUploader implements StreamingUploader {
 
     private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
         RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
@@ -132,6 +133,33 @@ final class URLConnectionUploader implements StreamingUploader {
         connection.setFixedLengthStreamingMode(contentLength);
         connection.setDoOutput(true);
         return connection;
+    }
+
+    /**
+     * Prepares an HTTP connection for the given request URL.
+     *
+     * @param url               the request URL
+     * @param httpMethod        the HTTP request method
+     * @param clientHeaders     the client headers
+     * @param chunkSize         the chunk size
+     * @param connectionTimeout the connection timeout
+     * @param readTimeout       the read timeout
+     *
+     * @return the {@link HttpURLConnection}
+     *
+     * @throws IOException if an I/O error occurred during opening of the connection
+     */
+    public static HttpURLConnection prepareConnection(final URL url, final String httpMethod,
+        final Map<String, String> clientHeaders, final int chunkSize, final Duration connectionTimeout,
+        final Duration readTimeout) throws IOException {
+        final var conn = (HttpURLConnection) URLConnectionFactory.getConnection(url);
+        conn.setRequestMethod(httpMethod);
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(Math.toIntExact(connectionTimeout.toMillis()));
+        conn.setReadTimeout(Math.toIntExact(readTimeout.toMillis()));
+        clientHeaders.forEach(conn::addRequestProperty);
+        conn.setChunkedStreamingMode(chunkSize);
+        return conn;
     }
 
     private static void transferContent(@NotOwning final InputStream contentStream, final OutputStream out,

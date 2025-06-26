@@ -51,6 +51,8 @@ package org.knime.hub.client.sdk;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -71,6 +73,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.ent.ProblemDescription;
+import org.knime.hub.client.sdk.transfer.URLConnectionUploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -630,6 +633,42 @@ public class ApiClient implements AutoCloseable {
                     httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
+            }
+        }
+
+        /**
+         * Creates an invocation builder for hub calls.
+         *
+         * @param path The sub-path of the HTTP URL.
+         * @param requestBody The request body
+         *
+         * @return the invocation builder
+         *
+         * @throws HubFailureIOException if an I/O error occurred during the creation of the builder
+         */
+        public Invocation.Builder apiInvocationBuilder(final IPath path, final Object requestBody)
+                throws HubFailureIOException {
+            return createInvocationBuilder(buildUrl(path), requestBody);
+        }
+
+        /**
+         * Creates an HTTP URL connection given the HTTP URL sub-path.
+         *
+         * @param httpMethod The HTTP request method
+         * @param path The sub-path of the HTTP URL
+         * @param chunkSize The chunk size for the upload connection
+         * @return The {@link HttpURLConnection}
+         *
+         * @throws IOException If an I/O error occurred during opening of the connection
+         */
+        public HttpURLConnection createAPIURLConnection(final String httpMethod,
+            final IPath path, final int chunkSize) throws IOException {
+            try {
+                return URLConnectionUploader.prepareConnection(
+                    buildUrl(path).toURL(), httpMethod, m_headerParams, chunkSize,
+                    m_requestReadTimeout, m_requestReadTimeout);
+            } catch (MalformedURLException ex) {
+                throw new IllegalStateException("Unexpected URL syntax violation", ex);
             }
         }
 
