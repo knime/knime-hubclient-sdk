@@ -166,15 +166,7 @@ public class ApiClient implements AutoCloseable {
         m_auth = auth;
 
         // Configure the object mapper for the JSON provider
-        m_objectMapper = new ObjectMapper();
-        m_objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        m_objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        m_objectMapper.configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false);
-        m_objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        m_objectMapper.enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING);
-        m_objectMapper.enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING);
-        m_objectMapper.registerModule(new JavaTimeModule());
-        m_objectMapper.registerModule(new Jdk8Module()); // Needed for Optional support.
+        m_objectMapper = createObjectMapper();
 
         // Set timeouts
         m_connectionTimeout = connectionTimeout;
@@ -193,10 +185,35 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.property(HTTP_AUTOREDIRECT_PROP, true);
 
         // Set timeouts for connection
-        clientBuilder.property(HTTP_CONNECTION_TIMEOUT_PROP, m_connectionTimeout.toMillis());
-        clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
+        if (m_connectionTimeout != null) {
+            clientBuilder.property(HTTP_CONNECTION_TIMEOUT_PROP, m_connectionTimeout.toMillis());
+        }
+        if (m_readTimeout != null) {
+            clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
+        }
 
         m_httpClient = clientBuilder.build();
+    }
+
+    private static ObjectMapper createObjectMapper() {
+        // Configure the object mapper for the JSON provider
+        return new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+                .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .registerModule(new JavaTimeModule())
+                .registerModule(new Jdk8Module()); // Needed for Optional support.
+    }
+
+    /**
+     * Creates the {@link JacksonJsonProvider} which is needed for JSON de-serialization.
+     *
+     * @return {@link JacksonJsonProvider}
+     */
+    public static JacksonJsonProvider createJsonProvider() {
+        return new JacksonJsonProvider(createObjectMapper());
     }
 
     /**
@@ -794,8 +811,8 @@ public class ApiClient implements AutoCloseable {
      *
      * @return {@link Duration} connection timeout
      */
-    public Duration getConnectTimeout() {
-        return m_connectionTimeout;
+    public Optional<Duration> getConnectTimeout() {
+        return Optional.ofNullable(m_connectionTimeout);
     }
 
     /**
@@ -803,8 +820,8 @@ public class ApiClient implements AutoCloseable {
      *
      * @return {@link Duration} read timeout
      */
-    public Duration getReadTimeout() {
-        return m_readTimeout;
+    public Optional<Duration> getReadTimeout() {
+        return Optional.ofNullable(m_readTimeout);
     }
 
     /**
