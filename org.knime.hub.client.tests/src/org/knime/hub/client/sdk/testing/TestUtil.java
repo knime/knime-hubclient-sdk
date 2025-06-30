@@ -92,6 +92,8 @@ public class TestUtil {
         CATALOG_ENTITES("catalogEntities"), //
         /** Account entity folder */
         ACCOUNT_ENTITIES("accountEntities"), //
+        /** Execution entity folder */
+        EXECUTION_ENTITIES("executionEntities"), //
         /** API entity folder */
         API_ENTITES("apiEntities"); //
 

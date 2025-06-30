@@ -10,6 +10,7 @@ Export-Package: org.knime.hub.client.sdk,
  org.knime.hub.client.sdk.ent,
  org.knime.hub.client.sdk.ent.account,
  org.knime.hub.client.sdk.ent.catalog,
+ org.knime.hub.client.sdk.ent.execution,
  org.knime.hub.client.sdk.transfer
 Require-Bundle: com.fasterxml.jackson.core.jackson-annotations;bundle-version="[2.16.1,3.0.0)",
  com.fasterxml.jackson.core.jackson-core;bundle-version="[2.16.1,3.0.0)",

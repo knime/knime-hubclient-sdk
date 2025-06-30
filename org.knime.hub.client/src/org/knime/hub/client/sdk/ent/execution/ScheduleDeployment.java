@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,87 +41,69 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Jun 27, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.ent.execution;
 
-package org.knime.hub.client.sdk.api;
+import java.util.Map;
+import java.util.Objects;
 
-import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
-import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Hub Client API for KNIME Hub.
+ * POJO representing a KNIME Hub schedule deployment.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class HubClientAPI implements AutoCloseable {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class ScheduleDeployment extends Deployment {
 
-    private final @Owning ApiClient m_apiClient;
+    static final String TYPE = "schedule";
 
-    private final CatalogServiceClient m_catalog;
-
-    private final AccountServiceClient m_accountService;
-
-    private final ExecutionServiceClient m_executionService;
-
-    /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
-     *
-     * @param apiClient {@link ApiClient}
-     */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
-        m_apiClient = apiClient;
-        m_catalog = new CatalogServiceClient(m_apiClient);
-        m_accountService = new AccountServiceClient(m_apiClient);
-        m_executionService = new ExecutionServiceClient(apiClient);
+    @JsonCreator
+    private ScheduleDeployment(@JsonProperty(value = JSON_PROPERTY_ID) final String id,
+        @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
+        @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls) {
+        super(id, name, masonControls);
     }
 
-    /**
-     * Retrieves the associated {@link ApiClient}.
-     *
-     * @return {@link ApiClient}
-     */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
-    }
-
-    /**
-     * Retrieves the catalog client.
-     *
-     * @return {@link CatalogServiceClient}
-     */
-    public CatalogServiceClient catalog() {
-        return m_catalog;
-    }
-
-    /**
-     * Retrieves the account service client.
-     *
-     * @return {@link AccountServiceClient}
-     */
-    public AccountServiceClient account() {
-        return m_accountService;
-    }
-
-    /**
-     * Retrieves the execution service client.
-     *
-     * @return {@link ExecutionServiceClient}
-     */
-    public ExecutionServiceClient execution() {
-        return m_executionService;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void close() {
-        m_apiClient.close();
+    public DeploymentType getType() {
+        return DeploymentType.SCHEDULE;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        return super.equals(o);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode());
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
+        }
     }
 
 }

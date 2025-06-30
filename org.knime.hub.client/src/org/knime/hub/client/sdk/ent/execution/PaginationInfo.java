@@ -1,5 +1,6 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
  *  Website: http://www.knime.com; Email: contact@knime.com
  *
@@ -40,87 +41,92 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
+ * ---------------------------------------------------------------------
  *
  * History
- *   Nov 6, 2024 (magnus): created
+ *   Jun 27, 2025 (magnus): created
  */
+package org.knime.hub.client.sdk.ent.execution;
 
-package org.knime.hub.client.sdk.api;
+import java.util.Objects;
 
-import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
-import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * Hub Client API for KNIME Hub.
+ * POJO representing information for paginated requests.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-public final class HubClientAPI implements AutoCloseable {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public final class PaginationInfo {
 
-    private final @Owning ApiClient m_apiClient;
+    private static final String JSON_PROPERTY_TOTAL_ITEM_COUNT = "totalItemCount";
+    private final int m_totalItemCount;
 
-    private final CatalogServiceClient m_catalog;
+    private static final String JSON_PROPERTY_TOTAL_PAGE_COUNT = "totalPageCount";
+    private final int m_totalPageCount;
 
-    private final AccountServiceClient m_accountService;
-
-    private final ExecutionServiceClient m_executionService;
-
-    /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
-     *
-     * @param apiClient {@link ApiClient}
-     */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
-        m_apiClient = apiClient;
-        m_catalog = new CatalogServiceClient(m_apiClient);
-        m_accountService = new AccountServiceClient(m_apiClient);
-        m_executionService = new ExecutionServiceClient(apiClient);
+    @JsonCreator
+    private PaginationInfo(
+        @JsonProperty(value = JSON_PROPERTY_TOTAL_ITEM_COUNT, required = true) final int totalItemCount,
+        @JsonProperty(value = JSON_PROPERTY_TOTAL_PAGE_COUNT, required = true) final int totalPageCount) {
+        m_totalItemCount = totalItemCount;
+        m_totalPageCount = totalPageCount;
     }
 
     /**
-     * Retrieves the associated {@link ApiClient}.
+     * Retrieves the total item count.
      *
-     * @return {@link ApiClient}
+     * @return totalItemCount
      */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
+    @JsonProperty(JSON_PROPERTY_TOTAL_ITEM_COUNT)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public int getTotalItemCount() {
+        return m_totalItemCount;
     }
 
     /**
-     * Retrieves the catalog client.
+     * Retrieves the total page count.
      *
-     * @return {@link CatalogServiceClient}
+     * @return totalPageCount
      */
-    public CatalogServiceClient catalog() {
-        return m_catalog;
+    @JsonProperty(JSON_PROPERTY_TOTAL_PAGE_COUNT)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    public int getTotalPageCount() {
+        return m_totalPageCount;
     }
 
-    /**
-     * Retrieves the account service client.
-     *
-     * @return {@link AccountServiceClient}
-     */
-    public AccountServiceClient account() {
-        return m_accountService;
-    }
-
-    /**
-     * Retrieves the execution service client.
-     *
-     * @return {@link ExecutionServiceClient}
-     */
-    public ExecutionServiceClient execution() {
-        return m_executionService;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void close() {
-        m_apiClient.close();
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var paginationInfo = (PaginationInfo)o;
+        return Objects.equals(this.m_totalItemCount, paginationInfo.m_totalItemCount)
+                && Objects.equals(this.m_totalItemCount, paginationInfo.m_totalItemCount);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_totalItemCount, m_totalPageCount);
+    }
+
+    @Override
+    public String toString() {
+        try {
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
+        }
     }
 
 }
