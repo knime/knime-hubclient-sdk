@@ -55,7 +55,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.knime.hub.client.sdk.ent.Control;
+import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -98,7 +100,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * @param canonicalPath the canonical path of the workflow group
      * @param id the ID of a workflow group
      * @param owner the owner of a workflow group
-     * @param ownerAccountId the owner account ID of a workflow group
+     * @param ownerAccountId the account ID of the owner of a workflow group
      * @param createdOn the time of creation
      * @param description the description of a workflow group
      * @param lastUploadedOn the time of last upload/overwrite
@@ -123,6 +125,11 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
         this.m_children = children;
     }
 
+    WorkflowGroup(@NonNull final WorkflowGroupBuilder builder) {
+        super(builder);
+        m_children = List.of();
+    }
+
     /**
      * Retrieves the workflow groups children.
      *
@@ -137,6 +144,36 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
     @Override
     public RepositoryItemType getType() {
         return RepositoryItemType.WORKFLOW_GROUP;
+    }
+
+    /**
+     * Creates a new {@link SpaceRequestBodyBuilder}.
+     *
+     * @return builder
+     */
+    public static WorkflowGroupBuilder builder() {
+        return new WorkflowGroupBuilder();
+    }
+
+    /**
+     * Builder for {@link WorkflowGroup}.
+     *
+     * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+     */
+    public static class WorkflowGroupBuilder extends RepositoryItemBuilder<WorkflowGroupBuilder, WorkflowGroup> {
+
+        /**
+         * Creates a new {@link WorkflowGroupBuilder}.
+         */
+        public WorkflowGroupBuilder() {
+            super(RepositoryItemType.WORKFLOW_GROUP);
+        }
+
+        @Override
+        public WorkflowGroup build() {
+            return new WorkflowGroup(this);
+        }
+
     }
 
     @Override

@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
@@ -250,6 +251,24 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     }
 
     /**
+     * Creates a new item from a builder.
+     *
+     * @param builder a builder
+     */
+    protected RepositoryItem(final RepositoryItemBuilder<?, ?> builder) {
+        m_path = builder.m_path;
+        m_canonicalPath = null;
+        m_id = null;
+        m_owner = Objects.requireNonNull(builder.m_owner, "Owner must not be null");
+        m_ownerAccountId = null;
+        m_createdOn = builder.m_createdOn;
+        m_description = null;
+        m_lastUploadedOn = builder.m_lastUploadedOn;
+        m_details = null;
+        m_masonControls = Map.of();
+    }
+
+    /**
      * Retrieves the items absolute path in the repository.
      *
      * @return path
@@ -368,6 +387,89 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     @JsonProperty(JSON_PROPERTY_TYPE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public abstract RepositoryItemType getType();
+
+    /**
+     * Builder for {@link RepositoryItem}.
+     *
+     * @param <R> The repository item sub-class
+     * @param <B> The repository item builder sub-class
+     */
+    @SuppressWarnings("unchecked")
+    public abstract static class RepositoryItemBuilder<B extends RepositoryItemBuilder<?, ?>,
+        R extends RepositoryItem> {
+        String m_path;
+
+        @Nullable
+        String m_owner;
+
+        @Nullable
+        ZonedDateTime m_createdOn;
+
+        @Nullable
+        ZonedDateTime m_lastUploadedOn;
+
+        RepositoryItemType m_type;
+
+        /**
+         * Creates a new {@link RepositoryItemBuilder} for the given type.
+         *
+         * @param type the type of the repository item
+         */
+        protected RepositoryItemBuilder(final RepositoryItemType type) {
+            m_type = type;
+        }
+
+        /**
+         * Sets the item's path.
+         *
+         * @param path the item's path
+         * @return this
+         */
+        public B withPath(final String path) {
+            m_path = path;
+            return (B)this;
+        }
+
+        /**
+         * Sets the item's owner.
+         *
+         * @param owner the owner of the item
+         * @return this
+         */
+        public B withOwner(final String owner) {
+            m_owner = owner;
+            return (B)this;
+        }
+
+        /**
+         * Sets the item creation time.
+         *
+         * @param createdOn the time of creation
+         * @return this
+         */
+        public B withCreatedOn(final ZonedDateTime createdOn) {
+            m_createdOn = createdOn;
+            return (B)this;
+        }
+
+        /**
+         * Sets the time of the last upload/overwrite of the item.
+         *
+         * @param lastUploadedOn the time of the last upload/overwrite
+         * @return this
+         */
+        public B withLastUploadedOn(final ZonedDateTime lastUploadedOn) {
+            m_lastUploadedOn = lastUploadedOn;
+            return (B)this;
+        }
+
+        /**
+         * Creates a new repository item.
+         *
+         * @return repository item of type R
+         */
+        public abstract R build();
+    }
 
     @Override
     public boolean equals(final Object o) {
