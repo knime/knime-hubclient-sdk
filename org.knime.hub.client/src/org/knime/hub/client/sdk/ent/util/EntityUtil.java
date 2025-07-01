@@ -44,86 +44,36 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Apr 28, 2025 (magnus): created
+ *   Jul 2, 2025 (magnus): created
  */
-package org.knime.hub.client.sdk.ent.catalog;
+package org.knime.hub.client.sdk.ent.util;
 
-import java.net.URL;
-import java.util.Objects;
-import java.util.Optional;
-
-import org.knime.hub.client.sdk.ent.util.EntityUtil;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
- * POJO representing the prepared download
+ * Utility class for common functions related to entities.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class PreparedDownload {
-
-    private static final String JSON_PROPERTY_DOWNLOAD_ID = "downloadId";
-    private final String m_downloadId;
-
-    private static final String JSON_PROPERTY_DOWNLOAD_URL = "downloadUrl";
-    private final URL m_downloadUrl;
-
-    @JsonCreator
-    private PreparedDownload(@JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID) final String downloadId,
-        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_URL) final URL downloadUrl) {
-        m_downloadId = downloadId;
-        m_downloadUrl = downloadUrl;
-    }
+public final class EntityUtil {
 
     /**
-     * Retrieves the download ID.
-     *
-     * @return downloadId
+     * Utility class.
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_ID)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<String> getDownloadId() {
-        return Optional.ofNullable(m_downloadId);
-    }
+    private EntityUtil() {}
 
     /**
-     * Retrieves the download URL.
+     * Serializes the given entity class object as a String.
      *
-     * @return downlopadUrl
+     * @param entity the entity to serialize
+     * @return the serialized String representation of the entity
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<URL> getDownloadUrl() {
-        return Optional.ofNullable(m_downloadUrl);
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
+    public static String toString(final Object entity) {
+        try {
+            return ObjectMapperUtil.getObjectMapper().writeValueAsString(entity);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize to JSON: ", e);
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        var preparedDownload = (PreparedDownload) o;
-        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId)
-                && Objects.equals(this.m_downloadUrl, preparedDownload.m_downloadUrl);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_downloadId, m_downloadUrl);
-    }
-
-    @Override
-    public String toString() {
-        return EntityUtil.toString(this);
     }
 
 }

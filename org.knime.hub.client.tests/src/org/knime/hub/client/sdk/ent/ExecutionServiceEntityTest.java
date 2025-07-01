@@ -53,7 +53,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
@@ -77,7 +76,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 class ExecutionServiceEntityTest extends AbstractTest {
 
     @Test
-    void testCreateDeploymentList() throws IOException, URISyntaxException {
+    void testCreateDeploymentList() throws IOException {
         final var deploymentList = load(EntityFolders.EXECUTION_ENTITIES, "deploymentList.json", DeploymentList.class);
 
         assertTrue(deploymentList.getPagination().isPresent(), "Expected pagination");
@@ -130,7 +129,7 @@ class ExecutionServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateExecutionContextList() throws IOException, URISyntaxException {
+    void testCreateExecutionContextList() throws IOException {
         final var executionContextList =
             load(EntityFolders.EXECUTION_ENTITIES, "executionContextList.json", ExecutionContextList.class);
 

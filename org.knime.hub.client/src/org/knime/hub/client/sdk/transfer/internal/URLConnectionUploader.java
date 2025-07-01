@@ -46,7 +46,7 @@
  * History
  *   7 May 2025 (leonard.woerteler): created
  */
-package org.knime.hub.client.sdk.transfer;
+package org.knime.hub.client.sdk.transfer.internal;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -76,12 +76,16 @@ import jakarta.ws.rs.core.Response.Status.Family;
 import jakarta.ws.rs.ext.RuntimeDelegate;
 import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
 
+/**
+ * Uploader using {@link HttpURLConnection}.
+ */
 public final class URLConnectionUploader implements StreamingUploader {
 
     private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
         RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
 
-    static final StreamingUploader INSTANCE = new URLConnectionUploader();
+    /** Singleton instance of the URLConnectionUploader. */
+    public static final StreamingUploader INSTANCE = new URLConnectionUploader();
 
     private URLConnectionUploader() {
     }
@@ -152,14 +156,14 @@ public final class URLConnectionUploader implements StreamingUploader {
     public static HttpURLConnection prepareConnection(final URL url, final String httpMethod,
         final Map<String, String> clientHeaders, final int chunkSize, final Duration connectionTimeout,
         final Duration readTimeout) throws IOException {
-        final var conn = (HttpURLConnection) URLConnectionFactory.getConnection(url);
-        conn.setRequestMethod(httpMethod);
-        conn.setDoOutput(true);
-        conn.setConnectTimeout(Math.toIntExact(connectionTimeout.toMillis()));
-        conn.setReadTimeout(Math.toIntExact(readTimeout.toMillis()));
-        clientHeaders.forEach(conn::addRequestProperty);
-        conn.setChunkedStreamingMode(chunkSize);
-        return conn;
+        HttpURLConnection connection = (HttpURLConnection)URLConnectionFactory.getConnection(url);
+        connection.setRequestMethod(httpMethod);
+        connection.setDoOutput(true);
+        connection.setConnectTimeout(connectionTimeout != null ? Math.toIntExact(connectionTimeout.toMillis()) : 0);
+        connection.setReadTimeout(readTimeout != null ? Math.toIntExact(readTimeout.toMillis()) : 0);
+        clientHeaders.forEach(connection::addRequestProperty);
+        connection.setChunkedStreamingMode(chunkSize);
+        return connection;
     }
 
     private static void transferContent(@NotOwning final InputStream contentStream, final OutputStream out,

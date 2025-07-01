@@ -73,7 +73,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.ent.ProblemDescription;
-import org.knime.hub.client.sdk.transfer.URLConnectionUploader;
+import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -211,6 +211,7 @@ public class ApiClient implements AutoCloseable {
      * Creates the {@link JacksonJsonProvider} which is needed for JSON de-serialization.
      *
      * @return {@link JacksonJsonProvider}
+     * @since 0.1
      */
     public static JacksonJsonProvider createJsonProvider() {
         return new JacksonJsonProvider(createObjectMapper());
@@ -447,7 +448,31 @@ public class ApiClient implements AutoCloseable {
          */
         private Invocation.Builder createInvocationBuilder(final URI uri, final Object body)
             throws HubFailureIOException {
+            updateHeaderParameters();
 
+            CheckUtils.checkState(hasRequiredContentType(body),
+                "Missing required content type for '%s'".formatted(uri));
+
+            WebTarget target = m_httpClient.target(uri);
+            if (m_requestReadTimeout != null) {
+                target.property(HTTP_RECEIVE_TIMEOUT_PROP, m_requestReadTimeout.toMillis());
+            }
+
+            final Invocation.Builder builder;
+            if (m_headerAccept == null) {
+                builder = target.request();
+            } else {
+                builder = target.request(m_headerAccept);
+            }
+
+            // Set headers and cookies
+            m_headerParams.forEach(builder::header);
+            m_cookieParams.forEach(builder::cookie);
+
+            return builder;
+        }
+
+        private void updateHeaderParameters() throws HubFailureIOException {
             try {
                 m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
             } catch (final ProcessingException pe) {
@@ -465,33 +490,15 @@ public class ApiClient implements AutoCloseable {
             // which got possibly modified through the additional headers
             if (m_headerParams.containsKey(HttpHeaders.ACCEPT)) {
                 m_headerAccept = m_headerParams.get(HttpHeaders.ACCEPT);
+            } else if (m_headerAccept != null) {
+                m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
             if (m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
                 m_contentType = MediaType.valueOf(m_headerParams.get(HttpHeaders.CONTENT_TYPE));
+            } else if (m_contentType != null) {
+                m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
             }
-
-            CheckUtils.checkState(hasRequiredContentType(body),
-                "Missing required content type for '%s'".formatted(uri));
-
-            WebTarget target = m_httpClient.target(uri);
-            if (m_requestReadTimeout != null) {
-                target.property(HTTP_RECEIVE_TIMEOUT_PROP, m_requestReadTimeout.toMillis());
-            }
-
-            final Invocation.Builder builder;
-            if (m_headerAccept == null) {
-                builder = target.request();
-            } else {
-                builder = target.request(m_headerAccept);
-                m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
-            }
-
-            // Set headers and cookies
-            m_headerParams.forEach(builder::header);
-            m_cookieParams.forEach(builder::cookie);
-
-            return builder;
         }
 
         /**
@@ -662,6 +669,7 @@ public class ApiClient implements AutoCloseable {
          * @return the invocation builder
          *
          * @throws HubFailureIOException if an I/O error occurred during the creation of the builder
+         * @since 0.1
          */
         public Invocation.Builder apiInvocationBuilder(final IPath path, final Object requestBody)
                 throws HubFailureIOException {
@@ -677,6 +685,7 @@ public class ApiClient implements AutoCloseable {
          * @return The {@link HttpURLConnection}
          *
          * @throws IOException If an I/O error occurred during opening of the connection
+         * @since 0.1
          */
         public HttpURLConnection createAPIURLConnection(final String httpMethod,
             final IPath path, final int chunkSize) throws IOException {
@@ -810,6 +819,7 @@ public class ApiClient implements AutoCloseable {
      * Retrieves the connection timeout duration.
      *
      * @return {@link Duration} connection timeout
+     * @since 0.1
      */
     public Optional<Duration> getConnectTimeout() {
         return Optional.ofNullable(m_connectionTimeout);
@@ -819,6 +829,7 @@ public class ApiClient implements AutoCloseable {
      * Retrieves the read timeout duration
      *
      * @return {@link Duration} read timeout
+     * @since 0.1
      */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(m_readTimeout);

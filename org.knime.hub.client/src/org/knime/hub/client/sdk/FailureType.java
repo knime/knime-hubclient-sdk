@@ -82,9 +82,11 @@ public enum FailureType {
     UPLOAD_LIMIT_EXCEEDED,
     /** Upload of a part was aborted after exhausting its retries. */
     PART_UPLOAD_EXHAUSTED_RETRIES,
-    /** The upload connection could not be created. */
+    /** The upload connection could not be created.
+     * @since 0.1*/
     UPLOAD_CONNECTION_CREATION_FAILED,
-    /** The upload stream could not be created. */
+    /** The upload stream could not be created.
+     * @since 0.1*/
     UPLOAD_STREAM_CREATION_FAILED,
 
     /** A Hub REST call returned a non-successful response code. */

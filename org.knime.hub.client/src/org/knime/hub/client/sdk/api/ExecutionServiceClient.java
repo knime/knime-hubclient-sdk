@@ -49,7 +49,6 @@
 package org.knime.hub.client.sdk.api;
 
 import java.util.Map;
-import java.util.Optional;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
@@ -58,14 +57,12 @@ import org.knime.core.util.hub.ItemVersion;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.ent.execution.Deployment;
 import org.knime.hub.client.sdk.ent.execution.DeploymentCreationBody;
 import org.knime.hub.client.sdk.ent.execution.DeploymentList;
 import org.knime.hub.client.sdk.ent.execution.ExecutionContextList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.knime.hub.client.sdk.ent.util.ClientUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
@@ -77,11 +74,10 @@ import jakarta.ws.rs.core.MediaType;
  * Execution service client for KNIME Hub.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
 public final class ExecutionServiceClient {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(ExecutionServiceClient.class);
 
     /* API paths */
     private static final String EXECUTION_CONTEXTS_API_PATH = "execution-contexts";
@@ -101,15 +97,10 @@ public final class ExecutionServiceClient {
     private static final String QUERY_PARAM_PAGE = "page";
     private static final String QUERY_PARAM_PAGELEN = "pagelen";
 
-    /* Item version query parameter "special" values */
-    private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
-    private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
-
     /* Return Types */
-    private static final GenericType<ExecutionContextList> EXECUTION_CONTEXT_LIST =
-            new GenericType<ExecutionContextList>() {};
-    private static final GenericType<DeploymentList> DEPLOYMENT_LIST = new GenericType<DeploymentList>() {};
-    private static final GenericType<Deployment> DEPLOYMENT = new GenericType<Deployment>() {};
+    private static final GenericType<ExecutionContextList> EXECUTION_CONTEXT_LIST = new GenericType<>() {};
+    private static final GenericType<DeploymentList> DEPLOYMENT_LIST = new GenericType<>() {};
+    private static final GenericType<Deployment> DEPLOYMENT = new GenericType<>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -180,7 +171,7 @@ public final class ExecutionServiceClient {
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
             .withQueryParam(QUERY_PARAM_WORKFLOW_URI, workflowUri)
-            .withQueryParam(getQueryParameter(itemVersion).orElse(null))
+            .withQueryParam(ClientUtil.getQueryParameter(QUERY_PARAM_ITEM_VERSION, itemVersion).orElse(null))
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.POST, requestBody, DEPLOYMENT);
     }
@@ -193,7 +184,7 @@ public final class ExecutionServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws HubFailureIOException id an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<Deployment> updateDeployment(final String id, final DeploymentCreationBody requestBody,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
@@ -247,7 +238,7 @@ public final class ExecutionServiceClient {
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
-     * @throws HubFailureIOException id an I/O error occurred
+     * @throws HubFailureIOException if an I/O error occurred
      */
     public ApiResponse<DeploymentList> getDeployments(final String scope,
         final DeploymentsEndpointSuffix deploymentType, final String workflowUri, final ItemVersion itemVersion,
@@ -255,21 +246,41 @@ public final class ExecutionServiceClient {
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(scope);
 
-        final var requestPath = IPath.forPosix(DEPLOYMENTS_API_PATH).append(scope);
+        var requestPath = IPath.forPosix(DEPLOYMENTS_API_PATH).append(scope);
         if (deploymentType != null) {
-            requestPath.append(deploymentType.getValue());
+            requestPath = requestPath.append(deploymentType.getValue());
         }
 
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withQueryParam(QUERY_PARAM_WORKFLOW_URI, workflowUri)
-            .withQueryParam(getQueryParameter(itemVersion).orElse(null))
+            .withQueryParam(ClientUtil.getQueryParameter(QUERY_PARAM_ITEM_VERSION, itemVersion).orElse(null))
             .withQueryParam(QUERY_PARAM_Q, q)
             .withQueryParam(QUERY_PARAM_SORT, sort)
             .withQueryParam(QUERY_PARAM_PAGE, page != null ? Integer.toString(page) : null)
             .withQueryParam(QUERY_PARAM_PAGELEN, pagelen != null ? Integer.toString(pagelen) : null)
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.GET, null, DEPLOYMENT_LIST);
+    }
+
+    /**
+     * Deletes the deployment.
+     *
+     * @param id The deployment id. (required)
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    public ApiResponse<Void> deleteDeployment(final String id, final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(DEPLOYMENTS_API_PATH).append(id);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.DELETE, null);
     }
 
     /**
@@ -317,24 +328,6 @@ public final class ExecutionServiceClient {
             }
             throw new IllegalArgumentException("Unexpected value '" + value + "'");
         }
-    }
-
-    /**
-     * Returns the given item version for the Execution service as a query parameter key-value pair, or
-     * {@link Optional#empty()} if the argument was {@code null}.
-     *
-     * @param version {@code null}-able version to map to its string representation
-     * @return query parameter key-value pair representing the given item version or {@link Optional#empty()} if
-     *         argument was {@code null}
-     */
-    public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
-        return Optional.ofNullable(version) //
-                .map(v -> v.match(//
-                    () -> new HTTPQueryParameter(QUERY_PARAM_ITEM_VERSION, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
-                    () -> new HTTPQueryParameter(QUERY_PARAM_ITEM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
-                    sv -> new HTTPQueryParameter(QUERY_PARAM_ITEM_VERSION, Integer.toString(sv)) //
-                    ) //
-                );
     }
 
 }

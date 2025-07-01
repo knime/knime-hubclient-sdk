@@ -184,6 +184,20 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/org/knime/hub/client/sdk/ApiClient.java" type="org.knime.hub.client.sdk.ApiClient">
+        <filter comment="Changed return type to optional" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ApiClient"/>
+                <message_argument value="getConnectTimeout()"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Changed return type to optional" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ApiClient"/>
+                <message_argument value="getReadTimeout()"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/org/knime/hub/client/sdk/api/CatalogServiceClient.java" type="org.knime.hub.client.sdk.api.CatalogServiceClient">
         <filter comment="Moved entity classes to dedicated packages" id="338792546">
             <message_arguments>

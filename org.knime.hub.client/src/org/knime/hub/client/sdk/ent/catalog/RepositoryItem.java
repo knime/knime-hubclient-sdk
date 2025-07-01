@@ -54,9 +54,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.eclipse.jdt.annotation.Nullable;
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -67,7 +66,6 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a repository item.
@@ -117,7 +115,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
         /** Represents an item in the recycle bin. */
         TRASH("trash"), //
         /** Unknown type, e.g. from future versions. */
-        UNKOWN("unknown");
+        UNKNOWN("unknown");
 
         private final String m_value;
 
@@ -285,7 +283,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @return path
      */
     @JsonProperty(JSON_PROPERTY_CANONICAL_PATH)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getCanonicalPath() {
         return m_canonicalPath;
     }
@@ -297,7 +295,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getId() {
         return m_id;
     }
@@ -347,9 +345,9 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     }
 
     /**
-     * Retrieves the items creation time stamp.
+     * Retrieves the time stamp of the last upload or overwrite of this item.
      *
-     * @return createdOn
+     * @return lastUploadedOn
      */
     @JsonProperty(JSON_PROPERTY_LAST_UPLOADED_ON)
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
@@ -398,16 +396,9 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     public abstract static class RepositoryItemBuilder<B extends RepositoryItemBuilder<?, ?>,
         R extends RepositoryItem> {
         String m_path;
-
-        @Nullable
         String m_owner;
-
-        @Nullable
         ZonedDateTime m_createdOn;
-
-        @Nullable
         ZonedDateTime m_lastUploadedOn;
-
         RepositoryItemType m_type;
 
         /**
@@ -501,10 +492,6 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

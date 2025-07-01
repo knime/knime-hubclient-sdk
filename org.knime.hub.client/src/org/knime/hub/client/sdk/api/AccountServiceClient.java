@@ -78,10 +78,9 @@ public final class AccountServiceClient {
     private static final String PATH_PIECE_IDENTITY = "identity";
 
     /* Return types */
-    private static final GenericType<Billboard> BILLBOARD = new GenericType<Billboard>() {};
-    private static final GenericType<AccountIdentity> ACCOUNT_IDENTITY = new GenericType<AccountIdentity>() {};
-    private static final GenericType<HubInstallationAccount> HUB_INSTALLATION_ACCOUNT =
-            new GenericType<HubInstallationAccount>() {};
+    private static final GenericType<Billboard> BILLBOARD = new GenericType<>() {};
+    private static final GenericType<AccountIdentity> ACCOUNT_IDENTITY = new GenericType<>() {};
+    private static final GenericType<HubInstallationAccount> HUB_INSTALLATION_ACCOUNT = new GenericType<>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 

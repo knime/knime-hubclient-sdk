@@ -55,10 +55,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.eclipse.jdt.annotation.NonNull;
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -67,7 +66,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a workflow group.
@@ -125,7 +123,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
         this.m_children = children;
     }
 
-    WorkflowGroup(@NonNull final WorkflowGroupBuilder builder) {
+    WorkflowGroup(final WorkflowGroupBuilder builder) {
         super(builder);
         m_children = List.of();
     }
@@ -195,10 +193,6 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

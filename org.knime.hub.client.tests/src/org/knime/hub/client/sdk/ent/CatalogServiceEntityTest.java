@@ -436,7 +436,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testNamedItemVersionsListCreation() throws IOException, URISyntaxException {
+    void testNamedItemVersionsListCreation() throws IOException {
         var namedItemVersionsList =
                 load(EntityFolders.CATALOG_ENTITES, "emptyNamedItemVersionsList.json", NamedItemVersionList.class);
         assertEquals(List.of(), namedItemVersionsList.getVersions(), "Unexpected versions");

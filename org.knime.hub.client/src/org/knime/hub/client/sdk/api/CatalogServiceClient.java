@@ -83,6 +83,7 @@ import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.ent.catalog.UploadStarted;
 import org.knime.hub.client.sdk.ent.catalog.UploadStatus;
 import org.knime.hub.client.sdk.ent.catalog.UploadTarget;
+import org.knime.hub.client.sdk.ent.util.ClientUtil;
 import org.knime.hub.client.sdk.transfer.ArtifactDownloadStream;
 import org.knime.hub.client.sdk.transfer.AsyncHubUploadStream;
 import org.knime.hub.client.sdk.transfer.ItemID;
@@ -139,19 +140,14 @@ public final class CatalogServiceClient {
 
 
     /* Return Types */
-    private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<RepositoryItem>() {};
-    private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<UploadStatus>() {};
-    private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<UploadStarted>() {};
-    private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<UploadTarget>() {};
-    private static final GenericType<PreparedDownload> PREPARED_DOWNLOAD = new GenericType<PreparedDownload>() {};
-    private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<DownloadStatus>() {};
-    private static final GenericType<NamedItemVersion> NAMED_ITEM_VERSION = new GenericType<NamedItemVersion>() {};
-    private static final GenericType<NamedItemVersionList> NAMED_ITEM_VERSION_LIST =
-            new GenericType<NamedItemVersionList>() {};
-
-    /* Item version query parameter "special" values */
-    private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
-    private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
+    private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<>() {};
+    private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<>() {};
+    private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<>() {};
+    private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<>() {};
+    private static final GenericType<PreparedDownload> PREPARED_DOWNLOAD = new GenericType<>() {};
+    private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<>() {};
+    private static final GenericType<NamedItemVersion> NAMED_ITEM_VERSION = new GenericType<>() {};
+    private static final GenericType<NamedItemVersionList> NAMED_ITEM_VERSION_LIST = new GenericType<>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -427,6 +423,7 @@ public final class CatalogServiceClient {
      * @return {@link InputStream}
      * @throws IOException if an I/O error occurred
      * @deprecated use {@link #createArtifactDownloadStream(ItemID, ItemVersion, Map, BooleanSupplier)}
+     * @since 0.1
      */
     @Deprecated
     public @Owning InputStream createResponseDownloadStream(final IPath path, final ItemVersion version,
@@ -567,6 +564,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<NamedItemVersionList> getItemVersions(final String id, final Integer limit,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
@@ -576,7 +574,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(QUERY_PARAM_LIMIT, Integer.toString(limit)) //
+            .withQueryParam(QUERY_PARAM_LIMIT, limit != null ? Integer.toString(limit) : null) //
             .invokeAPI(requestPath, Method.GET, null, NAMED_ITEM_VERSION_LIST);
     }
 
@@ -592,6 +590,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<NamedItemVersion> createItemVersion(final String id,
         final CreateNamedItemVersionRequestBody createNamedItemVersionRequestBody,
@@ -602,6 +601,7 @@ public final class CatalogServiceClient {
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_VERSIONS);
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
             .invokeAPI(requestPath, Method.POST, createNamedItemVersionRequestBody, NAMED_ITEM_VERSION);
     }
@@ -998,12 +998,16 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException If an I/O error occurred during the creation of the upload stream
      * @deprecated use {@link #createAsyncHubUploadStream(String, boolean, String, EntityTag, Map)}
+     * @since 0.1
      */
     @Deprecated
     public @Owning OutputStream createRequestUploadStream(final IPath path, final MediaType contentType,
         final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
-        return RequestUploadStream.create(this, path, contentType, additionalHeaders);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
+
+        return RequestUploadStream.create(this, requestPath, contentType, additionalHeaders);
     }
 
     /**
@@ -1042,8 +1046,7 @@ public final class CatalogServiceClient {
      * @since 0.1
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
-        final Duration readTimeout, final Map<String, String> additionalHeaders)
-                throws HubFailureIOException {
+        final Duration readTimeout, final Map<String, String> additionalHeaders) throws HubFailureIOException {
         LOGGER.atDebug() //
             .addArgument(() -> requestBody.getItems().size()) //
             .log("Initiating upload of {} items");
@@ -1271,37 +1274,7 @@ public final class CatalogServiceClient {
      *         argument was {@code null}
      */
     public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
-        return getQueryParameter(QUERY_PARAM_VERSION, version);
-    }
-
-    private static Optional<HTTPQueryParameter> getQueryParameter(final String queryParameter,
-        final ItemVersion version) {
-        return Optional.ofNullable(version) //
-            .map(v -> v.match(//
-                () -> new HTTPQueryParameter(queryParameter, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
-                () -> new HTTPQueryParameter(queryParameter, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
-                sv -> new HTTPQueryParameter(queryParameter, Integer.toString(sv)) //
-            ));
-    }
-
-    /**
-     * Returns the given item version for the Catalog service,
-     * or {@link Optional#empty()} if the argument was {@code null}.
-     *
-     * @param version {@code null}-able version to map to its {@link ItemVersion} representation
-     * @return {@link ItemVersion} or {@link Optional#empty()} if argument was {@code null} or does not define a version
-     */
-    public static Optional<ItemVersion> getItemVersion(final String version) {
-        if (ITEM_VERSION_CURRENT_STATE_IDENTIFIER.equals(version)) {
-            return Optional.of(ItemVersion.currentState());
-        } else if (ITEM_VERSION_MOST_RECENT_IDENTIFIER.equals(version)) {
-            return Optional.of(ItemVersion.mostRecent());
-        }
-        try {
-            return Optional.of(ItemVersion.of(Integer.parseInt(version)));
-        } catch (NumberFormatException ex) {
-            return Optional.empty();
-        }
+        return ClientUtil.getQueryParameter(QUERY_PARAM_VERSION, version);
     }
 
 }

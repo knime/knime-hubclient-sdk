@@ -51,13 +51,12 @@ package org.knime.hub.client.sdk.ent.catalog;
 import java.util.Map;
 import java.util.Objects;
 
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the started upload process.
@@ -72,8 +71,8 @@ public final class UploadStarted {
     private final Map<String, ItemUploadInstructions> m_items;
 
     @JsonCreator
-    private UploadStarted(
-            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) final Map<String, ItemUploadInstructions> items) {
+    private UploadStarted(@JsonProperty(value = JSON_PROPERTY_ITEMS, required = true)
+        final Map<String, ItemUploadInstructions> items) {
         this.m_items = items;
     }
 
@@ -107,11 +106,7 @@ public final class UploadStarted {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 
 }

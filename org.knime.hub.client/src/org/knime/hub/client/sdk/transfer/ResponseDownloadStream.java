@@ -74,6 +74,7 @@ import jakarta.ws.rs.core.Response.StatusType;
  * Provides an response download stream for single item download from a hub instance.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 public final class ResponseDownloadStream extends FilterInputStream {
 

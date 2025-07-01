@@ -49,6 +49,9 @@
 package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.List;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -59,6 +62,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * POJO representing a list of named item versions of a {@link RepositoryItem}.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class NamedItemVersionList {
@@ -93,9 +97,32 @@ public final class NamedItemVersionList {
      * @return versions
      */
     @JsonProperty(JSON_PROPERTY_VERSIONS)
-    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public List<NamedItemVersion> getVersions() {
         return m_versions;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var namedItemVersionList = (NamedItemVersionList) o;
+        return Objects.equals(this.m_totalCount, namedItemVersionList.m_totalCount)
+                && Objects.equals(this.m_versions, namedItemVersionList.m_versions);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_totalCount, m_versions);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 
 }

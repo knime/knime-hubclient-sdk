@@ -46,7 +46,7 @@
  * History
  *   7 May 2025 (leonard.woerteler): created
  */
-package org.knime.hub.client.sdk.transfer;
+package org.knime.hub.client.sdk.transfer.internal;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -63,6 +63,7 @@ import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.StreamingUploader;
+import org.knime.hub.client.sdk.transfer.MonitoringInputStream;
 
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Entity;

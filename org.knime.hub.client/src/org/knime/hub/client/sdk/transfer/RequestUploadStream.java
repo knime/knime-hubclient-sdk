@@ -55,6 +55,7 @@ import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
@@ -74,6 +75,7 @@ import jakarta.ws.rs.core.Response.Status.Family;
  * Provides an request upload stream for single item upload to a hub instance.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 public final class RequestUploadStream extends OutputStream {
 
@@ -83,13 +85,11 @@ public final class RequestUploadStream extends OutputStream {
 
     private boolean m_isCancelled;
 
-    private static final String CONTENT_TYPE_HEADER = "Content-Type";
-
     /** Chunk size for uploading (10MB). */
-    private static final int CHUNK_SIZE = 1024 * 1024 * 10;
+    private static final int CHUNK_SIZE = (int)(10 * FileUtils.ONE_MB);
 
     /**
-     * Opens an {@link ResponseDownloadStream} to upload an item.
+     * Opens an {@link RequestUploadStream} to upload an item.
      *
      * @param catalogClient the catalog client
      * @param path the path to the repository item
@@ -109,8 +109,9 @@ public final class RequestUploadStream extends OutputStream {
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var urlConnection = catalogClient.getApiClient().createApiRequest() //
+                    .withContentTypeHeader(contentType) //
                     .withHeaders(clientHeaders) //
-                    .createAPIURLConnection(Method.GET.name(), path, CHUNK_SIZE);
+                    .createAPIURLConnection(Method.PUT.name(), path, CHUNK_SIZE);
             return openUploadStream(urlConnection);
         } catch (IOException ex) {
             throw new HubFailureIOException(

@@ -52,17 +52,17 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a KNIME Hub trigger deployment.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class TriggerDeployment extends Deployment {
@@ -89,21 +89,21 @@ public final class TriggerDeployment extends Deployment {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        return super.equals(o);
+        var deployment = (Deployment) o;
+        return Objects.equals(this.getId(), deployment.getId())
+                && Objects.equals(this.getName(), deployment.getName())
+                && Objects.equals(this.getType(), deployment.getType())
+                && Objects.equals(this.getMasonControls(), deployment.getMasonControls());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode());
+        return Objects.hash(this.getId(), this.getName(), getType(), this.getMasonControls());
     }
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 
 }

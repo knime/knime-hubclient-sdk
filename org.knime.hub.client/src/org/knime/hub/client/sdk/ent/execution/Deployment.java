@@ -50,11 +50,10 @@ package org.knime.hub.client.sdk.ent.execution;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -65,18 +64,18 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a deployment.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(value = Deployment.JSON_PROPERTY_TYPE, allowSetters = true, ignoreUnknown = true)
 @JsonTypeInfo(//
         use = JsonTypeInfo.Id.NAME, //
-        include = JsonTypeInfo.As.EXISTING_PROPERTY, // Also serialized via #getType().
-        property = Deployment.JSON_PROPERTY_TYPE, //
+        include = JsonTypeInfo.As.EXISTING_PROPERTY, //
+        property = Deployment.JSON_PROPERTY_TYPE, // Also serialized via #getType().
         visible = true, //
         requireTypeIdForSubtypes = OptBoolean.TRUE
 )
@@ -163,7 +162,7 @@ public abstract sealed class Deployment permits
      */
     @JsonCreator
     protected Deployment(
-        @JsonProperty(value = JSON_PROPERTY_ID) final String id,
+        @JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
         @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
         @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls) {
         m_id = id;
@@ -214,32 +213,8 @@ public abstract sealed class Deployment permits
     public abstract DeploymentType getType();
 
     @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        var deployment = (Deployment) o;
-        return Objects.equals(this.m_id, deployment.m_id)
-                && Objects.equals(this.m_name, deployment.m_name)
-                && Objects.equals(this.getType(), deployment.getType())
-                && Objects.equals(this.m_masonControls, deployment.m_masonControls);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_id, m_name, getType(), m_masonControls);
-    }
-
-    @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 
 }

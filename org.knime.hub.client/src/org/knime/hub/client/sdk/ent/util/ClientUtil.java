@@ -44,86 +44,49 @@
  * ---------------------------------------------------------------------
  *
  * History
- *   Apr 28, 2025 (magnus): created
+ *   Jul 30, 2025 (magnus): created
  */
-package org.knime.hub.client.sdk.ent.catalog;
+package org.knime.hub.client.sdk.ent.util;
 
-import java.net.URL;
-import java.util.Objects;
 import java.util.Optional;
 
-import org.knime.hub.client.sdk.ent.util.EntityUtil;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.knime.core.util.hub.ItemVersion;
+import org.knime.hub.client.sdk.HTTPQueryParameter;
 
 /**
- * POJO representing the prepared download
+ * Utility class for common functions related to service clients
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class PreparedDownload {
+public final class ClientUtil {
 
-    private static final String JSON_PROPERTY_DOWNLOAD_ID = "downloadId";
-    private final String m_downloadId;
-
-    private static final String JSON_PROPERTY_DOWNLOAD_URL = "downloadUrl";
-    private final URL m_downloadUrl;
-
-    @JsonCreator
-    private PreparedDownload(@JsonProperty(value = JSON_PROPERTY_DOWNLOAD_ID) final String downloadId,
-        @JsonProperty(value = JSON_PROPERTY_DOWNLOAD_URL) final URL downloadUrl) {
-        m_downloadId = downloadId;
-        m_downloadUrl = downloadUrl;
-    }
+    /* Item version query parameter "special" values */
+    private static final String ITEM_VERSION_MOST_RECENT_IDENTIFIER = "most-recent";
+    private static final String ITEM_VERSION_CURRENT_STATE_IDENTIFIER = "current-state";
 
     /**
-     * Retrieves the download ID.
-     *
-     * @return downloadId
+     * Utility class.
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_ID)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<String> getDownloadId() {
-        return Optional.ofNullable(m_downloadId);
-    }
+    private ClientUtil() {}
 
     /**
-     * Retrieves the download URL.
+     * Returns the given item version for the Catalog service as a query parameter key-value pair, or
+     * {@link Optional#empty()} if the argument was {@code null}.
      *
-     * @return downlopadUrl
+     * @param queryParamVersion query parameter key to use for the item version
+     * @param version {@code null}-able version to map to its string representation
+     * @return query parameter key-value pair representing the given item version or {@link Optional#empty()} if
+     *         argument was {@code null}
      */
-    @JsonProperty(JSON_PROPERTY_DOWNLOAD_URL)
-    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
-    public Optional<URL> getDownloadUrl() {
-        return Optional.ofNullable(m_downloadUrl);
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        var preparedDownload = (PreparedDownload) o;
-        return Objects.equals(this.m_downloadId, preparedDownload.m_downloadId)
-                && Objects.equals(this.m_downloadUrl, preparedDownload.m_downloadUrl);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_downloadId, m_downloadUrl);
-    }
-
-    @Override
-    public String toString() {
-        return EntityUtil.toString(this);
+    public static Optional<HTTPQueryParameter> getQueryParameter(final String queryParamVersion,
+        final ItemVersion version) {
+        return Optional.ofNullable(version) //
+                .map(v -> v.match(//
+                    () -> new HTTPQueryParameter(queryParamVersion, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
+                    () -> new HTTPQueryParameter(queryParamVersion, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
+                    sv -> new HTTPQueryParameter(queryParamVersion, Integer.toString(sv)) //
+                    ) //
+                );
     }
 
 }
