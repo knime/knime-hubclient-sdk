@@ -49,7 +49,6 @@
 package org.knime.hub.client.sdk.api;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.List;
 
@@ -116,8 +115,6 @@ class HubClientAPITest extends AbstractTest {
 	 * @param testFileName the provided JSON response
 	 * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException
-	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -128,7 +125,7 @@ class HubClientAPITest extends AbstractTest {
         "space.json,           Space"
     })
 	void testGetRepositoryItemMetaDataWithoutDetails(final String testFileName, final String repoItemName)
-			throws IOException, CouldNotAuthorizeException, URISyntaxException {
+	    throws IOException {
 	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = null;
         boolean deep = false;
@@ -160,8 +157,6 @@ class HubClientAPITest extends AbstractTest {
 	 * @param testFileName the provided JSON response
      * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException
-	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -172,7 +167,7 @@ class HubClientAPITest extends AbstractTest {
         // Space does not provide details if requested.
     })
     void testGetRepositoryItemMetaDataWithDetails(final String testFileName, final String repoItemName)
-            throws IOException, CouldNotAuthorizeException, URISyntaxException {
+        throws IOException {
         String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = "full";
         boolean deep = false;
@@ -206,8 +201,6 @@ class HubClientAPITest extends AbstractTest {
 	 * @param testFileName the provided JSON response
      * @param repoItemName the name of the repository item
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException
-	 * @throws URISyntaxException
 	 */
 	@ParameterizedTest
     @CsvSource(value = {
@@ -215,7 +208,7 @@ class HubClientAPITest extends AbstractTest {
         "space.json,           Space"
     })
 	void testGetRepositoryItemMetaDataWithChildren(final String testFileName, final String repoItemName)
-	        throws IOException, CouldNotAuthorizeException, URISyntaxException {
+	        throws IOException {
 	    String path = "%s/%s".formatted(DEFAULT_PUBLIC_SPACE_PATH, repoItemName);
         String details = null;
         boolean deep = false;
@@ -246,12 +239,9 @@ class HubClientAPITest extends AbstractTest {
      * are deserialized into the expected repository item meta data.
 	 *
 	 * @throws IOException
-	 * @throws CouldNotAuthorizeException
-	 * @throws URISyntaxException
 	 */
 	@Test
-	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException, CouldNotAuthorizeException,
-	URISyntaxException {
+	void testGetRepositoryItemMetaDataWithContribSpaces() throws IOException {
         String path = "Users/%s".formatted(DEFAULT_USERNAME);
         String details = null;
         boolean deep = false;

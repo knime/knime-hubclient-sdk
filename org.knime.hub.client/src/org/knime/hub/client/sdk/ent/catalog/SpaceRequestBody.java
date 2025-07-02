@@ -63,12 +63,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the space request body.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SpaceRequestBody {
-    
+
     private static final String JSON_PROPERTY_DESCRIPTION = "description";
     private final String m_description;
 
@@ -80,9 +80,9 @@ public final class SpaceRequestBody {
 
     @JsonCreator
     private SpaceRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_DESCRIPTION) String description,
-            @JsonProperty(value = JSON_PROPERTY_TAGS) List<String> tags,
-            @JsonProperty(value = JSON_PROPERTY_PRIVATE) Boolean isPrivate) {
+            @JsonProperty(value = JSON_PROPERTY_DESCRIPTION) final String description,
+            @JsonProperty(value = JSON_PROPERTY_TAGS) final List<String> tags,
+            @JsonProperty(value = JSON_PROPERTY_PRIVATE) final Boolean isPrivate) {
         this.m_description = description;
         this.m_tags = tags;
         this.m_private = isPrivate;
@@ -90,7 +90,7 @@ public final class SpaceRequestBody {
 
     /**
      * Retrieves the optional description for this item.
-     * 
+     *
      * @return description
      */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
@@ -101,7 +101,7 @@ public final class SpaceRequestBody {
 
     /**
      * Retrieves an array of tags for the space.
-     * 
+     *
      * @return tags
      */
     @JsonProperty(JSON_PROPERTY_TAGS)
@@ -112,7 +112,7 @@ public final class SpaceRequestBody {
 
     /**
      * Return {@code true} if the space is private otherwise {@code false}.
-     * 
+     *
      * @return _private
      */
     @JsonProperty(JSON_PROPERTY_PRIVATE)
@@ -123,7 +123,7 @@ public final class SpaceRequestBody {
 
     /**
      * Creates a new {@link SpaceRequestBodyBuilder}.
-     * 
+     *
      * @return builder
      */
     public static SpaceRequestBodyBuilder builder() {
@@ -143,40 +143,40 @@ public final class SpaceRequestBody {
 
         /**
          * Sets a description for the space.
-         * 
-         * @param description
+         *
+         * @param description the space description
          * @return this
          */
-        public SpaceRequestBodyBuilder withDescription(String description) {
+        public SpaceRequestBodyBuilder withDescription(final String description) {
             m_description = description;
             return this;
         }
 
         /**
          * Sets tags for the space.
-         * 
-         * @param tags
+         *
+         * @param tags the space tags
          * @return this
          */
-        public SpaceRequestBodyBuilder withTags(List<String> tags) {
+        public SpaceRequestBodyBuilder withTags(final List<String> tags) {
             m_tags = tags;
             return this;
         }
 
         /**
          * Sets a value for whether the space shall be private.
-         * 
+         *
          * @param isPrivate
          * @return this
          */
-        public SpaceRequestBodyBuilder setPrivate(Boolean isPrivate) {
+        public SpaceRequestBodyBuilder setPrivate(final Boolean isPrivate) {
             m_private = isPrivate;
             return this;
         }
 
         /**
          * Builds a new {@link SpaceRequestBody}.
-         * 
+         *
          * @return spaceRequestBody
          */
         public SpaceRequestBody build() {
@@ -185,7 +185,7 @@ public final class SpaceRequestBody {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

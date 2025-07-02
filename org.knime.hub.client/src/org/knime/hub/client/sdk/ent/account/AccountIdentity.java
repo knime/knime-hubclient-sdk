@@ -48,8 +48,6 @@
  */
 package org.knime.hub.client.sdk.ent.account;
 
-import java.util.Objects;
-
 import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -162,24 +160,6 @@ public abstract sealed class AccountIdentity permits UserAccount {
     @JsonProperty(JSON_PROPERTY_TYPE)
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public abstract AccountIdentityType getType();
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        var accountIdentity = (AccountIdentity) o;
-        return Objects.equals(this.m_id, accountIdentity.m_id)
-                && Objects.equals(this.getType(), accountIdentity.getType());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(m_id, getType());
-    }
 
     @Override
     public String toString() {

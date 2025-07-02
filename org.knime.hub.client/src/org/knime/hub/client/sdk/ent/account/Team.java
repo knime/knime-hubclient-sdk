@@ -94,12 +94,12 @@ public final class Team {
             return false;
         }
         var team = (Team) o;
-        return Objects.equals(this.m_name, team.m_name) && super.equals(o);
+        return Objects.equals(this.m_name, team.m_name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_name, super.hashCode());
+        return Objects.hash(m_name);
     }
 
     @Override

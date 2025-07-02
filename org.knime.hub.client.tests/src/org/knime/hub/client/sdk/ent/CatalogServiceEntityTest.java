@@ -54,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Instant;
 import java.util.HashMap;
@@ -118,7 +117,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
     @Test
-    void testCreateComponent() throws IOException, URISyntaxException {
+    void testCreateComponent() throws IOException {
         final var component = load(EntityFolders.CATALOG_ENTITES, "component.json", Component.class);
         assertEquals(RepositoryItem.RepositoryItemType.COMPONENT, component.getType(), "Unexpected type");
         assertEquals(EXPECTED_COMPONENT_PATH, component.getPath(), "Unexpected path");
@@ -146,7 +145,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateData() throws IOException, URISyntaxException {
+    void testCreateData() throws IOException {
         final var data = load(EntityFolders.CATALOG_ENTITES, "data.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
         assertEquals(EXPECTED_DATA_PATH, data.getPath(), "Unexpected path");
@@ -171,7 +170,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateWorkflow() throws IOException, URISyntaxException {
+    void testCreateWorkflow() throws IOException {
         final var workflow = load(EntityFolders.CATALOG_ENTITES, "workflow.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflow.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_PATH, workflow.getPath(), "Unexpected path");
@@ -198,7 +197,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateLargeSizedItems() throws IOException, URISyntaxException {
+    void testCreateLargeSizedItems() throws IOException {
         final var largeComponent = load(EntityFolders.CATALOG_ENTITES, "largeComponent.json", Component.class);
         assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize(), "Unexpected size");
         final var largeData = load(EntityFolders.CATALOG_ENTITES, "largeData.json", Data.class);
@@ -208,7 +207,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateWorkflowGroup() throws IOException, URISyntaxException {
+    void testCreateWorkflowGroup() throws IOException {
         final var workflowGroup = load(EntityFolders.CATALOG_ENTITES, "workflowGroup.json", WorkflowGroup.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW_GROUP, workflowGroup.getType(), "Unexpected type");
         assertEquals(EXPECTED_WORKFLOW_GROUP_PATH, workflowGroup.getPath(), "Unexpected path");
@@ -238,7 +237,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateSpace() throws IOException, URISyntaxException {
+    void testCreateSpace() throws IOException {
         final var space = load(EntityFolders.CATALOG_ENTITES, "space.json", Space.class);
         assertEquals(RepositoryItem.RepositoryItemType.SPACE, space.getType(), "Unexpected type");
         assertEquals(EXPECTED_SPACE_PATH, space.getPath(), "Unexpected path");
@@ -252,7 +251,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateUploadManifest() throws IOException, URISyntaxException {
+    void testCreateUploadManifest() throws IOException {
         final var uploadManifest = load(EntityFolders.CATALOG_ENTITES, "uploadManifest.json", UploadManifest.class);
         final var items = uploadManifest.getItems();
         assertEquals(3, items.size(), "Unexpected number of items");
@@ -274,7 +273,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateUploadStarted() throws IOException, URISyntaxException {
+    void testCreateUploadStarted() throws IOException {
         final var uploadStarted = load(EntityFolders.CATALOG_ENTITES, "uploadStarted.json", UploadStarted.class);
         final var items = uploadStarted.getItems();
         assertEquals(3, items.size(), "Unexpected number of items");
@@ -321,7 +320,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateUploadStatus() throws IOException, URISyntaxException {
+    void testCreateUploadStatus() throws IOException {
         final var uploadStatus = load(EntityFolders.CATALOG_ENTITES, "uploadStatus.json", UploadStatus.class);
         assertEquals("d63ec9e1-24a7-4015-82b4-476ca4f4a57b~7fbeb904-2272-4dd7-b2e1-d3f49b8373a0",
             uploadStatus.getUploadId(), "Unexpected upload ID");
@@ -337,7 +336,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testPreparedDownloadCreation() throws IOException, URISyntaxException {
+    void testPreparedDownloadCreation() throws IOException {
         final var preparedDownloadWithId =
                 load(EntityFolders.CATALOG_ENTITES, "preparedDownloadWithId.json", PreparedDownload.class);
         var downloadIdOpt = preparedDownloadWithId.getDownloadId();
@@ -356,7 +355,7 @@ class CatalogServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testDownloadStatusCreation() throws IOException, URISyntaxException {
+    void testDownloadStatusCreation() throws IOException {
         final var downloadStatus = load(EntityFolders.CATALOG_ENTITES, "downloadStatus.json", DownloadStatus.class);
         assertEquals("f9226530-f9e6-4e1c-9944-82baf1d43cb3",
                 downloadStatus.getDownloadId(), "Unexpected download ID");

@@ -52,7 +52,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
@@ -75,7 +74,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 class AccountServiceEntityTest extends AbstractTest {
 
     @Test
-    void testCreateBillboardWithoutAuth() throws IOException, URISyntaxException {
+    void testCreateBillboardWithoutAuth() throws IOException {
         final var billboard = load(EntityFolders.ACCOUNT_ENTITIES, "billboard.json", Billboard.class);
         assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
         assertTrue(billboard.isEnableResetOnUploadCheckbox().isEmpty(), "Unexpected enabled");
@@ -91,7 +90,7 @@ class AccountServiceEntityTest extends AbstractTest {
             "Unexpected href for self control");
         assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
 
-        assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
+        assertEquals(AuthenticationType.OAUTH, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
 
         final var version = billboard.getVersion();
         assertEquals(5, version.getMajor(), "Unexpected major version");
@@ -101,7 +100,7 @@ class AccountServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testCreateBillboardWithAuth() throws IOException, URISyntaxException {
+    void testCreateBillboardWithAuth() throws IOException {
         final var billboard = load(EntityFolders.ACCOUNT_ENTITIES, "billboardWithAuth.json", Billboard.class);
         assertEquals("KNIME-Hub", billboard.getMountId(), "Unexpected mount ID");
 
@@ -136,7 +135,7 @@ class AccountServiceEntityTest extends AbstractTest {
             "Unexpected href for self control");
         assertEquals("GET", masonControls.get("self").getMethod(), "Unexpected method for self control");
 
-        assertEquals(AuthenticationType.OAuth, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
+        assertEquals(AuthenticationType.OAUTH, billboard.getPreferredAuthType(), "Unexpected preferred auth type");
 
         final var version = billboard.getVersion();
         assertEquals(5, version.getMajor(), "Unexpected major version");
@@ -146,18 +145,18 @@ class AccountServiceEntityTest extends AbstractTest {
     }
 
     @Test
-    void testAccountIdentity() throws IOException, URISyntaxException {
-        var accounntIdenity = load(EntityFolders.ACCOUNT_ENTITIES,
+    void testAccountIdentity() throws IOException {
+        var accountIdentity = load(EntityFolders.ACCOUNT_ENTITIES,
             "accountIdentityWithoutTeam.json", AccountIdentity.class);
-        var userAccountIdentity = (UserAccount)accounntIdenity;
+        var userAccountIdentity = (UserAccount)accountIdentity;
         assertEquals("account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
             userAccountIdentity.getId(), "Unexpected account ID");
         assertEquals(AccountIdentityType.USER, userAccountIdentity.getType(), "Unexpected account type");
         assertEquals("space_explorer_user", userAccountIdentity.getName(), "Unexpected account name");
         assertTrue(userAccountIdentity.getTeams().isEmpty(), "Unexpected account teams");
 
-        accounntIdenity = load(EntityFolders.ACCOUNT_ENTITIES, "accountIdentityWithTeam.json", AccountIdentity.class);
-        userAccountIdentity = (UserAccount)accounntIdenity;
+        accountIdentity = load(EntityFolders.ACCOUNT_ENTITIES, "accountIdentityWithTeam.json", AccountIdentity.class);
+        userAccountIdentity = (UserAccount)accountIdentity;
         assertEquals("account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
             userAccountIdentity.getId(), "Unexpected account ID");
         assertEquals(AccountIdentityType.USER, userAccountIdentity.getType(), "Unexpected account type");

@@ -55,7 +55,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.Map;
@@ -186,10 +185,9 @@ public abstract class AbstractTest {
      * @param clazz the {@link Class} of the entity
      * @return the created entity
      * @throws IOException
-     * @throws URISyntaxException
      */
     public static <T> T load(final EntityFolders entityFolder, final String filename, final Class<T> clazz)
-        throws IOException, URISyntaxException {
+        throws IOException {
         // Path to the file inside test file folder.
         final var filePath =
             IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append(entityFolder.toString()).append(filename);

@@ -127,13 +127,15 @@ public final class UserAccount extends AccountIdentity {
             return false;
         }
         var userAccount = (UserAccount) o;
-        return Objects.equals(this.m_name, userAccount.m_name)
+        return Objects.equals(this.getId(), userAccount.getId())
+                && Objects.equals(this.getType(), userAccount.getType())
+                && Objects.equals(this.m_name, userAccount.m_name)
                 && Objects.equals(this.m_teams, userAccount.m_teams);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_name, m_teams);
+        return Objects.hash(this.getId(), this.getType(), m_name, m_teams);
     }
 
     @Override

@@ -51,7 +51,6 @@ package org.knime.hub.client.sdk.ent;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,7 +67,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 class ProblemJSONEntityTest extends AbstractTest {
 
     @Test
-    void testCreateRFC9457ErrorResponse() throws IOException, URISyntaxException {
+    void testCreateRFC9457ErrorResponse() throws IOException {
         final var basic = load(EntityFolders.API_ENTITES, "rfc9457.json", ProblemDescription.class);
         assertEquals(Optional.empty(), basic.getType(), "Unexpected type");
         assertEquals(Optional.empty(), basic.getStatus(), "Unexpected status");

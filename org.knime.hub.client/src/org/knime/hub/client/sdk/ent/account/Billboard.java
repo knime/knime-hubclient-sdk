@@ -63,6 +63,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
@@ -264,9 +265,26 @@ public final class Billboard {
      */
     public enum AuthenticationType {
             /** OAuth authorization */
-            OAuth,
+            OAUTH("OAuth"),
             /** Credentials authorization */
-            Credentials;
+            CREDENTIALS("Credentials");
+
+        private final String m_value;
+
+        AuthenticationType(final String value) {
+            this.m_value = value;
+        }
+
+        @JsonValue
+        private final String getValue() {
+            return m_value;
+        }
+
+        @Override
+        public String toString() {
+            return String.valueOf(m_value);
+        }
+
     }
 
 }
