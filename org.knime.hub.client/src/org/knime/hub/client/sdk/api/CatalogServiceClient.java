@@ -175,6 +175,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<RepositoryItem> createItemByCanonicalPath(final String accountId, final IPath subPath,
         final SpaceRequestBody spaceRequestBody, final Map<String, String> additionalHeaders)
@@ -207,6 +208,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<RepositoryItem> createItemByPath(final IPath path, final SpaceRequestBody spaceRequestBody,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
@@ -938,6 +940,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<UploadStarted> initiateUpload(final String parentId, final UploadManifest requestBody,
         final Duration readTimeout, final Map<String, String> additionalHeaders)

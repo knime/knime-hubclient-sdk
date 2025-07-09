@@ -62,6 +62,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing a team where a hub user is a member of.
  *
  * @author Magnus Gohm, KNIMA AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Team {

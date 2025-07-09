@@ -65,6 +65,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * to actually upload an item.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ItemUploadInstructions {

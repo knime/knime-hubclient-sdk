@@ -60,8 +60,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the metaInfo of a {@link RepositoryItem}.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetaInfo {
@@ -71,13 +72,13 @@ public final class MetaInfo {
 
     @JsonCreator
     private MetaInfo(
-            @JsonProperty(value = JSON_PROPERTY_SPACE, required = true) SpacePermissionAttributes space) {
+            @JsonProperty(value = JSON_PROPERTY_SPACE, required = true) final SpacePermissionAttributes space) {
         this.m_space = space;
     }
 
     /**
      * Retrieves the space info.
-     * 
+     *
      * @return space
      */
     @JsonProperty(JSON_PROPERTY_SPACE)
@@ -87,7 +88,7 @@ public final class MetaInfo {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

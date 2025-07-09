@@ -71,6 +71,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing a repository item.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(value = RepositoryItem.JSON_PROPERTY_TYPE, allowSetters = true, ignoreUnknown = true)
 @JsonTypeInfo(//

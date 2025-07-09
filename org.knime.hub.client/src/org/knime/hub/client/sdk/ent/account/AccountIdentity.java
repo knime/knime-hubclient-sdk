@@ -65,6 +65,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing the account identity.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(value = AccountIdentity.JSON_PROPERTY_TYPE, allowSetters = true, ignoreUnknown = true)
 @JsonTypeInfo(//

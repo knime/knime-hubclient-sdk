@@ -116,6 +116,7 @@ public final class AccountServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
      */
     public ApiResponse<AccountIdentity> getAccountIdentity(final Map<String, String> additionalHeaders)
         throws HubFailureIOException {

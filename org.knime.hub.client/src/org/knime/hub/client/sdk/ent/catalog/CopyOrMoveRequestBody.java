@@ -64,6 +64,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * Request body for copy or move request.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class CopyOrMoveRequestBody {

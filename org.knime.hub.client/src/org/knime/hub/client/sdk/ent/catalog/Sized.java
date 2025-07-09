@@ -50,13 +50,14 @@ package org.knime.hub.client.sdk.ent.catalog;
 
 /**
  * Implemented by entities that have a size.
- * 
+ *
  * @author Jasper Krauter, KNIME GmbH, Konstanz, Germany
+ * @since 0.1
  */
 public interface Sized {
     /**
      * Retrieves the size of the item.
-     * 
+     *
      * @return size
      */
     long getSize();

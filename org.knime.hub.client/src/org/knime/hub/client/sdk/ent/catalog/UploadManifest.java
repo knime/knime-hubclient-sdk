@@ -63,6 +63,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing the upload manifest.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UploadManifest {

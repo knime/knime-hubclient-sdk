@@ -80,6 +80,7 @@ public final class FilePartUploader {
          * @return fetched upload target specification
          * @throws IOException if an error occurs while fetching
          * @throws CouldNotAuthorizeException if a Hub call could not be authorized
+         * @since 0.1
          */
         UploadTarget fetch(int partNo) throws IOException, CouldNotAuthorizeException;
     }

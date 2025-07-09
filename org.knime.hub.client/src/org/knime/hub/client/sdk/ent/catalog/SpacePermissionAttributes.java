@@ -60,8 +60,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the space permission attributes.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class SpacePermissionAttributes {
@@ -71,13 +72,13 @@ public final class SpacePermissionAttributes {
 
     @JsonCreator
     private SpacePermissionAttributes(
-            @JsonProperty(value = JSON_PROPERTY_SPACE_ID, required = true) String spaceId) {
+            @JsonProperty(value = JSON_PROPERTY_SPACE_ID, required = true) final String spaceId) {
         this.m_spaceId = spaceId;
     }
 
     /**
      * Retrieves the unique ID of the space.
-     * 
+     *
      * @return spaceId
      */
     @JsonProperty(JSON_PROPERTY_SPACE_ID)
@@ -87,7 +88,7 @@ public final class SpacePermissionAttributes {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

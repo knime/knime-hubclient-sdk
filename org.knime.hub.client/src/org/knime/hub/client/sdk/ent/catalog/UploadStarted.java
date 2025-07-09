@@ -61,8 +61,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the started upload process.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class UploadStarted {
@@ -72,13 +73,13 @@ public final class UploadStarted {
 
     @JsonCreator
     private UploadStarted(
-            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) Map<String, ItemUploadInstructions> items) {
+            @JsonProperty(value = JSON_PROPERTY_ITEMS, required = true) final Map<String, ItemUploadInstructions> items) {
         this.m_items = items;
     }
 
     /**
      * Retrieves the items which are going to be uploaded.
-     * 
+     *
      * @return items
      */
     @JsonProperty(JSON_PROPERTY_ITEMS)
@@ -88,7 +89,7 @@ public final class UploadStarted {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }

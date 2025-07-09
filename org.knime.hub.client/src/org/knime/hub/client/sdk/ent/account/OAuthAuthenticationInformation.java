@@ -63,6 +63,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing OAuth authentication information
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 public final class OAuthAuthenticationInformation {
 

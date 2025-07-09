@@ -64,6 +64,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
  * POJO representing a Component.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @since 0.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Component extends RepositoryItem implements Sized {
