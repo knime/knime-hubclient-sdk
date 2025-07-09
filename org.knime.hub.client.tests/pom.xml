@@ -11,7 +11,7 @@
 	<properties>
 		<sonar.sources></sonar.sources>
 		<sonar.tests>src</sonar.tests>
-		<revision>0.0.1</revision>
+		<revision>0.1.0</revision>
 	</properties>
 	
 	<build>

@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.knime.maven</groupId>
 		<artifactId>ap.parent</artifactId>
-		<version>5.5.0</version>
+		<version>5.6.0</version>
 	</parent>
 
 	<groupId>org.knime</groupId>
@@ -14,7 +14,7 @@
 	<packaging>pom</packaging>
 
     <properties>
-        <revision>0.0.1</revision>
+        <revision>0.1.0</revision>
         <changelist>-SNAPSHOT</changelist>
         <feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
         <feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
@@ -43,41 +43,6 @@
 			<id>p2-knime-shared</id>
 			<layout>p2</layout>
 			<url>${knime.shared.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-server-client</id>
-			<layout>p2</layout>
-			<url>${knime.server.client.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-workbench</id>
-			<layout>p2</layout>
-			<url>${knime.workbench.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-gateway</id>
-			<layout>p2</layout>
-			<url>${knime.gateway.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-core-ui</id>
-			<layout>p2</layout>
-			<url>${knime.core.ui.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-filehandling-core</id>
-			<layout>p2</layout>
-			<url>${knime.filehandling.core.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-svg</id>
-			<layout>p2</layout>
-			<url>${knime.svg.p2}</url>
-		</repository>
-		<repository>
-			<id>p2-knime-base</id>
-			<layout>p2</layout>
-			<url>${knime.base.p2}</url>
 		</repository>
 	</repositories>
 </project>
