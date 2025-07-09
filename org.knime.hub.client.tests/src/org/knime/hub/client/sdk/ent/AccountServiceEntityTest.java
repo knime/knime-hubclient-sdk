@@ -49,10 +49,13 @@
 package org.knime.hub.client.sdk.ent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
@@ -60,6 +63,8 @@ import org.knime.hub.client.sdk.ent.account.AccountIdentity;
 import org.knime.hub.client.sdk.ent.account.AccountIdentity.AccountIdentityType;
 import org.knime.hub.client.sdk.ent.account.Billboard;
 import org.knime.hub.client.sdk.ent.account.Billboard.AuthenticationType;
+import org.knime.hub.client.sdk.ent.account.HubInstallationAccount;
+import org.knime.hub.client.sdk.ent.account.Member.MemberType;
 import org.knime.hub.client.sdk.ent.account.UserAccount;
 import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 
@@ -71,6 +76,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
+@SuppressWarnings("java:S2701") // ignore the warning regarding nulls in assertions because of access restriction
 class AccountServiceEntityTest extends AbstractTest {
 
     @Test
@@ -165,6 +171,79 @@ class AccountServiceEntityTest extends AbstractTest {
         assertTrue(!teams.isEmpty(), "Expected teams");
         final var team = teams.get(0);
         assertEquals("Space Explorer Team", team.getName(), "Unexpected team name");
+    }
+
+    @Test
+    void testHubGlobalWithoutAuth() throws IOException {
+        final var hubGlobal = load(EntityFolders.ACCOUNT_ENTITIES, "hubGlobal.json", HubInstallationAccount.class);
+        assertEquals("hub:global", hubGlobal.getId(), "Unexpected hub account installation ID");
+        assertEquals("Hub installation", hubGlobal.getName(), "Unexpected hub installation account name");
+        assertEquals("installation", hubGlobal.getType(), "Unexpected hub account installation type");
+        assertEquals(null, hubGlobal.getVersion(), "Unexpected business hub version");
+        assertEquals(null, hubGlobal.getClusterId(), "Unexpected kubernetes cluster ID");
+        assertFalse(hubGlobal.getFeatures().isEmpty(), "Expected installation features");
+        assertEquals(List.of("HubCollections", "CommunityHub", "AiServices", "SecretStore", "Hub",
+            "SpacesInUserAccounts", "AnonymousBrowsing", "DataApplicationPassword"),
+            hubGlobal.getFeatures(), "Unexpected installation features");
+        assertTrue(hubGlobal.getGroups().isEmpty(), "Unexpected global groups");
+        var control = hubGlobal.getControls().get("self");
+        assertNotEquals(null, control, "Expected self control");
+        assertEquals("https://api.hub.knime.com/accounts/hub:global", control.getHref(), "Unexpected href");
+        assertEquals("GET", control.getMethod(), "Unexpected method");
+    }
+
+    @Test
+    void testHubGlobalWithAuth() throws IOException {
+        final var hubGlobal = load(EntityFolders.ACCOUNT_ENTITIES, "hubGlobalWithAuth.json",
+            HubInstallationAccount.class);
+        assertEquals("hub:global", hubGlobal.getId(), "Unexpected hub account installation ID");
+        assertEquals("Hub installation", hubGlobal.getName(), "Unexpected hub installation account name");
+        assertEquals("installation", hubGlobal.getType(), "Unexpected hub account installation type");
+        assertEquals(null, hubGlobal.getVersion(), "Unexpected business hub version");
+        assertEquals("c1f7ed25-efe6-414d-a80a-7f98f4623033", hubGlobal.getClusterId(),
+            "Unexpected kubernetes cluster ID");
+        assertFalse(hubGlobal.getFeatures().isEmpty(), "Expected installation features");
+        assertEquals(List.of("HubCollections", "CommunityHub", "AiServices", "SecretStore", "Hub",
+            "SpacesInUserAccounts", "AnonymousBrowsing", "DataApplicationPassword"),
+            hubGlobal.getFeatures(), "Unexpected installation features");
+        assertFalse(hubGlobal.getControls().isEmpty(), "Expected mason controls");
+        var control = hubGlobal.getControls().get("self");
+        assertNotEquals(null, control, "Expected self control");
+        assertEquals("https://api.hub.knime.com/accounts/hub:global", control.getHref(), "Unexpected href");
+        assertEquals("GET", control.getMethod(), "Unexpected method");
+        assertEquals(2, hubGlobal.getGroups().size(), "Expected global groups");
+        final var groups = hubGlobal.getGroups();
+        var group = groups.get(0);
+        assertEquals("MyExternalGroup", group.getName(), "Unexpected global group name");
+        assertEquals("My External Group :)", group.getDisplayName(), "Unexpected global group display name");
+        assertEquals("hub:global:group:MyExternalGroup", group.getId(), "Unexpected global group ID");
+        assertTrue(group.isExternal(), "Unexpected external flag");
+        assertFalse(group.isScimManaged(), "Unexpected scim managed flag");
+        assertTrue(group.getMembers().isEmpty(), "Unexpected group members");
+        assertFalse(group.getControls().isEmpty(), "Expected mason controls");
+        control = group.getControls().get("self");
+        assertNotEquals(null, control, "Expected self control");
+        assertEquals("https://api.hub.knime.com/accounts/hub:global/groups/MyExternalGroup", control.getHref(),
+                "Unexpected href");
+        assertEquals("GET", control.getMethod(), "Unexpected method");
+        group = groups.get(1);
+        assertEquals("MyInternalGroup", group.getName(), "Unexpected global group name");
+        assertEquals("My Internal Group :)", group.getDisplayName(), "Unexpected global group display name");
+        assertEquals("hub:global:group:MyInternalGroup", group.getId(), "Unexpected global group ID");
+        assertFalse(group.isExternal(), "Unexpected external flag");
+        assertFalse(group.isScimManaged(), "Unexpected scim managed flag");
+        assertFalse(group.getMembers().isEmpty(), "Expected group members");
+        final var member = group.getMembers().get(0);
+        assertEquals("account:team:a885bb42-d808-4557-9a7f-9f10c5777739", member.getId(), "Unexpected member id");
+        assertEquals("jdoe", member.getName(), "Unexpected member name");
+        assertEquals(MemberType.USER, member.getType(), "Unexpected member type");
+        assertTrue(member.isIndirect(), "Unexpected indirect flag");
+        assertFalse(group.getControls().isEmpty(), "Expected mason controls");
+        control = group.getControls().get("self");
+        assertNotEquals(null, control, "Expected self control");
+        assertEquals("https://api.hub.knime.com/accounts/hub:global/groups/MyInternalGroup", control.getHref(),
+                "Unexpected href");
+        assertEquals("GET", control.getMethod(), "Unexpected method");
     }
 
 }

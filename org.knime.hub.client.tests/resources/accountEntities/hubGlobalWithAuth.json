@@ -1,0 +1,64 @@
+{
+	"@namespaces": {
+		"knime": {
+			"name": "http://www.knime.com/server/rels#"
+		}
+	},
+	"@controls": {
+		"self": {
+			"href": "https://api.hub.knime.com/accounts/hub:global",
+			"isHrefTemplate": true,
+			"method": "GET"
+		}
+	},
+	"id": "hub:global",
+	"type": "installation",
+	"name": "Hub installation",
+	"clusterId": "c1f7ed25-efe6-414d-a80a-7f98f4623033",
+	"features": [
+		"HubCollections",
+		"CommunityHub",
+		"AiServices",
+		"SecretStore",
+		"Hub",
+		"SpacesInUserAccounts",
+		"AnonymousBrowsing",
+		"DataApplicationPassword"
+	],
+	"groups": [
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.hub.knime.com/accounts/hub:global/groups/MyExternalGroup",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"name": "MyExternalGroup",
+			"displayName": "My External Group :)",
+			"id": "hub:global:group:MyExternalGroup",
+			"external": true
+		},
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.hub.knime.com/accounts/hub:global/groups/MyInternalGroup",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"name": "MyInternalGroup",
+			"displayName": "My Internal Group :)",
+			"id": "hub:global:group:MyInternalGroup",
+			"external": false,
+			"members": [
+				{
+					"id": "account:team:a885bb42-d808-4557-9a7f-9f10c5777739",
+					"name": "jdoe",
+					"type": "user",
+					"indirect": true
+				}
+			]
+		}
+	]
+}
