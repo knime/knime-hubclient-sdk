@@ -115,8 +115,10 @@ public final class CatalogServiceClient {
     private static final String PATH_PIECE_COPIES = "copies";
     private static final String PATH_PIECE_PATH = "path";
     private static final String PATH_PIECE_NAME = "name";
+    private static final String PATH_PIECE_WORKING_AREA = "workingArea";
 
     /* Query parameters */
+    private static final String QUERY_PARAM_FROM_VERSION = "fromVersion";
     private static final String QUERY_PARAM_FROM_REPOSITORY = "from-repository";
     private static final String QUERY_PARAM_MOVE = "move";
     private static final String QUERY_PARAM_VERSION = "version";
@@ -126,6 +128,7 @@ public final class CatalogServiceClient {
     private static final String QUERY_PARAM_SPACE_DETAILS = "spaceDetails";
     private static final String QUERY_PARAM_CONTRIB_SPACES = "contribSpaces";
     private static final String QUERY_PARAM_PART_NUMBER = "partNumber";
+
 
     /* Return Types */
     private static final GenericType<RepositoryItem> REPOSITORY_ITEM = new GenericType<RepositoryItem>() {};
@@ -320,8 +323,7 @@ public final class CatalogServiceClient {
      */
     public <R> ApiResponse<R> downloadItemByCanonicalPath(final String accountId, final IPath subPath,
         final ItemVersion version, final MediaType responseType, final DownloadContentHandler<R> contentHandler,
-        final Map<String, String> additionalHeaders)
-                throws IOException, CancelationException {
+        final Map<String, String> additionalHeaders) throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(accountId);
@@ -333,7 +335,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -356,9 +358,8 @@ public final class CatalogServiceClient {
      * @throws IOException if the operation had an I/O error
      * @throws CancelationException if the operation was canceled
      */
-    public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version,
-        final MediaType responseType, final Map<String, String> additionalHeaders,
-        final DownloadContentHandler<R> contentHandler)
+    public <R> ApiResponse<R> downloadItemById(final String id, final ItemVersion version, final MediaType responseType,
+        final Map<String, String> additionalHeaders, final DownloadContentHandler<R> contentHandler)
         throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
@@ -369,7 +370,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -391,8 +392,7 @@ public final class CatalogServiceClient {
      */
     public <R> ApiResponse<R> downloadItemByPath(final IPath path, final ItemVersion version,
         final MediaType responseType, final DownloadContentHandler<R> contentHandler,
-        final Map<String, String> additionalHeaders)
-        throws IOException, CancelationException {
+        final Map<String, String> additionalHeaders) throws IOException, CancelationException {
         CheckUtils.checkArgumentNotNull(contentHandler);
         CheckUtils.checkArgumentNotNull(responseType);
         CheckUtils.checkArgumentNotNull(path);
@@ -402,7 +402,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -428,8 +428,7 @@ public final class CatalogServiceClient {
      */
     public ApiResponse<RepositoryItem> getRepositoryItemByCanonicalPath(final String accountId, final IPath subPath,
         final String details, final boolean deep, final boolean spaceDetails, final String contribSpaces,
-        final ItemVersion version, final Map<String, String> additionalHeaders)
-        throws HubFailureIOException {
+        final ItemVersion version, final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(accountId);
         CheckUtils.checkArgumentNotNull(subPath);
 
@@ -439,7 +438,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -473,7 +472,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -500,17 +499,16 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException if an I/O error occurred
      */
-    public ApiResponse<RepositoryItem> getRepositoryItemById(final String id, final String details,
-        final boolean deep, final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
+    public ApiResponse<RepositoryItem> getRepositoryItemById(final String id, final String details, final boolean deep,
+        final boolean spaceDetails, final String contribSpaces, final ItemVersion version,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
         CheckUtils.checkArgumentNotNull(id);
-
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id);
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -1086,7 +1084,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, PREPARED_DOWNLOAD);
     }
 
@@ -1141,6 +1139,29 @@ public final class CatalogServiceClient {
     }
 
     /**
+     * Restores a repository item by its ID to the given version.
+     *
+     * @param id the ID of the space to rename
+     * @param version {@code null}-able version to map to its string representation
+     * @param additionalHeaders additional header parameters
+     * @return {@link ApiResponse}
+     * @throws HubFailureIOException if an I/O error occurred
+     * @since 0.1
+     */
+    public ApiResponse<Void> restoreItemById(final String id, final ItemVersion version,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_WORKING_AREA);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(QUERY_PARAM_FROM_VERSION, version).orElse(null)) //
+            .invokeAPI(requestPath, Method.POST, null);
+    }
+
+    /**
      * Returns the given item version for the Catalog service as a query parameter key-value pair, or
      * {@link Optional#empty()} if the argument was {@code null}.
      *
@@ -1149,13 +1170,17 @@ public final class CatalogServiceClient {
      *         argument was {@code null}
      */
     public static Optional<HTTPQueryParameter> getQueryParameter(final ItemVersion version) {
+        return getQueryParameter(QUERY_PARAM_VERSION, version);
+    }
+
+    private static Optional<HTTPQueryParameter> getQueryParameter(final String queryParameter,
+        final ItemVersion version) {
         return Optional.ofNullable(version) //
-                .map(v -> v.match(//
-                    () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
-                    () -> new HTTPQueryParameter(QUERY_PARAM_VERSION, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
-                    sv -> new HTTPQueryParameter(QUERY_PARAM_VERSION, Integer.toString(sv)) //
-                    ) //
-                );
+            .map(v -> v.match(//
+                () -> new HTTPQueryParameter(queryParameter, ITEM_VERSION_CURRENT_STATE_IDENTIFIER), //
+                () -> new HTTPQueryParameter(queryParameter, ITEM_VERSION_MOST_RECENT_IDENTIFIER), //
+                sv -> new HTTPQueryParameter(queryParameter, Integer.toString(sv)) //
+            ));
     }
 
 }
