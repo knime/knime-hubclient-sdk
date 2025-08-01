@@ -1141,8 +1141,8 @@ public final class CatalogServiceClient {
     /**
      * Restores a repository item by its ID to the given version.
      *
-     * @param id the ID of the space to rename
-     * @param version {@code null}-able version to map to its string representation
+     * @param id the ID of the item
+     * @param version {@code null}-able, the version to restore
      * @param additionalHeaders additional header parameters
      * @return {@link ApiResponse}
      * @throws HubFailureIOException if an I/O error occurred
