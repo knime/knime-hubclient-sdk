@@ -59,6 +59,7 @@ public interface Sized {
      * Retrieves the size of the item.
      *
      * @return size
+     * @since 0.2
      */
     Long getSize();
 }

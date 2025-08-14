@@ -342,7 +342,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -377,7 +377,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -409,7 +409,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, contentHandler);
     }
 
@@ -423,7 +423,7 @@ public final class CatalogServiceClient {
      * @return {@link InputStream}
      * @throws IOException if an I/O error occurred
      * @deprecated use {@link #createArtifactDownloadStream(ItemID, ItemVersion, Map, BooleanSupplier)}
-     * @since 0.1
+     * @since 0.2
      */
     @Deprecated
     public @Owning InputStream createResponseDownloadStream(final IPath path, final ItemVersion version,
@@ -467,7 +467,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -501,7 +501,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -537,7 +537,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .withQueryParams(metaDataQueryParameters(details, deep, spaceDetails, contribSpaces)) //
             .invokeAPI(requestPath, Method.GET, null, REPOSITORY_ITEM);
     }
@@ -564,7 +564,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @since 0.1
+     * @since 0.2
      */
     public ApiResponse<NamedItemVersionList> getItemVersions(final String id, final Integer limit,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
@@ -590,7 +590,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @since 0.1
+     * @since 0.2
      */
     public ApiResponse<NamedItemVersion> createItemVersion(final String id,
         final CreateNamedItemVersionRequestBody createNamedItemVersionRequestBody,
@@ -998,7 +998,7 @@ public final class CatalogServiceClient {
      *
      * @throws HubFailureIOException If an I/O error occurred during the creation of the upload stream
      * @deprecated use {@link #createAsyncHubUploadStream(String, boolean, String, EntityTag, Map)}
-     * @since 0.1
+     * @since 0.2
      */
     @Deprecated
     public @Owning OutputStream createRequestUploadStream(final IPath path, final MediaType contentType,
@@ -1188,7 +1188,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_VERSION, version).orElse(null)) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
             .invokeAPI(requestPath, Method.GET, null, PREPARED_DOWNLOAD);
     }
 
@@ -1250,7 +1250,7 @@ public final class CatalogServiceClient {
      * @param additionalHeaders additional header parameters
      * @return {@link ApiResponse}
      * @throws HubFailureIOException if an I/O error occurred
-     * @since 0.1
+     * @since 0.2
      */
     public ApiResponse<Void> restoreItemById(final String id, final ItemVersion version,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
@@ -1261,7 +1261,7 @@ public final class CatalogServiceClient {
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(MediaType.WILDCARD_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
             .withHeaders(additionalHeaders) //
-            .withQueryParam(getQueryParameter(QUERY_PARAM_FROM_VERSION, version).orElse(null)) //
+            .withQueryParam(ClientUtil.getQueryParameter(QUERY_PARAM_FROM_VERSION, version).orElse(null)) //
             .invokeAPI(requestPath, Method.POST, null);
     }
 

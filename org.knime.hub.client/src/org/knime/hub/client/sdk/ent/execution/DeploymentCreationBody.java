@@ -61,7 +61,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * POJO representing the body of a deployment creation request.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DeploymentCreationBody {

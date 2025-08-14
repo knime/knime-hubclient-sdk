@@ -62,7 +62,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * POJO representing an KNIME Hub execution context.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class ExecutionContext {

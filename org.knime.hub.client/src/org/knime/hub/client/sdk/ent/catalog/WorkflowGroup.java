@@ -105,6 +105,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * @param details the details of a workflow group
      * @param masonControls the mason controls of a workflow group
      * @param children the children of a workflow group
+     * @since 0.2
      */
     @JsonCreator
     protected WorkflowGroup(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
@@ -148,6 +149,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * Creates a new {@link SpaceRequestBodyBuilder}.
      *
      * @return builder
+     * @since 0.2
      */
     public static WorkflowGroupBuilder builder() {
         return new WorkflowGroupBuilder();
@@ -157,6 +159,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
      * Builder for {@link WorkflowGroup}.
      *
      * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+     * @since 0.2
      */
     public static class WorkflowGroupBuilder extends RepositoryItemBuilder<WorkflowGroupBuilder, WorkflowGroup> {
 

@@ -69,7 +69,7 @@ import com.fasterxml.jackson.annotation.OptBoolean;
  * POJO representing a deployment.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 @JsonIgnoreProperties(value = Deployment.JSON_PROPERTY_TYPE, allowSetters = true, ignoreUnknown = true)
 @JsonTypeInfo(//

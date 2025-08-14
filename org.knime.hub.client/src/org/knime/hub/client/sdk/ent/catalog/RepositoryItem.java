@@ -108,13 +108,17 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
         /** Remaining server item types */
 
-        /** Represents a metanode or subnode template. */
+        /** Represents a metanode or subnode template.
+         * @since 0.2*/
         WORKFLOW_TEMPLATE(Template.TYPE),
-        /** A snapshot of the parent item. */
+        /** A snapshot of the parent item.
+         * @since 0.2*/
         SNAPSHOT("snapshot"), //
-        /** Represents an item in the recycle bin. */
+        /** Represents an item in the recycle bin.
+         * @since 0.2*/
         TRASH("trash"), //
-        /** Unknown type, e.g. from future versions. */
+        /** Unknown type, e.g. from future versions.
+         * @since 0.2*/
         UNKNOWN("unknown");
 
         private final String m_value;
@@ -176,12 +180,14 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * JSON key name for the item owner account ID property
+     * @since 0.2
      */
     protected static final String JSON_PROPERTY_OWNER_ACCOUNT_ID = "ownerAccountId";
     private final String m_ownerAccountId;
 
     /**
      * JSON key name for the item created on time stamp.
+     * @since 0.2
      */
     protected static final String JSON_PROPERTY_CREATED_ON = "createdOn";
     private final ZonedDateTime m_createdOn;
@@ -194,6 +200,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
 
     /**
      * JSON key name for the item last uploaded on time stamp.
+     * @since 0.2
      */
     protected static final String JSON_PROPERTY_LAST_UPLOADED_ON = "lastUploadedOn";
     private final ZonedDateTime m_lastUploadedOn;
@@ -223,6 +230,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @param lastUploadedOn the time if the last upload/overwrite
      * @param details the item details
      * @param masonControls the item mason controls
+     * @since 0.2
      */
     @JsonCreator
     protected RepositoryItem(
@@ -252,6 +260,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * Creates a new item from a builder.
      *
      * @param builder a builder
+     * @since 0.2
      */
     protected RepositoryItem(final RepositoryItemBuilder<?, ?> builder) {
         m_path = builder.m_path;
@@ -315,6 +324,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * Retrieves the items creation time stamp.
      *
      * @return createdOn
+     * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID)
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
@@ -326,6 +336,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * Retrieves the items creation time stamp.
      *
      * @return createdOn
+     * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_CREATED_ON)
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
@@ -348,6 +359,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * Retrieves the time stamp of the last upload or overwrite of this item.
      *
      * @return lastUploadedOn
+     * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_LAST_UPLOADED_ON)
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
@@ -391,6 +403,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      *
      * @param <R> The repository item sub-class
      * @param <B> The repository item builder sub-class
+     * @since 0.2
      */
     @SuppressWarnings("unchecked")
     public abstract static class RepositoryItemBuilder<B extends RepositoryItemBuilder<?, ?>,

@@ -74,7 +74,7 @@ import jakarta.ws.rs.core.MediaType;
  * Execution service client for KNIME Hub.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 @SuppressWarnings("java:S107") // Number of parameters per endpoint is not controllable
 public final class ExecutionServiceClient {

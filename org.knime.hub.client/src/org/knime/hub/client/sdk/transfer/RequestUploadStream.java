@@ -75,7 +75,7 @@ import jakarta.ws.rs.core.Response.Status.Family;
  * Provides an request upload stream for single item upload to a hub instance.
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 public final class RequestUploadStream extends OutputStream {
 

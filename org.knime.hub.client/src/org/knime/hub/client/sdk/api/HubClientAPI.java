@@ -110,7 +110,7 @@ public final class HubClientAPI implements AutoCloseable {
      * Retrieves the execution service client.
      *
      * @return {@link ExecutionServiceClient}
-     * @since 0.1
+     * @since 0.2
      */
     public ExecutionServiceClient execution() {
         return m_executionService;

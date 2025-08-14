@@ -63,7 +63,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * POJO representing a metanode or subnode template in the server repository.
  *
  * Magnus Gohm, KNIME AG, Konstanz, Germany
- * @since 0.1
+ * @since 0.2
  */
 public final class Template extends RepositoryItem implements Sized {
 

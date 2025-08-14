@@ -211,7 +211,7 @@ public class ApiClient implements AutoCloseable {
      * Creates the {@link JacksonJsonProvider} which is needed for JSON de-serialization.
      *
      * @return {@link JacksonJsonProvider}
-     * @since 0.1
+     * @since 0.2
      */
     public static JacksonJsonProvider createJsonProvider() {
         return new JacksonJsonProvider(createObjectMapper());
@@ -669,7 +669,7 @@ public class ApiClient implements AutoCloseable {
          * @return the invocation builder
          *
          * @throws HubFailureIOException if an I/O error occurred during the creation of the builder
-         * @since 0.1
+         * @since 0.2
          */
         public Invocation.Builder apiInvocationBuilder(final IPath path, final Object requestBody)
                 throws HubFailureIOException {
@@ -685,7 +685,7 @@ public class ApiClient implements AutoCloseable {
          * @return The {@link HttpURLConnection}
          *
          * @throws IOException If an I/O error occurred during opening of the connection
-         * @since 0.1
+         * @since 0.2
          */
         public HttpURLConnection createAPIURLConnection(final String httpMethod,
             final IPath path, final int chunkSize) throws IOException {
@@ -819,7 +819,7 @@ public class ApiClient implements AutoCloseable {
      * Retrieves the connection timeout duration.
      *
      * @return {@link Duration} connection timeout
-     * @since 0.1
+     * @since 0.2
      */
     public Optional<Duration> getConnectTimeout() {
         return Optional.ofNullable(m_connectionTimeout);
@@ -829,7 +829,7 @@ public class ApiClient implements AutoCloseable {
      * Retrieves the read timeout duration
      *
      * @return {@link Duration} read timeout
-     * @since 0.1
+     * @since 0.2
      */
     public Optional<Duration> getReadTimeout() {
         return Optional.ofNullable(m_readTimeout);
