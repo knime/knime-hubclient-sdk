@@ -210,7 +210,14 @@ public final class HubDownloader extends AbstractHubTransfer {
             notDownloadable);
     }
 
-    private static boolean supportsArtifactDownload(final Map<String, Control> spaceParentControls) {
+    /**
+     * Checks if the given space parent controls supports the artifact download.
+     *
+     * @param spaceParentControls controls of the space parent
+     * @return <code>true</code> if artifact download is supported, <code>false</code> otherwise
+     * @since 0.3
+     */
+    public static boolean supportsArtifactDownload(final Map<String, Control> spaceParentControls) {
         if (Boolean.parseBoolean(System.getProperty(DISABLE_ARTIFACT_DOWNLOAD_PROPERTY))) {
             return false;
         }
