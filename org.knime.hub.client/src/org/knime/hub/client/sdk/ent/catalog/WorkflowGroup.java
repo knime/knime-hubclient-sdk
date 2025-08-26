@@ -56,7 +56,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -146,7 +145,7 @@ public sealed class WorkflowGroup extends RepositoryItem permits Space {
     }
 
     /**
-     * Creates a new {@link SpaceRequestBodyBuilder}.
+     * Creates a new {@link WorkflowGroupBuilder}.
      *
      * @return builder
      * @since 0.2

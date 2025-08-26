@@ -559,7 +559,8 @@ public final class CatalogServiceClient {
      *            renamed or moved. May also be a concatenation of path followed by the "~"; character and the ID
      *            without the leading "*" character. This occurs when the request originates from an older AP that
      *            cannot handle the new URI format which adds the ID to the end of the path. (required)
-     * @param limit Maximum number of versions returned in the response. All versions will be returned by using -1.
+     * @param limit Maximum number of versions returned in the response (10 by default).
+     *              All versions will be returned by using -1.
      * @param additionalHeaders Map of additional headers
      * @return {@link ApiResponse}
      *
@@ -1141,7 +1142,7 @@ public final class CatalogServiceClient {
      * @param parentEtag the entity tag of the parent group
      * @param additionalHeaders additional header parameters
      *
-     * @return {@link AsyncHubUploadStream}
+     * @return {@link AsyncHubUploadStream} or <code>null</code> if the given parent eTag does not match
      * @throws HubFailureIOException if an I/O error occurred during the upload
      */
     public @Owning AsyncHubUploadStream createAsyncHubUploadStream(final String itemName, final boolean isWorkflowLike,

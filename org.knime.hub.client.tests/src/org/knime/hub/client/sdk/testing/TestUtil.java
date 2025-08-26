@@ -151,7 +151,7 @@ public class TestUtil {
 
             // For expected JSON attributes which are represented by ZonedDateTime, we have to first parse
             // the string into a ZonedDateTime before we can compare with the actual values.
-            expectedJSONProperties = parseJSONPropertiesAsZonedDateTime(mapper,expectedJSONProperties, jsonPath);
+            expectedJSONProperties = parseJSONPropertiesAsZonedDateTime(mapper, expectedJSONProperties, jsonPath);
 
             assertEquals(expectedJSONProperties, actualJSONProperties,
                 "Unexpected properties for JSON path '%s'".formatted(jsonPath));
