@@ -50,6 +50,7 @@ package org.knime.hub.client.sdk.ent.execution;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -115,7 +116,7 @@ public final class ExecutionContext {
     @JsonProperty(JSON_PROPERTY_DEFAULT_FOR_SPACES)
     @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public List<String> getDefaultForSpaces() {
-        return m_defaultForSpaces;
+        return Optional.ofNullable(m_defaultForSpaces).orElse(List.of());
     }
 
     @Override

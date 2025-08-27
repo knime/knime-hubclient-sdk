@@ -98,12 +98,12 @@ public final class HubInstallationAccount {
 
     @JsonCreator
     private HubInstallationAccount(
-            @JsonProperty(value = JSON_PROPERTY_ID) final String id,
-            @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
-            @JsonProperty(value = JSON_PROPERTY_TYPE) final String type,
+            @JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
+            @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
+            @JsonProperty(value = JSON_PROPERTY_TYPE, required = true) final String type,
             @JsonProperty(value = JSON_PROPERTY_VERSION) final String version,
             @JsonProperty(value = JSON_PROPERTY_CLUSTER_ID) final String clusterId,
-            @JsonProperty(value = JSON_PROPERTY_FEATURES) final List<String> features,
+            @JsonProperty(value = JSON_PROPERTY_FEATURES, required = true) final List<String> features,
             @JsonProperty(value = JSON_PROPERTY_GROUPS) final List<Group> groups,
             @JsonProperty(value = JSON_PROPERTY_CONTROLS) final Map<String, Control> controls) {
         m_id = id;
@@ -122,6 +122,7 @@ public final class HubInstallationAccount {
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public String getId() {
         return m_id;
     }
@@ -132,6 +133,7 @@ public final class HubInstallationAccount {
      * @return name
      */
     @JsonProperty(JSON_PROPERTY_NAME)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public String getName() {
         return m_name;
     }
@@ -142,6 +144,7 @@ public final class HubInstallationAccount {
      * @return type
      */
     @JsonProperty(JSON_PROPERTY_TYPE)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public String getType() {
         return m_type;
     }
@@ -152,6 +155,7 @@ public final class HubInstallationAccount {
      * @return version
      */
     @JsonProperty(JSON_PROPERTY_VERSION)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getVersion() {
         return m_version;
     }
@@ -162,6 +166,7 @@ public final class HubInstallationAccount {
      * @return clusterId
      */
     @JsonProperty(JSON_PROPERTY_CLUSTER_ID)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getClusterId() {
         return m_clusterId;
     }
@@ -172,6 +177,7 @@ public final class HubInstallationAccount {
      * @return features
      */
     @JsonProperty(JSON_PROPERTY_FEATURES)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public List<String> getFeatures() {
         return m_features;
     }

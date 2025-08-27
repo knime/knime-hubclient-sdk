@@ -48,6 +48,7 @@
  */
 package org.knime.hub.client.sdk.ent.execution;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -96,7 +97,7 @@ public final class DeploymentList {
     @JsonProperty(JSON_PROPERTY_CONTROLS)
     @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public Map<String, Control> getControls() {
-        return m_masonControls;
+        return Optional.ofNullable(m_masonControls).orElseGet(Collections::emptyMap);
     }
 
     /**
@@ -118,7 +119,7 @@ public final class DeploymentList {
     @JsonProperty(JSON_PROPERTY_DEPLOYMENTS)
     @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public List<Deployment> getDeployments() {
-        return m_deployments;
+        return Optional.ofNullable(m_deployments).orElse(List.of());
     }
 
     @Override

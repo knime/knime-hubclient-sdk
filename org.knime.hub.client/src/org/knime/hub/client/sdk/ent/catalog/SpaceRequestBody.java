@@ -94,7 +94,7 @@ public final class SpaceRequestBody {
      * @return description
      */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDescription() {
         return Optional.ofNullable(m_description);
     }
@@ -116,7 +116,7 @@ public final class SpaceRequestBody {
      * @return _private
      */
     @JsonProperty(JSON_PROPERTY_PRIVATE)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<Boolean> getPrivate() {
         return Optional.ofNullable(m_private);
     }

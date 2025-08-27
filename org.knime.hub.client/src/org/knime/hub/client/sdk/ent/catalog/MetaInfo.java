@@ -81,7 +81,7 @@ public final class MetaInfo {
      * @return space
      */
     @JsonProperty(JSON_PROPERTY_SPACE)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public SpacePermissionAttributes getSpace() {
         return m_space;
     }

@@ -48,6 +48,8 @@
 
 package org.knime.hub.client.sdk.ent.catalog;
 
+import java.util.Optional;
+
 /**
  * Implemented by entities that have a size.
  *
@@ -61,5 +63,5 @@ public interface Sized {
      * @return size
      * @since 0.2
      */
-    Long getSize();
+    Optional<Long> getSize();
 }

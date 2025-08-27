@@ -139,7 +139,7 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_LAST_UPLOADED_ON, component.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(component.getDetails().isEmpty(), "Unexpected details");
         assertFalse(component.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, component.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, component.getSize().orElseThrow(), "Unexpected size");
 
         final var componentWithDetails = load(EntityFolders.CATALOG_ENTITES,
             "componentWithDetails.json", Component.class);
@@ -161,7 +161,7 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_SPACE_ID, componentWithDetails.getDetails().get().getSpace().getSpaceId(),
             "Unexpected space Id");
         assertFalse(componentWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, componentWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, componentWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
@@ -181,7 +181,7 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_LAST_UPLOADED_ON, data.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(data.getDetails().isEmpty(), "Unexpected details");
         assertFalse(data.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, data.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, data.getSize().orElseThrow(), "Unexpected size");
 
         final var dataWithDetails = load(EntityFolders.CATALOG_ENTITES, "dataWithDetails.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
@@ -200,7 +200,7 @@ class CatalogServiceEntityTest extends AbstractTest {
             "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_SPACE_ID,
                 dataWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
-        assertEquals(EXPECTED_SIZE, dataWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, dataWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
@@ -220,7 +220,7 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_LAST_UPLOADED_ON, workflow.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(workflow.getDetails().isEmpty(), "Unexpected details");
         assertFalse(workflow.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, workflow.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, workflow.getSize().orElseThrow(), "Unexpected size");
 
         final var workflowWithDetails = load(EntityFolders.CATALOG_ENTITES, "workflowWithDetails.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflowWithDetails.getType(), "Unexpected type");
@@ -241,17 +241,17 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_SPACE_ID, workflowWithDetails.getDetails().get().getSpace().getSpaceId(),
             "Unexpected space Id");
         assertFalse(workflowWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, workflowWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, workflowWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
     void testCreateLargeSizedItems() throws IOException {
         final var largeComponent = load(EntityFolders.CATALOG_ENTITES, "largeComponent.json", Component.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize().orElseThrow(), "Unexpected size");
         final var largeData = load(EntityFolders.CATALOG_ENTITES, "largeData.json", Data.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeData.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeData.getSize().orElseThrow(), "Unexpected size");
         final var largeWorkflow = load(EntityFolders.CATALOG_ENTITES, "largeWorkflow.json", Workflow.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeWorkflow.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeWorkflow.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test

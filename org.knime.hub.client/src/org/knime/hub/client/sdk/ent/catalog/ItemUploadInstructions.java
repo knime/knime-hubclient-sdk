@@ -92,7 +92,7 @@ public final class ItemUploadInstructions {
      * @return uploadId
      */
     @JsonProperty(JSON_PROPERTY_UPLOAD_ID)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getUploadId() {
         return m_uploadId;
     }

@@ -50,6 +50,7 @@ package org.knime.hub.client.sdk.ent.account;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -108,9 +109,9 @@ public final class UserAccount extends AccountIdentity {
      * @return teams
      */
     @JsonProperty(JSON_PROPERTY_TEAMS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public List<Team> getTeams() {
-        return m_teams;
+        return Optional.ofNullable(m_teams).orElse(List.of());
     }
 
     @Override

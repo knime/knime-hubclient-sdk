@@ -51,6 +51,7 @@ package org.knime.hub.client.sdk.ent.catalog;
 import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
@@ -97,10 +98,10 @@ public final class Component extends RepositoryItem implements Sized {
      * @return size
      */
     @JsonProperty(JSON_PROPERTY_SIZE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     @Override
-    public Long getSize() {
-        return m_size;
+    public Optional<Long> getSize() {
+        return Optional.ofNullable(m_size);
     }
 
     @Override

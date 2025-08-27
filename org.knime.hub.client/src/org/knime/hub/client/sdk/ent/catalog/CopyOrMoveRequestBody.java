@@ -79,7 +79,7 @@ public final class CopyOrMoveRequestBody {
 
     @JsonCreator
     private CopyOrMoveRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
             @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
             @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
         this.m_canonicalPath = canonicalPath;
@@ -104,7 +104,7 @@ public final class CopyOrMoveRequestBody {
      * @return tags
      */
     @JsonProperty(JSON_PROPERTY_FORCE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public boolean isForce() {
         return m_force;
     }

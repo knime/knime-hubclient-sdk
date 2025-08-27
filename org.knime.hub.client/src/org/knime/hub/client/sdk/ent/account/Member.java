@@ -97,6 +97,7 @@ public final class Member {
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getId() {
         return m_id;
     }
@@ -107,6 +108,7 @@ public final class Member {
      * @return name
      */
     @JsonProperty(JSON_PROPERTY_NAME)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getName() {
         return m_name;
     }
@@ -117,6 +119,7 @@ public final class Member {
      * @return type
      */
     @JsonProperty(JSON_PROPERTY_TYPE)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public MemberType getType() {
         return m_type;
     }
@@ -128,6 +131,7 @@ public final class Member {
      * @return indirect
      */
     @JsonProperty(JSON_PROPERTY_INDIRECT)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public boolean isIndirect() {
         return m_indirect;
     }

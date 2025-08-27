@@ -103,18 +103,15 @@ public final class Billboard {
 
     @JsonCreator
     private Billboard(
-        @JsonProperty(value = JSON_PROPERTY_MOUNT_ID, required = false) final String mountId,
-        @JsonProperty(value = JSON_PROPERTY_ENABLE_RESET_ON_UPLOAD_CHECKBOX, required = false)
-        final Boolean enableResetOnUploadCheckbox,
-        @JsonProperty(value = JSON_PROPERTY_OAUTH_INFORMATION, required = false)
-        final OAuthAuthenticationInformation oAuthInfo,
-        @JsonProperty(value = JSON_PROPERTY_FORCE_RESET_ON_UPLOAD, required = false) final Boolean forceResetOnUpload,
-        @JsonProperty(value = JSON_PROPERTY_FETCH_TIMEOUT, required = false) final Duration fetchTimeout,
-        @JsonProperty(value = JSON_PROPERTY_FETCH_INTERVAL, required = false) final Duration fetchInterval,
-        @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS, required = false) final Map<String, Control> controls,
-        @JsonProperty(value = JSON_PROPERTY_PREFERRED_AUTH_TYPE, required = false)
-        final AuthenticationType preferredAuthType,
-        @JsonProperty(value = JSON_PROPERTY_VERSION, required = false) final Version version) {
+        @JsonProperty(value = JSON_PROPERTY_MOUNT_ID) final String mountId,
+        @JsonProperty(value = JSON_PROPERTY_ENABLE_RESET_ON_UPLOAD_CHECKBOX) final Boolean enableResetOnUploadCheckbox,
+        @JsonProperty(value = JSON_PROPERTY_OAUTH_INFORMATION) final OAuthAuthenticationInformation oAuthInfo,
+        @JsonProperty(value = JSON_PROPERTY_FORCE_RESET_ON_UPLOAD) final Boolean forceResetOnUpload,
+        @JsonProperty(value = JSON_PROPERTY_FETCH_TIMEOUT) final Duration fetchTimeout,
+        @JsonProperty(value = JSON_PROPERTY_FETCH_INTERVAL) final Duration fetchInterval,
+        @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> controls,
+        @JsonProperty(value = JSON_PROPERTY_PREFERRED_AUTH_TYPE) final AuthenticationType preferredAuthType,
+        @JsonProperty(value = JSON_PROPERTY_VERSION) final Version version) {
         m_version = version;
         m_mountId = mountId;
         m_preferredAuthType = preferredAuthType;
@@ -132,6 +129,7 @@ public final class Billboard {
      * @return The default mount id.
      */
     @JsonProperty(JSON_PROPERTY_MOUNT_ID)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public String getMountId() {
         return m_mountId;
     }
@@ -209,6 +207,7 @@ public final class Billboard {
      * @return The preferred authentication type.
      */
     @JsonProperty(JSON_PROPERTY_PREFERRED_AUTH_TYPE)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public AuthenticationType getPreferredAuthType() {
         return m_preferredAuthType;
     }
@@ -219,6 +218,7 @@ public final class Billboard {
      * @return The server version.
      */
     @JsonProperty(JSON_PROPERTY_VERSION)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public Version getVersion() {
         return m_version;
     }

@@ -77,7 +77,7 @@ public final class DeploymentCreationBody {
 
     @JsonCreator
     DeploymentCreationBody(
-            @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
+            @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
             @JsonProperty(value = JSON_PROPERTY_ITEM_VERSION) final String itemVersion,
             @JsonProperty(value = JSON_PROPERTY_EXECUTION_CONTEXT) final String executionContext) {
         this.m_name = name;
@@ -91,7 +91,7 @@ public final class DeploymentCreationBody {
      * @return name
      */
     @JsonProperty(JSON_PROPERTY_NAME)
-    @JsonInclude(value = JsonInclude.Include.NON_NULL)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public String getName() {
         return m_name;
     }

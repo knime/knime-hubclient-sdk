@@ -103,7 +103,7 @@ public final class ItemUploadRequest {
      * @return initialPartCount
      */
     @JsonProperty(JSON_PROPERTY_INITIAL_PART_COUNT)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public Integer getInitialPartCount() {
         return m_initialPartCount;
     }

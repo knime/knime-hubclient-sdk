@@ -70,8 +70,8 @@ public final class ScheduleDeployment extends Deployment {
     static final String TYPE = "schedule";
 
     @JsonCreator
-    private ScheduleDeployment(@JsonProperty(value = JSON_PROPERTY_ID) final String id,
-        @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
+    private ScheduleDeployment(@JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
         @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls) {
         super(id, name, masonControls);
     }
@@ -98,7 +98,7 @@ public final class ScheduleDeployment extends Deployment {
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.getId(), this.getName(), getType(), this.getMasonControls());
+        return Objects.hash(getId(), getName(), getType(), getMasonControls());
     }
 
     @Override

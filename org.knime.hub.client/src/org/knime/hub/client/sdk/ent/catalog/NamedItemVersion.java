@@ -89,9 +89,9 @@ public final class NamedItemVersion {
     @JsonCreator
     private NamedItemVersion(@JsonProperty(value = JSON_PROPERTY_VERSION, required = true) final int version,
         @JsonProperty(value = JSON_PROPERTY_TITLE, required = true) final String title,
-        @JsonProperty(value = JSON_PROPERTY_DESCRIPTION, required = false) final String description,
+        @JsonProperty(value = JSON_PROPERTY_DESCRIPTION) final String description,
         @JsonProperty(value = JSON_PROPERTY_AUTHOR, required = true) final String author,
-        @JsonProperty(value = JSON_PROPERTY_AUTHOR_ACCOUNT_ID, required = true) final String authorAccountId,
+        @JsonProperty(value = JSON_PROPERTY_AUTHOR_ACCOUNT_ID) final String authorAccountId,
         @JsonProperty(value = JSON_PROPERTY_CREATED_ON, required = true) final Instant createdOn) {
         m_version = version;
         m_title = title;
@@ -151,7 +151,7 @@ public final class NamedItemVersion {
      * @return authorAccountId
      */
     @JsonProperty(JSON_PROPERTY_AUTHOR_ACCOUNT_ID)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getAuthorAccountId() {
         return m_authorAccountId;
     }

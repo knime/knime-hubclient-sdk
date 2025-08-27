@@ -163,7 +163,7 @@ public abstract sealed class Deployment permits
     @JsonCreator
     protected Deployment(
         @JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
-        @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
+        @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
         @JsonProperty(value = JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls) {
         m_id = id;
         m_name = name;

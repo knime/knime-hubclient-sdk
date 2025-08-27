@@ -95,7 +95,7 @@ public final class Group {
 
     @JsonCreator
     private Group(
-            @JsonProperty(value = JSON_PROPERTY_NAME) final String name,
+            @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
             @JsonProperty(value = JSON_PROPERTY_DISPLAY_NAME) final String displayName,
             @JsonProperty(value = JSON_PROPERTY_ID) final String id,
             @JsonProperty(value = JSON_PROPERTY_EXTERNAL) final boolean external,
@@ -117,6 +117,7 @@ public final class Group {
      * @return name
      */
     @JsonProperty(JSON_PROPERTY_NAME)
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public String getName() {
         return m_name;
     }
@@ -127,6 +128,7 @@ public final class Group {
      * @return display name
      */
     @JsonProperty(JSON_PROPERTY_DISPLAY_NAME)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getDisplayName() {
         return m_displayName;
     }
@@ -137,6 +139,7 @@ public final class Group {
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getId() {
         return m_id;
     }
@@ -147,6 +150,7 @@ public final class Group {
      * @return external
      */
     @JsonProperty(JSON_PROPERTY_EXTERNAL)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public boolean isExternal() {
         return m_external;
     }
@@ -157,6 +161,7 @@ public final class Group {
      * @return scimManaged
      */
     @JsonProperty(JSON_PROPERTY_SCIM_MANAGED)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public boolean isScimManaged() {
         return m_scimManaged;
     }

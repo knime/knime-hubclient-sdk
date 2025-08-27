@@ -79,7 +79,7 @@ public final class SpaceRenameRequestBody {
 
     @JsonCreator
     private SpaceRenameRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_NAME) final String canonicalPath,
+            @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String canonicalPath,
             @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
             @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
         this.m_name = canonicalPath;
@@ -104,7 +104,7 @@ public final class SpaceRenameRequestBody {
      * @return tags
      */
     @JsonProperty(JSON_PROPERTY_FORCE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public boolean isForce() {
         return m_force;
     }
