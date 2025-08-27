@@ -274,6 +274,14 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/SpaceRenameRequestBody.java" type="org.knime.hub.client.sdk.ent.catalog.SpaceRenameRequestBody">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.SpaceRenameRequestBody"/>
+                <message_argument value="isForce()"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/org/knime/hub/client/sdk/ent/catalog/Workflow.java" type="org.knime.hub.client.sdk.ent.catalog.Workflow">
         <filter comment="Changed return type from long to Long to handle special server case" id="338792546">
             <message_arguments>

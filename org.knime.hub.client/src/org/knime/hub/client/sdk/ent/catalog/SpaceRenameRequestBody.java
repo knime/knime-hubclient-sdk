@@ -72,7 +72,7 @@ public final class SpaceRenameRequestBody {
     private final String m_name;
 
     private static final String JSON_PROPERTY_FORCE = "force";
-    private final boolean m_force;
+    private final Boolean m_force;
 
     private static final String JSON_PROPERTY_IF_TARGET_MATCH = "If-Target-Match";
     private final String m_ifTargetMatch;
@@ -80,7 +80,7 @@ public final class SpaceRenameRequestBody {
     @JsonCreator
     private SpaceRenameRequestBody(
             @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String canonicalPath,
-            @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
+            @JsonProperty(value = JSON_PROPERTY_FORCE) final Boolean force,
             @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
         this.m_name = canonicalPath;
         this.m_force = force;
@@ -102,10 +102,11 @@ public final class SpaceRenameRequestBody {
      * Whether to force the rename operation.
      *
      * @return tags
+     * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_FORCE)
     @JsonInclude(value = JsonInclude.Include.NON_NULL)
-    public boolean isForce() {
+    public Boolean isForce() {
         return m_force;
     }
 
