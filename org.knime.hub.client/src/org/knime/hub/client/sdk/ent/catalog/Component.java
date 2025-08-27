@@ -73,7 +73,7 @@ public final class Component extends RepositoryItem implements Sized {
     static final String TYPE = "Component";
 
     private static final String JSON_PROPERTY_SIZE = "size";
-    private final long m_size;
+    private final Long m_size;
 
     @JsonCreator
     private Component(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
@@ -86,7 +86,7 @@ public final class Component extends RepositoryItem implements Sized {
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Component.JSON_PROPERTY_SIZE) final long size) {
+        @JsonProperty(value = Component.JSON_PROPERTY_SIZE) final Long size) {
         super(path, canonicalPath, id, owner, ownerAccountId,
             createdOn, description, lastUploadedOn, details, masonControls);
         m_size = size;
