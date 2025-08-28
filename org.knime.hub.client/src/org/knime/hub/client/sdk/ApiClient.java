@@ -689,6 +689,7 @@ public class ApiClient implements AutoCloseable {
          */
         public HttpURLConnection createAPIURLConnection(final String httpMethod,
             final IPath path, final int chunkSize) throws IOException {
+            updateHeaderParameters();
             try {
                 return URLConnectionUploader.prepareConnection(
                     buildUrl(path).toURL(), httpMethod, m_headerParams, chunkSize,
