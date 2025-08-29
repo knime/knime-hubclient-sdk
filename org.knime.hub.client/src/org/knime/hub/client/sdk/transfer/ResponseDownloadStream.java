@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalLong;
 
 import org.eclipse.core.runtime.IPath;
@@ -61,14 +60,11 @@ import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
 import org.knime.core.util.hub.ItemVersion;
-import org.knime.hub.client.sdk.FailureType;
-import org.knime.hub.client.sdk.FailureValue;
+import org.knime.hub.client.sdk.ApiClient.Method;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.Response.Status.Family;
-import jakarta.ws.rs.core.Response.StatusType;
 
 /**
  * Provides an response download stream for single item download from a hub instance.
@@ -100,29 +96,13 @@ public final class ResponseDownloadStream extends FilterInputStream {
         CheckUtils.checkArgumentNotNull(path);
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var invocationBuilder = catalogClient.getApiClient().createApiRequest() //
-                    .withHeaders(clientHeaders) //
-                    .withQueryParam(CatalogServiceClient.getQueryParameter(version).orElse(null)) //
-                    .apiInvocationBuilder(path, null);
-            return openDownloadStream(invocationBuilder.get());
+            final var response = catalogClient.getApiClient().createApiRequest() //
+                .withHeaders(clientHeaders) //
+                .withQueryParam(CatalogServiceClient.getQueryParameter(version).orElse(null)) //
+                .invokeAPIRaw(path, Method.GET, null, //
+                    msg -> String.format("Could not open download stream to %s: %s", path, msg));
+            return new ResponseDownloadStream(response);
         }
-    }
-
-    private static @Owning ResponseDownloadStream openDownloadStream(final @Owning Response response)
-        throws HubFailureIOException {
-        final StatusType statusInfo = response.getStatusInfo();
-        if (statusInfo.getFamily() != Family.SUCCESSFUL) {
-            try (response) {
-                var reason = Optional.ofNullable(statusInfo.getReasonPhrase()) //
-                    .orElse(statusInfo.toEnum().getReasonPhrase());
-                final String errContent = response.hasEntity() ? response.readEntity(String.class) : "";
-                final String message = "Could not open download stream to %s: %s".formatted(response,
-                    errContent.isBlank() ? reason : (reason + ": " + errContent));
-                throw new HubFailureIOException(FailureValue.fromHTTP(FailureType.DOWNLOAD_STREAM_OPEN_FAILED,
-                    statusInfo.getStatusCode(), message));
-            }
-        }
-        return new ResponseDownloadStream(response);
     }
 
     private ResponseDownloadStream(final @Owning Response response) {

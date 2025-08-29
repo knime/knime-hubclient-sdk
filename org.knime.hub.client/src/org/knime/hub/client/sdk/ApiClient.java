@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.UnaryOperator;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
@@ -95,6 +96,7 @@ import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status.Family;
 
 /**
  * API client used to make REST requests.
@@ -430,7 +432,7 @@ public class ApiClient implements AutoCloseable {
         private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody)
             throws HubFailureIOException {
             // Build the invocation builder which makes the request
-            var builder = createInvocationBuilder(uri, requestBody);
+            var builder = createInvocationBuilder(uri, requestBody != null);
 
             // Execute the request and retrieve the response
             return executeHttpRequest(builder, method, requestBody);
@@ -446,11 +448,11 @@ public class ApiClient implements AutoCloseable {
          *
          * @throws HubFailureIOException
          */
-        private Invocation.Builder createInvocationBuilder(final URI uri, final Object body)
+        private Invocation.Builder createInvocationBuilder(final URI uri, final boolean hasBody)
             throws HubFailureIOException {
             updateHeaderParameters();
 
-            CheckUtils.checkState(hasRequiredContentType(body),
+            CheckUtils.checkState(hasRequiredContentType(hasBody),
                 "Missing required content type for '%s'".formatted(uri));
 
             WebTarget target = m_httpClient.target(uri);
@@ -524,8 +526,8 @@ public class ApiClient implements AutoCloseable {
             }
         }
 
-        private boolean hasRequiredContentType(final Object body) {
-            return body == null || m_contentType != null;
+        private boolean hasRequiredContentType(final boolean hasBody) {
+            return !hasBody || m_contentType != null;
         }
 
         /**
@@ -558,24 +560,48 @@ public class ApiClient implements AutoCloseable {
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final GenericType<R> returnType) throws HubFailureIOException {
-
-            // Retrieve the API response
-            final var t0 = System.currentTimeMillis();
             final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, body)) {
 
-                final var httpStatus = response.getStatusInfo();
-                final  Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+            final var t0 = System.currentTimeMillis();
+            try (final var response = getAPIResponse(uri, method, body)) {
+                return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> returnType == null ? Result.success(null)
                         : readEntity(method, uri, returnType, response);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
+                    default -> Result.failure(createFailureValue(response));
+                });
+            } finally {
+                logDuration(uri, t0, System.currentTimeMillis());
+            }
+        }
 
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
+        /**
+         * Invoke API by sending HTTP request with the given options and receive a raw {@link Response}.
+         *
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         * @param messageCallback   A callback to modify the error message, receiving the message from the response
+         *
+         * @return {@link Response}, with the responsibility to close it
+         *
+         * @throws HubFailureIOException if the request failed (non-2xx response code)
+         * @since 0.2
+         */
+        public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body,
+                final UnaryOperator<String> messageCallback) throws HubFailureIOException {
+            final var uri = buildUrl(path);
+
+            final var t0 = System.currentTimeMillis();
+            try {
+                final var response = getAPIResponse(uri, method, body);
+                if (response.getStatusInfo().getFamily() == Family.SUCCESSFUL) {
+                    return response;
+                }
+
+                try (response) {
+                    final var failureValue = createFailureValue(response);
+                    throw new HubFailureIOException(messageCallback.apply(failureValue.title()), failureValue);
+                }
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
@@ -597,23 +623,14 @@ public class ApiClient implements AutoCloseable {
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
             final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
-            final var t0 = System.currentTimeMillis();
-
-            // Retrieve the API response
             final var uri = buildUrl(path);
+
+            final var t0 = System.currentTimeMillis();
             try (final var response = getAPIResponse(uri, method, body)) {
-
-                final var httpStatus = response.getStatusInfo();
-                final Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+                return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> downloadContent(method, uri, response, contentHandler);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
-
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
+                    default -> Result.failure(createFailureValue(response));
+                });
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
@@ -638,65 +655,17 @@ public class ApiClient implements AutoCloseable {
                 m_headerParams.put(HttpHeaders.CONTENT_LENGTH, Long.toString(numBytes));
             }
 
-            // Retrieve the API response
-            final var t0 = System.currentTimeMillis();
-            final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, data)) {
-
-                final var httpStatus = response.getStatusInfo();
-                final Result<T, FailureValue> result = switch (httpStatus.getFamily()) {
-                    case SUCCESSFUL -> returnType == null ? Result.success(null)
-                        : readEntity(method, uri, returnType, response);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
-
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
-            } finally {
-                logDuration(uri, t0, System.currentTimeMillis());
+            try (data) {
+                // request body is sent, we can close the input stream afterwards
+                return invokeAPI(path, method, data, returnType);
             }
         }
 
-        /**
-         * Creates an invocation builder for hub calls.
-         *
-         * @param path The sub-path of the HTTP URL.
-         * @param requestBody The request body
-         *
-         * @return the invocation builder
-         *
-         * @throws HubFailureIOException if an I/O error occurred during the creation of the builder
-         * @since 0.2
-         */
-        public Invocation.Builder apiInvocationBuilder(final IPath path, final Object requestBody)
-                throws HubFailureIOException {
-            return createInvocationBuilder(buildUrl(path), requestBody);
-        }
-
-        /**
-         * Creates an HTTP URL connection given the HTTP URL sub-path.
-         *
-         * @param httpMethod The HTTP request method
-         * @param path The sub-path of the HTTP URL
-         * @param chunkSize The chunk size for the upload connection
-         * @return The {@link HttpURLConnection}
-         *
-         * @throws IOException If an I/O error occurred during opening of the connection
-         * @since 0.2
-         */
-        public HttpURLConnection createAPIURLConnection(final String httpMethod,
-            final IPath path, final int chunkSize) throws IOException {
-            updateHeaderParameters();
-            try {
-                return URLConnectionUploader.prepareConnection(
-                    buildUrl(path).toURL(), httpMethod, m_headerParams, chunkSize,
-                    m_requestReadTimeout, m_requestReadTimeout);
-            } catch (MalformedURLException ex) {
-                throw new IllegalStateException("Unexpected URL syntax violation", ex);
-            }
+        private static <R> ApiResponse<R> toApiResponse(final @NotOwning Response response,
+            final Result<R, FailureValue> result) {
+            final var httpStatus = response.getStatusInfo();
+            return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(), httpStatus.getReasonPhrase(),
+                Optional.ofNullable(response.getEntityTag()), result);
         }
 
         private static <R> Result<R, FailureValue> readEntity(final Method method, final URI uri,
@@ -726,7 +695,18 @@ public class ApiClient implements AutoCloseable {
             }
         }
 
-        private static <R> Result<R, FailureValue> createFailureForResponse(final Response response) {
+        private static FailureValue createFailureValue(final Response response) {
+            final var status = response.getStatusInfo();
+            return switch (status.getFamily()) {
+                case SUCCESSFUL -> throw new IllegalStateException("Unexpected successful response");
+                case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
+                case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
+                case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
+                    .formatted(status.getStatusCode(), status.getReasonPhrase()));
+            };
+        }
+
+        private static FailureValue createFailureForResponse(final Response response) {
             final var contentType = response.getMediaType();
             final var responseStatusInfo = response.getStatusInfo();
             final var statusCode = responseStatusInfo.getStatusCode();
@@ -734,17 +714,15 @@ public class ApiClient implements AutoCloseable {
                     && response.hasEntity()) {
                 try {
                     final var problemDesc = response.readEntity(ProblemDescription.class);
-                    return Result
-                        .failure(FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc));
+                    return FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc);
                 } catch (final ProcessingException pe) {
                     LOGGER.atError() //
                         .setCause(pe) //
                         .addArgument(responseStatusInfo.getStatusCode()) //
                         .addArgument(responseStatusInfo.getReasonPhrase()) //
                         .log("Hub request failed: {} {}");
-                    return Result.failure(
-                        FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
-                            "Hub request failed: " + responseStatusInfo.getReasonPhrase()));
+                    return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
+                            "Hub request failed: " + responseStatusInfo.getReasonPhrase());
                 }
             }
 
@@ -758,11 +736,11 @@ public class ApiClient implements AutoCloseable {
                     .addArgument(message) //
                     .log("Hub request failed: {} {}");
             }
-            return Result.failure(
-                FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode, "Hub request failed: " + message));
+            return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
+                "Hub request failed: " + message);
         }
 
-        private static <R> Result<R, FailureValue> createFailureForRedirect(final Response response) {
+        private static FailureValue createFailureForRedirect(final Response response) {
             // A redirect is not a failure response, so we don't expect `application/problem+json` here
             final String message;
             if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
@@ -772,7 +750,7 @@ public class ApiClient implements AutoCloseable {
                 message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
                     null, () -> response.getStatusInfo().getReasonPhrase());
             }
-            return Result.failure(FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message));
+            return FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message);
         }
 
         private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {
@@ -784,6 +762,29 @@ public class ApiClient implements AutoCloseable {
                 .addArgument(() -> "%.3f".formatted((toMillis - fromMillis) / 1000.0)) //
                 .setMessage("Request '{}' took {}s") //
                 .log();
+        }
+
+        /**
+         * Creates an HTTP URL connection given the HTTP URL sub-path.
+         *
+         * @param httpMethod The HTTP request method
+         * @param path The sub-path of the HTTP URL
+         * @param chunkSize The chunk size for the upload connection
+         * @return The {@link HttpURLConnection}
+         *
+         * @throws IOException If an I/O error occurred during opening of the connection
+         * @since 0.2
+         */
+        public HttpURLConnection createAPIURLConnection(final String httpMethod,
+            final IPath path, final int chunkSize) throws IOException {
+            updateHeaderParameters();
+            try {
+                return URLConnectionUploader.prepareConnection(
+                    buildUrl(path).toURL(), httpMethod, m_headerParams, chunkSize,
+                    m_connectionTimeout, m_readTimeout);
+            } catch (MalformedURLException ex) {
+                throw new IllegalStateException("Unexpected URL syntax violation", ex);
+            }
         }
 
     }
