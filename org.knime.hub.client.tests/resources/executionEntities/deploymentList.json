@@ -1,0 +1,530 @@
+{
+	"@namespaces": {
+		"knime": {
+			"name": "http://www.knime.com/server/rels#"
+		}
+	},
+	"@controls": {
+		"self": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/account:team:e3133141-8fb3-4d4a-99cc-70519a90149b?pagelen=8",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:new-schedule-deployment": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/schedule?workflowUri={path}{&spaceVersion}",
+			"isHrefTemplate": true,
+			"method": "POST"
+		},
+		"knime:new-data-app-deployment": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/data-app?workflowUri={path}{&spaceVersion}",
+			"isHrefTemplate": true,
+			"method": "POST"
+		},
+		"knime:new-rest-deployment": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest?workflowUri={path}{&spaceVersion}",
+			"isHrefTemplate": true,
+			"method": "POST"
+		},
+		"knime:new-trigger-deployment": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/trigger?workflowUri={path}{&spaceVersion}",
+			"isHrefTemplate": true,
+			"method": "POST"
+		},
+		"knime:data-app-collection": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/{account-id}/data-apps",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:schedule-collection": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/{account-id}/schedules",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:rest-collection": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/{account-id}/rest",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:trigger-collection": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/{account-id}/triggers",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"knime:next-page": {
+			"href": "https://api.business-hubdev.cloudops.knime.com/deployments/account:team:e3133141-8fb3-4d4a-99cc-70519a90149b?pagelen=8&page=2",
+			"isHrefTemplate": true,
+			"method": "GET"
+		}
+	},
+	"pagination": {
+		"totalItemCount": 111,
+		"totalPageCount": 14
+	},
+	"deployments": [
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/data-app:31f07f4f-75e9-4ea4-8b52-1547328d790b",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:execution-context": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/execution-contexts/bf19bdde-eed8-46a9-a060-9997e6a958f0",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:new-job": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/data-app:31f07f4f-75e9-4ea4-8b52-1547328d790b/jobs{?asyncLoading,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:workflow": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/knime/rest/v4/repository/*WEvNH1OJgq6nqcLW",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"id": "data-app:31f07f4f-75e9-4ea4-8b52-1547328d790b",
+			"type": "data-app",
+			"name": "Service Caller (Assign Labels; user scoped)",
+			"scope": "account:team:e3133141-8fb3-4d4a-99cc-70519a90149b",
+			"runMode": "INITIATOR",
+			"creator": "account:user:61a20757-6ebf-4dbc-b21d-319ffbca9653",
+			"creatorName": "knime_admin",
+			"workflowPath": "/Users/Workflow Applications/Workflow Validation (Demo)/Actions/Service Caller (Assign Labels)",
+			"workflowId": "*WEvNH1OJgq6nqcLW",
+			"spaceVersion": "10",
+			"itemVersion": "10",
+			"executionContext": "bf19bdde-eed8-46a9-a060-9997e6a958f0",
+			"createdAt": "2025-06-26T14:17:38.356Z[GMT]",
+			"modifiedAt": "2025-06-26T15:28:31.652Z[GMT]",
+			"enabled": true,
+			"actions": [
+				{
+					"customName": "",
+					"onSuccess": false,
+					"onFailure": false,
+					"type": "DiscardAfterExecution"
+				}
+			],
+			"cpuRequirement": 0.0,
+			"loadTimeout": "PT5M",
+			"updateLinkedComponents": false,
+			"asyncLoadTimeout": "PT5M",
+			"maxJobTimeInMemory": "PT10M",
+			"maxJobLifeTime": "PT168H",
+			"executionTimeout": "PT5M",
+			"reportTimeout": "PT5M",
+			"swapTimeout": "PT1M",
+			"maxJobExecutionTime": "PT24000H",
+			"discardAfterMaxExecutionTime": false,
+			"ramRequirement": 0,
+			"saveWorkflowSummary": false,
+			"defaultProperties": [],
+			"overridableProperties": [
+				"cpuRequirement",
+				"loadTimeout",
+				"updateLinkedComponents",
+				"asyncLoadTimeout",
+				"maxJobTimeInMemory",
+				"maxJobLifeTime",
+				"executionTimeout",
+				"reportTimeout",
+				"swapTimeout",
+				"maxJobExecutionTime",
+				"discardAfterMaxExecutionTime",
+				"ramRequirement",
+				"saveWorkflowSummary"
+			],
+			"readOnlyProperties": [],
+			"description": "https://knime-com.atlassian.net/browse/WA-379",
+			"tags": []
+		},
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:execution-context": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/execution-contexts/bf19bdde-eed8-46a9-a060-9997e6a958f0",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"edit": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53",
+					"isHrefTemplate": true,
+					"title": "Edit deployment",
+					"method": "PUT",
+					"encoding": "Json"
+				},
+				"knime:delete": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53",
+					"isHrefTemplate": true,
+					"method": "DELETE"
+				},
+				"knime:change-permissions": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/permissions/policies/rest_deployment/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:new-job": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53/jobs{?asyncLoading,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:execution": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53/execution{?reset,format,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:workflow": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/knime/rest/v4/repository/*vN0W1rL3XgdIuhXt",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"id": "rest:d7dc336a-a0db-464c-aaae-cbdf29fc8f53",
+			"type": "rest",
+			"name": "Notify User Service",
+			"scope": "account:team:e3133141-8fb3-4d4a-99cc-70519a90149b",
+			"runMode": "ACCOUNT",
+			"creator": "account:user:32993ee9-0e64-4c0d-bfe8-c7d741720570",
+			"creatorName": "g1a2m2",
+			"workflowPath": "/Users/Workflow Applications/2 Workflow Applications in Development/Notify User Service/Notify User Service",
+			"workflowId": "*vN0W1rL3XgdIuhXt",
+			"spaceVersion": "2",
+			"itemVersion": "2",
+			"executionContext": "bf19bdde-eed8-46a9-a060-9997e6a958f0",
+			"createdAt": "2025-06-26T10:02:58.103Z[GMT]",
+			"modifiedAt": "2025-06-26T10:02:58.103Z[GMT]",
+			"enabled": true,
+			"actions": [
+				{
+					"customName": "",
+					"onSuccess": false,
+					"onFailure": true,
+					"onInactivityDiscard": false,
+					"recipients": [
+						"workflowapplications+g1a2m2@knime.com"
+					],
+					"appendNodeMessages": false,
+					"type": "SendMail"
+				},
+				{
+					"customName": "",
+					"onSuccess": false,
+					"onFailure": false,
+					"type": "DiscardAfterExecution"
+				}
+			],
+			"cpuRequirement": 0.0,
+			"loadTimeout": "PT5M",
+			"updateLinkedComponents": false,
+			"asyncLoadTimeout": "PT5M",
+			"maxJobTimeInMemory": "PT10M",
+			"maxJobLifeTime": "PT168H",
+			"executionTimeout": "PT5M",
+			"reportTimeout": "PT5M",
+			"swapTimeout": "PT1M",
+			"maxJobExecutionTime": "PT24000H",
+			"discardAfterMaxExecutionTime": false,
+			"ramRequirement": 0,
+			"saveWorkflowSummary": false,
+			"defaultProperties": [],
+			"overridableProperties": [
+				"cpuRequirement",
+				"loadTimeout",
+				"updateLinkedComponents",
+				"asyncLoadTimeout",
+				"maxJobTimeInMemory",
+				"maxJobLifeTime",
+				"executionTimeout",
+				"reportTimeout",
+				"swapTimeout",
+				"maxJobExecutionTime",
+				"discardAfterMaxExecutionTime",
+				"ramRequirement",
+				"saveWorkflowSummary"
+			],
+			"readOnlyProperties": [],
+			"description": "",
+			"tags": []
+		},
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/schedule:fff92b21-441d-4ed3-868f-ce61f5fb8369",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:execution-context": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/execution-contexts/bf19bdde-eed8-46a9-a060-9997e6a958f0",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:new-job": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/schedule:fff92b21-441d-4ed3-868f-ce61f5fb8369/jobs{?asyncLoading,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:execution": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/schedule:fff92b21-441d-4ed3-868f-ce61f5fb8369/execution{?reset,format,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:workflow": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/knime/rest/v4/repository/*7g-9QmfWdiNpIDFL",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"id": "schedule:fff92b21-441d-4ed3-868f-ce61f5fb8369",
+			"type": "schedule",
+			"name": "[Siemens] Collect Usage Metrics",
+			"scope": "account:team:e3133141-8fb3-4d4a-99cc-70519a90149b",
+			"runMode": "INITIATOR",
+			"creator": "account:user:32993ee9-0e64-4c0d-bfe8-c7d741720570",
+			"creatorName": "g1a2m2",
+			"workflowPath": "/Users/Workflow Applications/2 Workflow Applications in Development/FEATKNHUB-680 Consumption based pricing/[Siemens] Collect Usage Metrics",
+			"workflowId": "*7g-9QmfWdiNpIDFL",
+			"spaceVersion": "3",
+			"itemVersion": "3",
+			"executionContext": "bf19bdde-eed8-46a9-a060-9997e6a958f0",
+			"createdAt": "2025-06-23T15:55:59.672Z[GMT]",
+			"modifiedAt": "2025-06-23T15:55:59.672Z[GMT]",
+			"enabled": true,
+			"actions": [
+				{
+					"customName": "",
+					"onSuccess": false,
+					"onFailure": true,
+					"onInactivityDiscard": false,
+					"recipients": [
+						"team-workflow-applica-aaaagmlvhei7jbjqhxl74tc4py@knime.slack.com"
+					],
+					"appendNodeMessages": true,
+					"type": "SendMail"
+				}
+			],
+			"maxFailures": 2147483647,
+			"cpuRequirement": 0.0,
+			"loadTimeout": "PT5M",
+			"updateLinkedComponents": false,
+			"asyncLoadTimeout": "PT5M",
+			"maxJobTimeInMemory": "PT10M",
+			"maxJobLifeTime": "PT168H",
+			"executionTimeout": "PT5M",
+			"reportTimeout": "PT5M",
+			"swapTimeout": "PT1M",
+			"maxJobExecutionTime": "PT24000H",
+			"discardAfterMaxExecutionTime": false,
+			"ramRequirement": 0,
+			"saveWorkflowSummary": false,
+			"defaultProperties": [
+				"maxFailures"
+			],
+			"overridableProperties": [
+				"maxFailures",
+				"cpuRequirement",
+				"loadTimeout",
+				"updateLinkedComponents",
+				"asyncLoadTimeout",
+				"maxJobTimeInMemory",
+				"maxJobLifeTime",
+				"executionTimeout",
+				"reportTimeout",
+				"swapTimeout",
+				"maxJobExecutionTime",
+				"discardAfterMaxExecutionTime",
+				"ramRequirement",
+				"saveWorkflowSummary"
+			],
+			"readOnlyProperties": [],
+			"description": "",
+			"tags": [],
+			"lastJob": "49ce76cf-70a5-4837-a4cd-889e01fad13c",
+			"lastRun": "2025-06-26T22:15:00.102Z[GMT]",
+			"numFailures": 0,
+			"maxFailures": 2147483647,
+			"targetName": "[Siemens] Collect Usage Metrics",
+			"reset": false,
+			"executionRetries": 0,
+			"schedule": {
+				"disabled": false,
+				"startTime": "2025-06-23T00:00:00+02:00[Europe/Berlin]",
+				"delayType": "MINUTES",
+				"delay": 1,
+				"filter": {
+					"days": [
+						1,
+						2,
+						3,
+						4,
+						5,
+						6,
+						7,
+						8,
+						9,
+						10,
+						11,
+						12,
+						13,
+						14,
+						15,
+						16,
+						17,
+						18,
+						19,
+						20,
+						21,
+						22,
+						23,
+						24,
+						25,
+						26,
+						27,
+						28,
+						29,
+						30,
+						31,
+						32
+					],
+					"daysOfWeek": [
+						"MONDAY",
+						"TUESDAY",
+						"WEDNESDAY",
+						"THURSDAY",
+						"FRIDAY",
+						"SATURDAY",
+						"SUNDAY"
+					],
+					"months": [
+						"JANUARY",
+						"FEBRUARY",
+						"MARCH",
+						"APRIL",
+						"MAY",
+						"JUNE",
+						"JULY",
+						"AUGUST",
+						"SEPTEMBER",
+						"OCTOBER",
+						"NOVEMBER",
+						"DECEMBER"
+					],
+					"times": [
+						{
+							"start": "00:15",
+							"end": "00:15:59"
+						}
+					]
+				},
+				"skipIfPreviousJobStillRunning": false,
+				"nextScheduledExecution": "2025-07-01T00:15:00+02:00[Europe/Berlin]"
+			}
+		},
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/trigger:582f19c1-0135-4ef1-b1f8-2bce87bf7d6e",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:execution-context": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/execution-contexts/bf19bdde-eed8-46a9-a060-9997e6a958f0",
+					"isHrefTemplate": true,
+					"method": "GET"
+				},
+				"knime:new-job": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/trigger:582f19c1-0135-4ef1-b1f8-2bce87bf7d6e/jobs{?asyncLoading,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:execution": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/deployments/trigger:582f19c1-0135-4ef1-b1f8-2bce87bf7d6e/execution{?reset,format,timeout}",
+					"isHrefTemplate": true,
+					"method": "POST"
+				},
+				"knime:workflow": {
+					"href": "https://api.business-hubdev.cloudops.knime.com/knime/rest/v4/repository/*wUSx2QqdfARVd9nC",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"id": "trigger:582f19c1-0135-4ef1-b1f8-2bce87bf7d6e",
+			"type": "trigger",
+			"name": "Workflow Labeling Assistant",
+			"scope": "account:team:e3133141-8fb3-4d4a-99cc-70519a90149b",
+			"runMode": "INITIATOR",
+			"creator": "account:user:f6eacfe9-bb93-4f7d-902f-7336c735db54",
+			"creatorName": "<deleted user>",
+			"workflowPath": "/Users/Workflow Applications/Workflow Validation (Demo)/Workflow Labeling Assistant",
+			"workflowId": "*wUSx2QqdfARVd9nC",
+			"spaceVersion": "4",
+			"itemVersion": "4",
+			"executionContext": "bf19bdde-eed8-46a9-a060-9997e6a958f0",
+			"createdAt": "2025-06-16T13:58:26.294Z[GMT]",
+			"modifiedAt": "2025-06-16T13:58:26.294Z[GMT]",
+			"enabled": true,
+			"actions": [
+				{
+					"customName": "",
+					"onSuccess": false,
+					"onFailure": false,
+					"type": "DiscardAfterExecution"
+				}
+			],
+			"cpuRequirement": 0.0,
+			"loadTimeout": "PT5M",
+			"updateLinkedComponents": false,
+			"asyncLoadTimeout": "PT5M",
+			"maxJobTimeInMemory": "PT10M",
+			"maxJobLifeTime": "PT168H",
+			"executionTimeout": "PT5M",
+			"reportTimeout": "PT5M",
+			"swapTimeout": "PT1M",
+			"maxJobExecutionTime": "PT24000H",
+			"discardAfterMaxExecutionTime": false,
+			"ramRequirement": 0,
+			"saveWorkflowSummary": false,
+			"defaultProperties": [],
+			"overridableProperties": [
+				"cpuRequirement",
+				"loadTimeout",
+				"updateLinkedComponents",
+				"asyncLoadTimeout",
+				"maxJobTimeInMemory",
+				"maxJobLifeTime",
+				"executionTimeout",
+				"reportTimeout",
+				"swapTimeout",
+				"maxJobExecutionTime",
+				"discardAfterMaxExecutionTime",
+				"ramRequirement",
+				"saveWorkflowSummary"
+			],
+			"readOnlyProperties": [],
+			"description": "",
+			"tags": [],
+			"filters": [
+				{
+					"spaces": [
+						{
+							"spaceId": "*zhhYxEe21_fQbYxC"
+						}
+					],
+					"itemTypes": [
+						"Workflow"
+					],
+					"actionTypes": [
+						"ADDED",
+						"UPDATED",
+						"VERSION_CREATED"
+					]
+				}
+			]
+		}
+	]
+}

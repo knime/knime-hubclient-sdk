@@ -1,0 +1,135 @@
+{
+	"@namespaces": {
+		"knime": {
+			"name": "http://www.knime.com/server/rels#"
+		}
+	},
+	"@controls": {
+		"self": {
+			"href": "https://api.hubdev.knime.com/execution-contexts/account:team:7b0cb5f6-d931-48ce-8934-bd048f8c6bc2?pagelen=1",
+			"isHrefTemplate": true,
+			"method": "GET"
+		},
+		"collection": {
+			"href": "https://api.hubdev.knime.com/execution-contexts{?spaceId}",
+			"isHrefTemplate": true,
+			"method": "GET"
+		}
+	},
+	"executionContexts": [
+		{
+			"@controls": {
+				"self": {
+					"href": "https://api.hubdev.knime.com/execution-contexts/ed1dd538-253f-4749-8636-078a3a5fc5db",
+					"isHrefTemplate": true,
+					"method": "GET"
+				}
+			},
+			"id": "ed1dd538-253f-4749-8636-078a3a5fc5db",
+			"scope": "hub:global",
+			"name": "AP 5.5 Editor",
+			"clusterInfoId": "00000000-0000-0000-0000-000000000000",
+			"isDisabled": true,
+			"isTemplate": false,
+			"isPool": false,
+			"description": "AP-5.5-editor",
+			"tags": [],
+			"readOnly": [],
+			"final": [
+				"maxJobTimeInMemory"
+			],
+			"inherited": [],
+			"inheritable": [
+				"operationInfo",
+				"defaultSwapTimeout",
+				"defaultReportTimeout",
+				"startExecutionTimeout",
+				"maxLoadedJobsPerExecutor",
+				"maxJobTimeInMemory",
+				"maxJobLifeTime",
+				"maxSwapFailures",
+				"maxJobInOutSize",
+				"clusterInfoId",
+				"customizationProfiles",
+				"discardAfterMaxExecutionTime",
+				"saveWorkflowSummary",
+				"defaultMaxScheduleFailures",
+				"rejectFutureWorkflows",
+				"defaultAsyncLoadTimeout",
+				"defaultCpuRequirement",
+				"blacklistedNodes",
+				"perJobLogging",
+				"updateLinkedComponents",
+				"defaultRamRequirement",
+				"defaultExecutionTimeout",
+				"defaultLoadTimeout",
+				"maxJobExecutionTime",
+				"defaultSessionTimeout"
+			],
+			"defaultCpuRequirement": 0.0,
+			"blacklistedNodes": "",
+			"perJobLogging": true,
+			"defaultSwapTimeout": "PT1M",
+			"updateLinkedComponents": false,
+			"defaultRamRequirement": 0,
+			"defaultReportTimeout": "PT5M",
+			"defaultExecutionTimeout": "PT5M",
+			"startExecutionTimeout": "PT1M",
+			"maxLoadedJobsPerExecutor": 2147483647,
+			"maxJobTimeInMemory": "PT1M",
+			"maxJobLifeTime": "PT168H",
+			"maxSwapFailures": 1,
+			"maxJobInOutSize": 10,
+			"defaultLoadTimeout": "PT5M",
+			"maxJobExecutionTime": "PT24000H",
+			"customizationProfiles": [
+				"7df3c440-35a8-43b4-b763-05aaaff5ff68"
+			],
+			"discardAfterMaxExecutionTime": false,
+			"saveWorkflowSummary": false,
+			"defaultMaxScheduleFailures": 2147483647,
+			"rejectFutureWorkflows": false,
+			"defaultAsyncLoadTimeout": "PT5M",
+			"defaultSessionTimeout": "PT0.0003S",
+			"operationInfo": {
+				"minExecutors": 1,
+				"maxExecutors": 1,
+				"dockerImage": "public.ecr.aws/knime/knime-full:5.5.0-beta-20250627-172200-005509-9dca910",
+				"kubernetesNodeLabel": "asd",
+				"containerCores": 2,
+				"containerMemoryLimit": 8192,
+				"executorCPUUsagePercentLimit": 90,
+				"executorHeapUsagePercentLimit": 90,
+				"envVars": {
+					"UPDATE_EC": "true",
+					"UPDATE_EC_TIMESTAMP": "2025-06-28 05:00:14"
+				},
+				"autoStart": {
+					"enabled": false
+				},
+				"autoStop": {
+					"enabled": false,
+					"idleTime": "PT1M"
+				},
+				"vmArguments": [
+					"-Dorg.knime.ui.mode=DEFAULT",
+					"-Dcom.knime.gateway.executor.canvasRenderer=WebGL",
+					"-Dknime.ai.assistant.server=https://ws.hubdev.knime.com/ai/v1",
+					"-XX:MaxRAMPercentage=60"
+				]
+			},
+			"defaultForSpaces": ["*ghKFrLNw4DrjixF0"],
+			"customizationProfiles": [
+				"7df3c440-35a8-43b4-b763-05aaaff5ff68"
+			],
+			"liveMetrics": {
+				"deployments": 67,
+				"jobs": 6,
+				"loadedJobs": 0,
+				"lastJobStatusUpdate": "2025-06-30T05:39:44.195924Z"
+			},
+			"executorApVersion": "5.5.0.v202506250854",
+			"executorConnectorVersion": "5.5.0.v202506240657"
+		}
+	]
+}

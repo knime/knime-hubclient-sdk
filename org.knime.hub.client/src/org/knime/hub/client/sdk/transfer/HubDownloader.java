@@ -60,10 +60,10 @@ import org.knime.hub.client.sdk.ent.Control;
 import org.knime.hub.client.sdk.ent.catalog.Component;
 import org.knime.hub.client.sdk.ent.catalog.Data;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
+import org.knime.hub.client.sdk.ent.catalog.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.catalog.Sized;
 import org.knime.hub.client.sdk.ent.catalog.Workflow;
 import org.knime.hub.client.sdk.ent.catalog.WorkflowGroup;
-import org.knime.hub.client.sdk.ent.catalog.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.slf4j.Logger;
@@ -466,6 +466,6 @@ public final class HubDownloader extends AbstractHubTransfer {
     }
 
     private static long getSize(final RepositoryItem item) {
-        return item instanceof Sized s ? s.getSize() : -1;
+        return item instanceof Sized s ? s.getSize().orElse((long)-1) : -1;
     }
 }

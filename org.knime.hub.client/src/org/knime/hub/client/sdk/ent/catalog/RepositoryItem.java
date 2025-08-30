@@ -48,13 +48,14 @@
 
 package org.knime.hub.client.sdk.ent.catalog;
 
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -65,7 +66,6 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.annotation.OptBoolean;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a repository item.
@@ -86,9 +86,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
         @JsonSubTypes.Type(value = Data.class, name = Data.TYPE), //
         @JsonSubTypes.Type(value = Workflow.class, name = Workflow.TYPE), //
         @JsonSubTypes.Type(value = WorkflowGroup.class, name = WorkflowGroup.TYPE), //
+        @JsonSubTypes.Type(value = Template.class, name = Template.TYPE), //
 })
 @JsonPropertyOrder({ RepositoryItem.JSON_PROPERTY_TYPE, RepositoryItem.JSON_PROPERTY_ID }) // Serialize first
-public abstract sealed class RepositoryItem permits Component, Data, Workflow, WorkflowGroup {
+public abstract sealed class RepositoryItem permits Component, Data, Workflow, WorkflowGroup, Template {
 
     /**
      * Repository item type enum.
@@ -103,7 +104,22 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
         /** Data */
         DATA(Data.TYPE), //
         /** Space */
-        SPACE(Space.TYPE);
+        SPACE(Space.TYPE), //
+
+        /** Remaining server item types */
+
+        /** Represents a metanode or subnode template.
+         * @since 0.2*/
+        WORKFLOW_TEMPLATE(Template.TYPE),
+        /** A snapshot of the parent item.
+         * @since 0.2*/
+        SNAPSHOT("snapshot"), //
+        /** Represents an item in the recycle bin.
+         * @since 0.2*/
+        TRASH("trash"), //
+        /** Unknown type, e.g. from future versions.
+         * @since 0.2*/
+        UNKNOWN("unknown");
 
         private final String m_value;
 
@@ -163,10 +179,31 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     private final String m_owner;
 
     /**
+     * JSON key name for the item owner account ID property
+     * @since 0.2
+     */
+    protected static final String JSON_PROPERTY_OWNER_ACCOUNT_ID = "ownerAccountId";
+    private final String m_ownerAccountId;
+
+    /**
+     * JSON key name for the item created on time stamp.
+     * @since 0.2
+     */
+    protected static final String JSON_PROPERTY_CREATED_ON = "createdOn";
+    private final ZonedDateTime m_createdOn;
+
+    /**
      * JSON key name for the item description property
      */
     protected static final String JSON_PROPERTY_DESCRIPTION = "description";
     private final String m_description;
+
+    /**
+     * JSON key name for the item last uploaded on time stamp.
+     * @since 0.2
+     */
+    protected static final String JSON_PROPERTY_LAST_UPLOADED_ON = "lastUploadedOn";
+    private final ZonedDateTime m_lastUploadedOn;
 
     /**
      * JSON key name for the item details property
@@ -187,26 +224,55 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @param canonicalPath the item canonical path
      * @param id the item ID
      * @param owner the item owner
+     * @param ownerAccountId the account ID of the owner
+     * @param createdOn the time of creation
      * @param description the item description
+     * @param lastUploadedOn the time if the last upload/overwrite
      * @param details the item details
      * @param masonControls the item mason controls
+     * @since 0.2
      */
     @JsonCreator
     protected RepositoryItem(
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CREATED_ON) final ZonedDateTime createdOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls) {
         m_path = path;
         m_canonicalPath = canonicalPath;
         m_id = id;
         m_owner = owner;
+        m_ownerAccountId = ownerAccountId;
+        m_createdOn = createdOn;
         m_description = description;
+        m_lastUploadedOn = lastUploadedOn;
         m_details = details;
         m_masonControls = masonControls;
+    }
+
+    /**
+     * Creates a new item from a builder.
+     *
+     * @param builder a builder
+     * @since 0.2
+     */
+    protected RepositoryItem(final RepositoryItemBuilder<?, ?> builder) {
+        m_path = builder.m_path;
+        m_canonicalPath = null;
+        m_id = null;
+        m_owner = Objects.requireNonNull(builder.m_owner, "Owner must not be null");
+        m_ownerAccountId = null;
+        m_createdOn = builder.m_createdOn;
+        m_description = null;
+        m_lastUploadedOn = builder.m_lastUploadedOn;
+        m_details = null;
+        m_masonControls = Map.of();
     }
 
     /**
@@ -226,7 +292,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @return path
      */
     @JsonProperty(JSON_PROPERTY_CANONICAL_PATH)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getCanonicalPath() {
         return m_canonicalPath;
     }
@@ -238,7 +304,7 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
      * @return id
      */
     @JsonProperty(JSON_PROPERTY_ID)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public String getId() {
         return m_id;
     }
@@ -255,6 +321,30 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     }
 
     /**
+     * Retrieves the items creation time stamp.
+     *
+     * @return createdOn
+     * @since 0.2
+     */
+    @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getOwnerAccountId() {
+        return Optional.ofNullable(m_ownerAccountId);
+    }
+
+    /**
+     * Retrieves the items creation time stamp.
+     *
+     * @return createdOn
+     * @since 0.2
+     */
+    @JsonProperty(JSON_PROPERTY_CREATED_ON)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<ZonedDateTime> getCreatedOn() {
+        return Optional.ofNullable(m_createdOn);
+    }
+
+    /**
      * Retrieves the optional plain text description for this item
      *
      * @return description
@@ -263,6 +353,18 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDescription() {
         return Optional.ofNullable(m_description);
+    }
+
+    /**
+     * Retrieves the time stamp of the last upload or overwrite of this item.
+     *
+     * @return lastUploadedOn
+     * @since 0.2
+     */
+    @JsonProperty(JSON_PROPERTY_LAST_UPLOADED_ON)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
+    public Optional<ZonedDateTime> getLastUploadedOn() {
+        return Optional.ofNullable(m_lastUploadedOn);
     }
 
     /**
@@ -296,6 +398,83 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public abstract RepositoryItemType getType();
 
+    /**
+     * Builder for {@link RepositoryItem}.
+     *
+     * @param <R> The repository item sub-class
+     * @param <B> The repository item builder sub-class
+     * @since 0.2
+     */
+    @SuppressWarnings("unchecked")
+    public abstract static class RepositoryItemBuilder<B extends RepositoryItemBuilder<?, ?>,
+        R extends RepositoryItem> {
+        String m_path;
+        String m_owner;
+        ZonedDateTime m_createdOn;
+        ZonedDateTime m_lastUploadedOn;
+        RepositoryItemType m_type;
+
+        /**
+         * Creates a new {@link RepositoryItemBuilder} for the given type.
+         *
+         * @param type the type of the repository item
+         */
+        protected RepositoryItemBuilder(final RepositoryItemType type) {
+            m_type = type;
+        }
+
+        /**
+         * Sets the item's path.
+         *
+         * @param path the item's path
+         * @return this
+         */
+        public B withPath(final String path) {
+            m_path = path;
+            return (B)this;
+        }
+
+        /**
+         * Sets the item's owner.
+         *
+         * @param owner the owner of the item
+         * @return this
+         */
+        public B withOwner(final String owner) {
+            m_owner = owner;
+            return (B)this;
+        }
+
+        /**
+         * Sets the item creation time.
+         *
+         * @param createdOn the time of creation
+         * @return this
+         */
+        public B withCreatedOn(final ZonedDateTime createdOn) {
+            m_createdOn = createdOn;
+            return (B)this;
+        }
+
+        /**
+         * Sets the time of the last upload/overwrite of the item.
+         *
+         * @param lastUploadedOn the time of the last upload/overwrite
+         * @return this
+         */
+        public B withLastUploadedOn(final ZonedDateTime lastUploadedOn) {
+            m_lastUploadedOn = lastUploadedOn;
+            return (B)this;
+        }
+
+        /**
+         * Creates a new repository item.
+         *
+         * @return repository item of type R
+         */
+        public abstract R build();
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
@@ -310,7 +489,10 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
                 && Objects.equals(this.m_id, repositoryItem.m_id)
                 && Objects.equals(this.getType(), repositoryItem.getType())
                 && Objects.equals(this.m_owner, repositoryItem.m_owner)
+                && Objects.equals(this.m_ownerAccountId, repositoryItem.m_ownerAccountId)
+                && Objects.equals(this.m_createdOn, repositoryItem.m_createdOn)
                 && Objects.equals(this.m_description, repositoryItem.m_description)
+                && Objects.equals(this.m_lastUploadedOn, repositoryItem.m_lastUploadedOn)
                 && Objects.equals(this.m_details, repositoryItem.m_details)
                 && Objects.equals(this.m_masonControls, repositoryItem.m_masonControls);
     }
@@ -318,15 +500,11 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     @Override
     public int hashCode() {
         return Objects.hash(m_path, m_canonicalPath, m_id, getType(),
-            m_owner, m_description, m_details, m_masonControls);
+            m_owner, m_ownerAccountId, m_createdOn, m_description, m_lastUploadedOn, m_details, m_masonControls);
     }
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

@@ -78,6 +78,7 @@ import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.catalog.UploadManifest;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.HubUploader.UploadPartSupplier;
+import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.MediaType;

@@ -56,6 +56,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URL;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.List;
 
@@ -64,6 +66,7 @@ import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ent.catalog.Component;
 import org.knime.hub.client.sdk.ent.catalog.Data;
 import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.NamedItemVersionList;
 import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
 import org.knime.hub.client.sdk.ent.catalog.Space;
@@ -109,10 +112,13 @@ class CatalogServiceEntityTest extends AbstractTest {
     private static final String EXPECTED_SPACE_CANONICAL_PATH =
             "/Users/account:team:a885bb42-d808-4557-9a7f-9f10c5777739/Space";
 
-    //account:team:a885bb42-d808-4557-9a7f-9f10c5777739
-
     private static final String EXPECTED_OWNER = "jdoe";
+    private static final String EXPECTED_OWNER_ACCOUNT_ID = "account:team:a885bb42-d808-4557-9a7f-9f10c5777739";
+    private static final ZonedDateTime EXPECTED_CREATED_ON =
+            ZonedDateTime.parse("2025-06-24T08:04:14+00:00").withZoneSameInstant(ZoneId.of("UTC"));
     private static final String EXPECTED_DESCRIPTION = "This is a description";
+    private static final ZonedDateTime EXPECTED_LAST_UPLOADED_ON =
+            ZonedDateTime.parse("2025-06-24T08:04:16+00:00").withZoneSameInstant(ZoneId.of("UTC"));
     private static final long EXPECTED_SIZE = 1337L;
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
@@ -124,10 +130,16 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_COMPONENT_CANONICAL_PATH, component.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_COMPONENT_ID, component.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, component.getOwner(), "Unexpected owner");
+        assertTrue(component.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID, component.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(component.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, component.getCreatedOn().get(), "Unexpected createdOn");
         assertEquals(EXPECTED_DESCRIPTION, component.getDescription().get(), "Unexpected description");
+        assertTrue(component.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, component.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(component.getDetails().isEmpty(), "Unexpected details");
         assertFalse(component.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, component.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, component.getSize().orElseThrow(), "Unexpected size");
 
         final var componentWithDetails = load(EntityFolders.CATALOG_ENTITES,
             "componentWithDetails.json", Component.class);
@@ -137,11 +149,19 @@ class CatalogServiceEntityTest extends AbstractTest {
             componentWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_COMPONENT_ID, componentWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, componentWithDetails.getOwner(), "Unexpected owner");
+        assertTrue(componentWithDetails.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID,
+            componentWithDetails.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(componentWithDetails.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, componentWithDetails.getCreatedOn().get(), "Unexpected createdOn");
         assertEquals(EXPECTED_DESCRIPTION, componentWithDetails.getDescription().get(), "Unexpected description");
+        assertTrue(componentWithDetails.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, componentWithDetails.getLastUploadedOn().get(),
+            "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_SPACE_ID, componentWithDetails.getDetails().get().getSpace().getSpaceId(),
             "Unexpected space Id");
         assertFalse(componentWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, componentWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, componentWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
@@ -152,10 +172,16 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_DATA_CANONICAL_PATH, data.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_DATA_ID, data.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, data.getOwner(), "Unexpected owner");
+        assertTrue(data.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID, data.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(data.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, data.getCreatedOn().get(), "Unexpected createdOn");
         assertTrue(data.getDescription().isEmpty(), "Unexpected description");
+        assertTrue(data.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, data.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(data.getDetails().isEmpty(), "Unexpected details");
         assertFalse(data.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, data.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, data.getSize().orElseThrow(), "Unexpected size");
 
         final var dataWithDetails = load(EntityFolders.CATALOG_ENTITES, "dataWithDetails.json", Data.class);
         assertEquals(RepositoryItem.RepositoryItemType.DATA, data.getType(), "Unexpected type");
@@ -163,10 +189,18 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_DATA_CANONICAL_PATH, dataWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_DATA_ID, dataWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, dataWithDetails.getOwner(), "Unexpected owner");
+        assertTrue(dataWithDetails.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID,
+            dataWithDetails.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(dataWithDetails.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, dataWithDetails.getCreatedOn().get(), "Unexpected createdOn");
         assertTrue(dataWithDetails.getDescription().isEmpty(), "Unexpected description");
+        assertTrue(dataWithDetails.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, dataWithDetails.getLastUploadedOn().get(),
+            "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_SPACE_ID,
                 dataWithDetails.getDetails().get().getSpace().getSpaceId(), "Unexpected space Id");
-        assertEquals(EXPECTED_SIZE, dataWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, dataWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
@@ -177,10 +211,16 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_WORKFLOW_CANONICAL_PATH, workflow.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_ID, workflow.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflow.getOwner(), "Unexpected owner");
+        assertTrue(workflow.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID, workflow.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(workflow.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, workflow.getCreatedOn().get(), "Unexpected createdOn");
         assertEquals(EXPECTED_DESCRIPTION, workflow.getDescription().get(), "Unexpected description");
+        assertTrue(workflow.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, workflow.getLastUploadedOn().get(), "Unexpected lastUploadedOn");
         assertTrue(workflow.getDetails().isEmpty(), "Unexpected details");
         assertFalse(workflow.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, workflow.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, workflow.getSize().orElseThrow(), "Unexpected size");
 
         final var workflowWithDetails = load(EntityFolders.CATALOG_ENTITES, "workflowWithDetails.json", Workflow.class);
         assertEquals(RepositoryItem.RepositoryItemType.WORKFLOW, workflowWithDetails.getType(), "Unexpected type");
@@ -189,21 +229,29 @@ class CatalogServiceEntityTest extends AbstractTest {
             workflowWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_ID, workflowWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowWithDetails.getOwner(), "Unexpected owner");
+        assertTrue(workflowWithDetails.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID,
+            workflowWithDetails.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(workflowWithDetails.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, workflowWithDetails.getCreatedOn().get(), "Unexpected createdOn");
         assertEquals(EXPECTED_DESCRIPTION, workflowWithDetails.getDescription().get(), "Unexpected description");
+        assertTrue(workflowWithDetails.getLastUploadedOn().isPresent(), "Expected lastUploadedOn");
+        assertEquals(EXPECTED_LAST_UPLOADED_ON, workflowWithDetails.getLastUploadedOn().get(),
+            "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_SPACE_ID, workflowWithDetails.getDetails().get().getSpace().getSpaceId(),
             "Unexpected space Id");
         assertFalse(workflowWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
-        assertEquals(EXPECTED_SIZE, workflowWithDetails.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_SIZE, workflowWithDetails.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
     void testCreateLargeSizedItems() throws IOException {
         final var largeComponent = load(EntityFolders.CATALOG_ENTITES, "largeComponent.json", Component.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeComponent.getSize().orElseThrow(), "Unexpected size");
         final var largeData = load(EntityFolders.CATALOG_ENTITES, "largeData.json", Data.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeData.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeData.getSize().orElseThrow(), "Unexpected size");
         final var largeWorkflow = load(EntityFolders.CATALOG_ENTITES, "largeWorkflow.json", Workflow.class);
-        assertEquals(EXPECTED_LARGE_SIZE, largeWorkflow.getSize(), "Unexpected size");
+        assertEquals(EXPECTED_LARGE_SIZE, largeWorkflow.getSize().orElseThrow(), "Unexpected size");
     }
 
     @Test
@@ -215,7 +263,12 @@ class CatalogServiceEntityTest extends AbstractTest {
             workflowGroup.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_ID, workflowGroup.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowGroup.getOwner(), "Unexpected owner");
+        assertTrue(workflowGroup.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID, workflowGroup.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(workflowGroup.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, workflowGroup.getCreatedOn().get(), "Unexpected createdOn");
         assertTrue(workflowGroup.getDescription().isEmpty(), "Unexpected description");
+        assertTrue(workflowGroup.getLastUploadedOn().isEmpty(), "Unexpected lastUploadedOn");
         assertTrue(workflowGroup.getDetails().isEmpty(), "Unexpected details");
         assertFalse(workflowGroup.getMasonControls().isEmpty(), "Mason Controls do not exist");
         assertFalse(workflowGroup.getChildren().isEmpty(), "Children are missing");
@@ -229,7 +282,13 @@ class CatalogServiceEntityTest extends AbstractTest {
             workflowGroupWithDetails.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_WORKFLOW_GROUP_ID, workflowGroupWithDetails.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, workflowGroupWithDetails.getOwner(), "Unexpected owner");
+        assertTrue(workflowGroupWithDetails.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID,
+            workflowGroupWithDetails.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(workflowGroupWithDetails.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, workflowGroupWithDetails.getCreatedOn().get(), "Unexpected createdOn");
         assertTrue(workflowGroupWithDetails.getDescription().isEmpty(), "Unexpected description");
+        assertTrue(workflowGroupWithDetails.getLastUploadedOn().isEmpty(), "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_SPACE_ID, workflowGroupWithDetails.getDetails().get().getSpace().getSpaceId(),
             "Unexpected space Id");
         assertFalse(workflowGroupWithDetails.getMasonControls().isEmpty(), "Mason Controls do not exist");
@@ -244,6 +303,12 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertEquals(EXPECTED_SPACE_CANONICAL_PATH, space.getCanonicalPath(), "Unexpected canonical path");
         assertEquals(EXPECTED_SPACE_ID, space.getId(), "Unexpected id");
         assertEquals(EXPECTED_OWNER, space.getOwner(), "Unexpected owner");
+        assertTrue(space.getOwnerAccountId().isPresent(), "Expected owner account ID");
+        assertEquals(EXPECTED_OWNER_ACCOUNT_ID, space.getOwnerAccountId().get(), "Unexpected owner account ID");
+        assertTrue(space.getCreatedOn().isPresent(), "Expected createdOn");
+        assertEquals(EXPECTED_CREATED_ON, space.getCreatedOn().get(), "Unexpected createdOn");
+        assertEquals(EXPECTED_DESCRIPTION, space.getDescription().get(), "Unexpected description");
+        assertTrue(space.getLastUploadedOn().isEmpty(), "Unexpected lastUploadedOn");
         assertEquals(EXPECTED_DESCRIPTION, space.getDescription().get(), "Unexpected description");
         assertTrue(space.getDetails().isEmpty(), "Unexpected details");
         assertFalse(space.getMasonControls().isEmpty(), "Mason Controls do not exist");
@@ -368,6 +433,36 @@ class CatalogServiceEntityTest extends AbstractTest {
         assertTrue(downloadStatus.getDownloadUrl().isPresent(), "Expected download url");
         assertEquals("https://s3.us-east-1.amazonaws.com/",
             downloadStatus.getDownloadUrl().get().toString(), "Unexpected download url");
+    }
+
+    @Test
+    void testNamedItemVersionsListCreation() throws IOException {
+        var namedItemVersionsList =
+                load(EntityFolders.CATALOG_ENTITES, "emptyNamedItemVersionsList.json", NamedItemVersionList.class);
+        assertEquals(List.of(), namedItemVersionsList.getVersions(), "Unexpected versions");
+        assertEquals(0, namedItemVersionsList.getTotalCount(), "Unexpected total count");
+
+        namedItemVersionsList =
+                load(EntityFolders.CATALOG_ENTITES, "nonEmptyNamedItemVersionsList.json", NamedItemVersionList.class);
+        assertEquals(2, namedItemVersionsList.getTotalCount(), "Unexpected total count");
+        final var versions = namedItemVersionsList.getVersions();
+        assertEquals(2, versions.size(), "Unexpected number of named item versions");
+        var version = versions.get(0);
+        assertEquals(2, version.getVersion(), "Unexpected version");
+        assertEquals("2", version.getTitle(), "Unexpected title");
+        assertEquals("This is a description", version.getDescription().get(), "Unexpected description");
+        assertEquals("jdoe", version.getAuthor(), "Unexpected author");
+        assertEquals("account:team:a885bb42-d808-4557-9a7f-9f10c5777739", version.getAuthorAccountId(),
+            "Unexpected authorAccountId");
+        assertEquals(Instant.parse("2025-06-23T08:55:42+00:00"), version.getCreatedOn(), "Unexpected createdOn");
+        version = versions.get(1);
+        assertEquals(1, version.getVersion(), "Unexpected version");
+        assertEquals("1", version.getTitle(), "Unexpected title");
+        assertEquals("", version.getDescription().get(), "Unexpected description");
+        assertEquals("jdoe", version.getAuthor(), "Unexpected author");
+        assertEquals("account:team:a885bb42-d808-4557-9a7f-9f10c5777739", version.getAuthorAccountId(),
+            "Unexpected authorAccountId");
+        assertEquals(Instant.parse("2025-06-23T08:55:16+00:00"), version.getCreatedOn(), "Unexpected createdOn");
     }
 
 }

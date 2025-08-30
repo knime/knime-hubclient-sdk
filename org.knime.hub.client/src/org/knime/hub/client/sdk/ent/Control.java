@@ -51,22 +51,21 @@ package org.knime.hub.client.sdk.ent;
 import java.util.Objects;
 
 import org.knime.hub.client.sdk.ent.catalog.RepositoryItem;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing mason controls of a {@link RepositoryItem}.
- * 
+ *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Control {
-    
+
     private static final String JSON_PROPERTY_HREF = "href";
     private final String m_href;
 
@@ -75,15 +74,15 @@ public final class Control {
 
     @JsonCreator
     private Control(
-            @JsonProperty(value = JSON_PROPERTY_HREF, required = true) String href,
-            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) String method) {
+            @JsonProperty(value = JSON_PROPERTY_HREF, required = true) final String href,
+            @JsonProperty(value = JSON_PROPERTY_METHOD, required = true) final String method) {
         this.m_href = href;
         this.m_method = method;
     }
 
     /**
      * Retrieves the hyper link of the mason control
-     * 
+     *
      * @return href
      */
     @JsonProperty(JSON_PROPERTY_HREF)
@@ -94,7 +93,7 @@ public final class Control {
 
     /**
      * Retrieves the method type of the mason control.
-     * 
+     *
      * @return method
      */
     @JsonProperty(JSON_PROPERTY_METHOD)
@@ -104,7 +103,7 @@ public final class Control {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(final Object o) {
         if (this == o) {
             return true;
         }
@@ -122,10 +121,6 @@ public final class Control {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

@@ -53,6 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.time.ZonedDateTime;
+import java.util.Iterator;
 import java.util.List;
 
 import org.eclipse.core.runtime.FileLocator;
@@ -66,6 +68,9 @@ import org.osgi.framework.FrameworkUtil;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 
@@ -87,6 +92,8 @@ public class TestUtil {
         CATALOG_ENTITES("catalogEntities"), //
         /** Account entity folder */
         ACCOUNT_ENTITIES("accountEntities"), //
+        /** Execution entity folder */
+        EXECUTION_ENTITIES("executionEntities"), //
         /** API entity folder */
         API_ENTITES("apiEntities"); //
 
@@ -141,9 +148,39 @@ public class TestUtil {
         for (var jsonPath : expectedJsonPaths) {
             var actualJSONProperties = JsonPath.using(jsonConfig).parse(actualJSONResponse).read(jsonPath);
             var expectedJSONProperties = JsonPath.using(jsonConfig).parse(knimeHubJSONResponse).read(jsonPath);
+
+            // For expected JSON attributes which are represented by ZonedDateTime, we have to first parse
+            // the string into a ZonedDateTime before we can compare with the actual values.
+            expectedJSONProperties = parseJSONPropertiesAsZonedDateTime(mapper, expectedJSONProperties, jsonPath);
+
             assertEquals(expectedJSONProperties, actualJSONProperties,
                 "Unexpected properties for JSON path '%s'".formatted(jsonPath));
         }
+    }
+
+    private static Object parseJSONPropertiesAsZonedDateTime(final ObjectMapper mapper,
+        final Object expectedJSONProperties, final String jsonPath) {
+        if (!(expectedJSONProperties instanceof NullNode)
+                && (jsonPath.contains("createdOn") || jsonPath.contains("lastUploadedOn"))) {
+            if (expectedJSONProperties instanceof TextNode expectedTextNode) {
+                final var textValue = expectedTextNode.asText().equals(null) ? null
+                    : ZonedDateTime.parse(expectedTextNode.asText()).toString();
+                return new TextNode(textValue);
+            }
+            if (expectedJSONProperties instanceof ArrayNode expectedArrayNode) {
+                var parsedArrayNode = mapper.createArrayNode();
+                for (Iterator<JsonNode> iterator = expectedArrayNode.iterator(); iterator.hasNext();) {
+                    final var next = iterator.next();
+                    if (next instanceof NullNode) {
+                        parsedArrayNode.add(NullNode.getInstance());
+                    } else {
+                        parsedArrayNode.add(new TextNode(ZonedDateTime.parse(next.asText()).toString()));
+                    }
+                }
+                return parsedArrayNode;
+            }
+        }
+        return expectedJSONProperties;
     }
 
 }

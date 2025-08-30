@@ -51,6 +51,8 @@ package org.knime.hub.client.sdk;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
@@ -61,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.UnaryOperator;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
@@ -71,6 +74,7 @@ import org.knime.core.node.util.CheckUtils;
 import org.knime.core.util.auth.Authenticator;
 import org.knime.core.util.auth.CouldNotAuthorizeException;
 import org.knime.hub.client.sdk.ent.ProblemDescription;
+import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +96,7 @@ import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status.Family;
 
 /**
  * API client used to make REST requests.
@@ -163,15 +168,7 @@ public class ApiClient implements AutoCloseable {
         m_auth = auth;
 
         // Configure the object mapper for the JSON provider
-        m_objectMapper = new ObjectMapper();
-        m_objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        m_objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        m_objectMapper.configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false);
-        m_objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        m_objectMapper.enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING);
-        m_objectMapper.enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING);
-        m_objectMapper.registerModule(new JavaTimeModule());
-        m_objectMapper.registerModule(new Jdk8Module()); // Needed for Optional support.
+        m_objectMapper = createObjectMapper();
 
         // Set timeouts
         m_connectionTimeout = connectionTimeout;
@@ -190,10 +187,36 @@ public class ApiClient implements AutoCloseable {
         clientBuilder.property(HTTP_AUTOREDIRECT_PROP, true);
 
         // Set timeouts for connection
-        clientBuilder.property(HTTP_CONNECTION_TIMEOUT_PROP, m_connectionTimeout.toMillis());
-        clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
+        if (m_connectionTimeout != null) {
+            clientBuilder.property(HTTP_CONNECTION_TIMEOUT_PROP, m_connectionTimeout.toMillis());
+        }
+        if (m_readTimeout != null) {
+            clientBuilder.property(HTTP_RECEIVE_TIMEOUT_PROP, m_readTimeout.toMillis());
+        }
 
         m_httpClient = clientBuilder.build();
+    }
+
+    private static ObjectMapper createObjectMapper() {
+        // Configure the object mapper for the JSON provider
+        return new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+                .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+                .registerModule(new JavaTimeModule())
+                .registerModule(new Jdk8Module()); // Needed for Optional support.
+    }
+
+    /**
+     * Creates the {@link JacksonJsonProvider} which is needed for JSON de-serialization.
+     *
+     * @return {@link JacksonJsonProvider}
+     * @since 0.2
+     */
+    public static JacksonJsonProvider createJsonProvider() {
+        return new JacksonJsonProvider(createObjectMapper());
     }
 
     /**
@@ -409,7 +432,7 @@ public class ApiClient implements AutoCloseable {
         private @Owning Response getAPIResponse(final URI uri, final Method method, final Object requestBody)
             throws HubFailureIOException {
             // Build the invocation builder which makes the request
-            var builder = createInvocationBuilder(uri, requestBody);
+            var builder = createInvocationBuilder(uri, requestBody != null);
 
             // Execute the request and retrieve the response
             return executeHttpRequest(builder, method, requestBody);
@@ -425,9 +448,33 @@ public class ApiClient implements AutoCloseable {
          *
          * @throws HubFailureIOException
          */
-        private Invocation.Builder createInvocationBuilder(final URI uri, final Object body)
+        private Invocation.Builder createInvocationBuilder(final URI uri, final boolean hasBody)
             throws HubFailureIOException {
+            updateHeaderParameters();
 
+            CheckUtils.checkState(hasRequiredContentType(hasBody),
+                "Missing required content type for '%s'".formatted(uri));
+
+            WebTarget target = m_httpClient.target(uri);
+            if (m_requestReadTimeout != null) {
+                target.property(HTTP_RECEIVE_TIMEOUT_PROP, m_requestReadTimeout.toMillis());
+            }
+
+            final Invocation.Builder builder;
+            if (m_headerAccept == null) {
+                builder = target.request();
+            } else {
+                builder = target.request(m_headerAccept);
+            }
+
+            // Set headers and cookies
+            m_headerParams.forEach(builder::header);
+            m_cookieParams.forEach(builder::cookie);
+
+            return builder;
+        }
+
+        private void updateHeaderParameters() throws HubFailureIOException {
             try {
                 m_headerParams.put(HttpHeaders.AUTHORIZATION, m_auth.getAuthorization());
             } catch (final ProcessingException pe) {
@@ -445,33 +492,15 @@ public class ApiClient implements AutoCloseable {
             // which got possibly modified through the additional headers
             if (m_headerParams.containsKey(HttpHeaders.ACCEPT)) {
                 m_headerAccept = m_headerParams.get(HttpHeaders.ACCEPT);
+            } else if (m_headerAccept != null) {
+                m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
             }
 
             if (m_headerParams.containsKey(HttpHeaders.CONTENT_TYPE)) {
                 m_contentType = MediaType.valueOf(m_headerParams.get(HttpHeaders.CONTENT_TYPE));
+            } else if (m_contentType != null) {
+                m_headerParams.put(HttpHeaders.CONTENT_TYPE, m_contentType.toString());
             }
-
-            CheckUtils.checkState(hasRequiredContentType(body),
-                "Missing required content type for '%s'".formatted(uri));
-
-            WebTarget target = m_httpClient.target(uri);
-            if (m_requestReadTimeout != null) {
-                target.property(HTTP_RECEIVE_TIMEOUT_PROP, m_requestReadTimeout.toMillis());
-            }
-
-            final Invocation.Builder builder;
-            if (m_headerAccept == null) {
-                builder = target.request();
-            } else {
-                builder = target.request(m_headerAccept);
-                m_headerParams.put(HttpHeaders.ACCEPT, m_headerAccept);
-            }
-
-            // Set headers and cookies
-            m_headerParams.forEach(builder::header);
-            m_cookieParams.forEach(builder::cookie);
-
-            return builder;
         }
 
         /**
@@ -497,8 +526,8 @@ public class ApiClient implements AutoCloseable {
             }
         }
 
-        private boolean hasRequiredContentType(final Object body) {
-            return body == null || m_contentType != null;
+        private boolean hasRequiredContentType(final boolean hasBody) {
+            return !hasBody || m_contentType != null;
         }
 
         /**
@@ -531,24 +560,48 @@ public class ApiClient implements AutoCloseable {
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
                 final GenericType<R> returnType) throws HubFailureIOException {
-
-            // Retrieve the API response
-            final var t0 = System.currentTimeMillis();
             final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, body)) {
 
-                final var httpStatus = response.getStatusInfo();
-                final  Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+            final var t0 = System.currentTimeMillis();
+            try (final var response = getAPIResponse(uri, method, body)) {
+                return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> returnType == null ? Result.success(null)
                         : readEntity(method, uri, returnType, response);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
+                    default -> Result.failure(createFailureValue(response));
+                });
+            } finally {
+                logDuration(uri, t0, System.currentTimeMillis());
+            }
+        }
 
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
+        /**
+         * Invoke API by sending HTTP request with the given options and receive a raw {@link Response}.
+         *
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         * @param messageCallback   A callback to modify the error message, receiving the message from the response
+         *
+         * @return {@link Response}, with the responsibility to close it
+         *
+         * @throws HubFailureIOException if the request failed (non-2xx response code)
+         * @since 0.2
+         */
+        public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body,
+                final UnaryOperator<String> messageCallback) throws HubFailureIOException {
+            final var uri = buildUrl(path);
+
+            final var t0 = System.currentTimeMillis();
+            try {
+                final var response = getAPIResponse(uri, method, body);
+                if (response.getStatusInfo().getFamily() == Family.SUCCESSFUL) {
+                    return response;
+                }
+
+                try (response) {
+                    final var failureValue = createFailureValue(response);
+                    throw new HubFailureIOException(messageCallback.apply(failureValue.title()), failureValue);
+                }
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
@@ -570,23 +623,14 @@ public class ApiClient implements AutoCloseable {
          */
         public <R> ApiResponse<R> invokeAPI(final IPath path, final Method method, final Object body,
             final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
-            final var t0 = System.currentTimeMillis();
-
-            // Retrieve the API response
             final var uri = buildUrl(path);
+
+            final var t0 = System.currentTimeMillis();
             try (final var response = getAPIResponse(uri, method, body)) {
-
-                final var httpStatus = response.getStatusInfo();
-                final Result<R, FailureValue> result = switch (httpStatus.getFamily()) {
+                return toApiResponse(response, switch (response.getStatusInfo().getFamily()) {
                     case SUCCESSFUL -> downloadContent(method, uri, response, contentHandler);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
-
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
+                    default -> Result.failure(createFailureValue(response));
+                });
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
             }
@@ -611,26 +655,17 @@ public class ApiClient implements AutoCloseable {
                 m_headerParams.put(HttpHeaders.CONTENT_LENGTH, Long.toString(numBytes));
             }
 
-            // Retrieve the API response
-            final var t0 = System.currentTimeMillis();
-            final var uri = buildUrl(path);
-            try (final var response = getAPIResponse(uri, method, data)) {
-
-                final var httpStatus = response.getStatusInfo();
-                final Result<T, FailureValue> result = switch (httpStatus.getFamily()) {
-                    case SUCCESSFUL -> returnType == null ? Result.success(null)
-                        : readEntity(method, uri, returnType, response);
-                    case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
-                    case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
-                    case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
-                        .formatted(httpStatus.getStatusCode(), httpStatus.getReasonPhrase()));
-                };
-
-                return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(),
-                    httpStatus.getReasonPhrase(), Optional.ofNullable(response.getEntityTag()), result);
-            } finally {
-                logDuration(uri, t0, System.currentTimeMillis());
+            try (data) {
+                // request body is sent, we can close the input stream afterwards
+                return invokeAPI(path, method, data, returnType);
             }
+        }
+
+        private static <R> ApiResponse<R> toApiResponse(final @NotOwning Response response,
+            final Result<R, FailureValue> result) {
+            final var httpStatus = response.getStatusInfo();
+            return new ApiResponse<>(response.getHeaders(), httpStatus.getStatusCode(), httpStatus.getReasonPhrase(),
+                Optional.ofNullable(response.getEntityTag()), result);
         }
 
         private static <R> Result<R, FailureValue> readEntity(final Method method, final URI uri,
@@ -660,7 +695,18 @@ public class ApiClient implements AutoCloseable {
             }
         }
 
-        private static <R> Result<R, FailureValue> createFailureForResponse(final Response response) {
+        private static FailureValue createFailureValue(final Response response) {
+            final var status = response.getStatusInfo();
+            return switch (status.getFamily()) {
+                case SUCCESSFUL -> throw new IllegalStateException("Unexpected successful response");
+                case REDIRECTION -> createFailureForRedirect(response); // auto-redirect failed
+                case CLIENT_ERROR, SERVER_ERROR -> createFailureForResponse(response);
+                case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
+                    .formatted(status.getStatusCode(), status.getReasonPhrase()));
+            };
+        }
+
+        private static FailureValue createFailureForResponse(final Response response) {
             final var contentType = response.getMediaType();
             final var responseStatusInfo = response.getStatusInfo();
             final var statusCode = responseStatusInfo.getStatusCode();
@@ -668,17 +714,15 @@ public class ApiClient implements AutoCloseable {
                     && response.hasEntity()) {
                 try {
                     final var problemDesc = response.readEntity(ProblemDescription.class);
-                    return Result
-                        .failure(FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc));
+                    return FailureValue.fromRFC9457(FailureType.HUB_FAILURE_RESPONSE, statusCode, problemDesc);
                 } catch (final ProcessingException pe) {
                     LOGGER.atError() //
                         .setCause(pe) //
                         .addArgument(responseStatusInfo.getStatusCode()) //
                         .addArgument(responseStatusInfo.getReasonPhrase()) //
                         .log("Hub request failed: {} {}");
-                    return Result.failure(
-                        FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
-                            "Hub request failed: " + responseStatusInfo.getReasonPhrase()));
+                    return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
+                            "Hub request failed: " + responseStatusInfo.getReasonPhrase());
                 }
             }
 
@@ -692,11 +736,11 @@ public class ApiClient implements AutoCloseable {
                     .addArgument(message) //
                     .log("Hub request failed: {} {}");
             }
-            return Result.failure(
-                FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode, "Hub request failed: " + message));
+            return FailureValue.fromHTTP(FailureType.HUB_FAILURE_RESPONSE, statusCode,
+                "Hub request failed: " + message);
         }
 
-        private static <R> Result<R, FailureValue> createFailureForRedirect(final Response response) {
+        private static FailureValue createFailureForRedirect(final Response response) {
             // A redirect is not a failure response, so we don't expect `application/problem+json` here
             final String message;
             if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
@@ -706,7 +750,7 @@ public class ApiClient implements AutoCloseable {
                 message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
                     null, () -> response.getStatusInfo().getReasonPhrase());
             }
-            return Result.failure(FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message));
+            return FailureValue.fromHTTP(FailureType.REDIRECT_FAILED, response.getStatus(), message);
         }
 
         private static void logDuration(final URI uri, final long fromMillis, final long toMillis) {
@@ -718,6 +762,29 @@ public class ApiClient implements AutoCloseable {
                 .addArgument(() -> "%.3f".formatted((toMillis - fromMillis) / 1000.0)) //
                 .setMessage("Request '{}' took {}s") //
                 .log();
+        }
+
+        /**
+         * Creates an HTTP URL connection given the HTTP URL sub-path.
+         *
+         * @param httpMethod The HTTP request method
+         * @param path The sub-path of the HTTP URL
+         * @param chunkSize The chunk size for the upload connection
+         * @return The {@link HttpURLConnection}
+         *
+         * @throws IOException If an I/O error occurred during opening of the connection
+         * @since 0.2
+         */
+        public HttpURLConnection createAPIURLConnection(final String httpMethod,
+            final IPath path, final int chunkSize) throws IOException {
+            updateHeaderParameters();
+            try {
+                return URLConnectionUploader.prepareConnection(
+                    buildUrl(path).toURL(), httpMethod, m_headerParams, chunkSize,
+                    m_connectionTimeout, m_readTimeout);
+            } catch (MalformedURLException ex) {
+                throw new IllegalStateException("Unexpected URL syntax violation", ex);
+            }
         }
 
     }
@@ -754,18 +821,20 @@ public class ApiClient implements AutoCloseable {
      * Retrieves the connection timeout duration.
      *
      * @return {@link Duration} connection timeout
+     * @since 0.2
      */
-    public Duration getConnectTimeout() {
-        return m_connectionTimeout;
+    public Optional<Duration> getConnectTimeout() {
+        return Optional.ofNullable(m_connectionTimeout);
     }
 
     /**
      * Retrieves the read timeout duration
      *
      * @return {@link Duration} read timeout
+     * @since 0.2
      */
-    public Duration getReadTimeout() {
-        return m_readTimeout;
+    public Optional<Duration> getReadTimeout() {
+        return Optional.ofNullable(m_readTimeout);
     }
 
     /**

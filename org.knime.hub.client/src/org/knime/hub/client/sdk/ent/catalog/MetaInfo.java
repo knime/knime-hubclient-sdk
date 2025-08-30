@@ -50,13 +50,12 @@ package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Objects;
 
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the metaInfo of a {@link RepositoryItem}.
@@ -82,7 +81,7 @@ public final class MetaInfo {
      * @return space
      */
     @JsonProperty(JSON_PROPERTY_SPACE)
-    @JsonInclude(value = JsonInclude.Include.USE_DEFAULTS)
+    @JsonInclude(value = JsonInclude.Include.ALWAYS)
     public SpacePermissionAttributes getSpace() {
         return m_space;
     }
@@ -106,10 +105,6 @@ public final class MetaInfo {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

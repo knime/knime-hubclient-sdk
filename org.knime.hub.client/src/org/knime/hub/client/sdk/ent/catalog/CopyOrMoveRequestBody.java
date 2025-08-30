@@ -52,13 +52,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.catalog.SpaceRequestBody.SpaceRequestBodyBuilder;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * Request body for copy or move request.
@@ -80,7 +79,7 @@ public final class CopyOrMoveRequestBody {
 
     @JsonCreator
     private CopyOrMoveRequestBody(
-            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+            @JsonProperty(value = JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
             @JsonProperty(value = JSON_PROPERTY_FORCE) final boolean force,
             @JsonProperty(value = JSON_PROPERTY_IF_TARGET_MATCH) final String ifTargetMatch) {
         this.m_canonicalPath = canonicalPath;
@@ -105,7 +104,7 @@ public final class CopyOrMoveRequestBody {
      * @return tags
      */
     @JsonProperty(JSON_PROPERTY_FORCE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public boolean isForce() {
         return m_force;
     }
@@ -205,10 +204,6 @@ public final class CopyOrMoveRequestBody {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

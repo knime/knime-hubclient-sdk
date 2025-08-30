@@ -48,17 +48,18 @@
 
 package org.knime.hub.client.sdk.ent.catalog;
 
+import java.time.ZonedDateTime;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.Control;
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing a workflow
@@ -72,18 +73,22 @@ public final class Workflow extends RepositoryItem implements Sized {
     static final String TYPE = "Workflow";
 
     private static final String JSON_PROPERTY_SIZE = "size";
-    private final long m_size;
+    private final Long m_size;
 
     @JsonCreator
     private Workflow(@JsonProperty(value = RepositoryItem.JSON_PROPERTY_PATH, required = true) final String path,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH, required = true) final String canonicalPath,
-        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CANONICAL_PATH) final String canonicalPath,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_ID) final String id,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER, required = true) final String owner,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_CREATED_ON) final ZonedDateTime createdOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DESCRIPTION) final String description,
+        @JsonProperty(value = RepositoryItem.JSON_PROPERTY_LAST_UPLOADED_ON) final ZonedDateTime lastUploadedOn,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_DETAILS) final MetaInfo details,
         @JsonProperty(value = RepositoryItem.JSON_PROPERTY_MASON_CONTROLS) final Map<String, Control> masonControls,
-        @JsonProperty(value = Workflow.JSON_PROPERTY_SIZE, required = true) final long size) {
-        super(path, canonicalPath, id, owner, description, details, masonControls);
+        @JsonProperty(value = Workflow.JSON_PROPERTY_SIZE) final Long size) {
+        super(path, canonicalPath, id, owner, ownerAccountId,
+            createdOn, description, lastUploadedOn, details, masonControls);
         m_size = size;
     }
 
@@ -91,12 +96,13 @@ public final class Workflow extends RepositoryItem implements Sized {
      * Retrieves the compressed workflows file size in bytes.
      *
      * @return size
+     * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_SIZE)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_ABSENT)
     @Override
-    public long getSize() {
-        return m_size;
+    public Optional<Long> getSize() {
+        return Optional.ofNullable(m_size);
     }
 
     @Override
@@ -123,10 +129,6 @@ public final class Workflow extends RepositoryItem implements Sized {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

@@ -184,6 +184,20 @@
             </message_arguments>
         </filter>
     </resource>
+    <resource path="src/org/knime/hub/client/sdk/ApiClient.java" type="org.knime.hub.client.sdk.ApiClient">
+        <filter comment="Changed return type to optional" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ApiClient"/>
+                <message_argument value="getConnectTimeout()"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Changed return type to optional" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ApiClient"/>
+                <message_argument value="getReadTimeout()"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/org/knime/hub/client/sdk/api/CatalogServiceClient.java" type="org.knime.hub.client.sdk.api.CatalogServiceClient">
         <filter comment="Moved entity classes to dedicated packages" id="338792546">
             <message_arguments>
@@ -201,6 +215,86 @@
             <message_arguments>
                 <message_argument value="org.knime.hub.client.sdk.api.CatalogServiceClient"/>
                 <message_argument value="initiateUpload(String, UploadManifest, Duration, Map&lt;String,String&gt;)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/Component.java" type="org.knime.hub.client.sdk.ent.catalog.Component">
+        <filter comment="Change return type from long to Long to handle special case for server" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.Component"/>
+                <message_argument value="getSize()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/Data.java" type="org.knime.hub.client.sdk.ent.catalog.Data">
+        <filter comment="Change return type from long to Long to handle special case from server" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.Data"/>
+                <message_argument value="getSize()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/RepositoryItem.java" type="org.knime.hub.client.sdk.ent.catalog.RepositoryItem">
+        <filter comment="Added field for file handling use case" id="336658481">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.RepositoryItem"/>
+                <message_argument value="JSON_PROPERTY_CREATED_ON"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Added field for file handling use case" id="336658481">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.RepositoryItem"/>
+                <message_argument value="JSON_PROPERTY_LAST_UPLOADED_ON"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Added field for file handling use case" id="336658481">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.RepositoryItem"/>
+                <message_argument value="JSON_PROPERTY_OWNER_ACCOUNT_ID"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Added lastUploadedOn, createdOn and ownerAccountId properties" id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.RepositoryItem"/>
+                <message_argument value="RepositoryItem(String, String, String, String, String, MetaInfo, Map&lt;String,Control&gt;)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/Sized.java" type="org.knime.hub.client.sdk.ent.catalog.Sized">
+        <filter comment="Changed return type from long to Long to handle special server case" id="403804204">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.Sized"/>
+                <message_argument value="getSize()"/>
+            </message_arguments>
+        </filter>
+        <filter comment="Changed return type from long to Long to handle special server case" id="405901410">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.Sized"/>
+                <message_argument value="getSize()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/SpaceRenameRequestBody.java" type="org.knime.hub.client.sdk.ent.catalog.SpaceRenameRequestBody">
+        <filter id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.SpaceRenameRequestBody"/>
+                <message_argument value="isForce()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/Workflow.java" type="org.knime.hub.client.sdk.ent.catalog.Workflow">
+        <filter comment="Changed return type from long to Long to handle special server case" id="338792546">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.Workflow"/>
+                <message_argument value="getSize()"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/knime/hub/client/sdk/ent/catalog/WorkflowGroup.java" type="org.knime.hub.client.sdk.ent.catalog.WorkflowGroup">
+        <filter comment="Added ownerAccountId, lastUploadedOn and createdOn fields to constructor" id="338722907">
+            <message_arguments>
+                <message_argument value="org.knime.hub.client.sdk.ent.catalog.WorkflowGroup"/>
+                <message_argument value="WorkflowGroup(String, String, String, String, String, MetaInfo, Map&lt;String,Control&gt;, List&lt;RepositoryItem&gt;)"/>
             </message_arguments>
         </filter>
     </resource>

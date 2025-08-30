@@ -52,12 +52,11 @@ import java.net.URL;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing OAuth authentication information
@@ -78,9 +77,9 @@ public final class OAuthAuthenticationInformation {
 
     @JsonCreator
     private OAuthAuthenticationInformation(
-        @JsonProperty(value = JSON_PROPERTY_TOKEN_ENDPOINT, required = false) final URL tokenEndpoint,
-        @JsonProperty(value = JSON_PROPERTY_CLIENT_ID, required = false) final String clientId,
-        @JsonProperty(value = JSON_PROPERTY_AUTHORIZATION_ENDPOINT, required = false) final URL authorizationEndpoint) {
+        @JsonProperty(value = JSON_PROPERTY_TOKEN_ENDPOINT) final URL tokenEndpoint,
+        @JsonProperty(value = JSON_PROPERTY_CLIENT_ID) final String clientId,
+        @JsonProperty(value = JSON_PROPERTY_AUTHORIZATION_ENDPOINT) final URL authorizationEndpoint) {
         m_tokenEndpoint = tokenEndpoint;
         m_clientId = clientId;
         m_authorizationEndpoint = authorizationEndpoint;
@@ -140,11 +139,7 @@ public final class OAuthAuthenticationInformation {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 
 }

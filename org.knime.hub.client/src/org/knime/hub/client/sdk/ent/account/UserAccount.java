@@ -50,14 +50,14 @@ package org.knime.hub.client.sdk.ent.account;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the user account identity.
@@ -109,9 +109,9 @@ public final class UserAccount extends AccountIdentity {
      * @return teams
      */
     @JsonProperty(JSON_PROPERTY_TEAMS)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_EMPTY)
     public List<Team> getTeams() {
-        return m_teams;
+        return Optional.ofNullable(m_teams).orElse(List.of());
     }
 
     @Override
@@ -141,11 +141,7 @@ public final class UserAccount extends AccountIdentity {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 
 }

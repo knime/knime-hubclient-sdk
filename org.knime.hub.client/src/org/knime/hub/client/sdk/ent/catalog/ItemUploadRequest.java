@@ -50,13 +50,12 @@ package org.knime.hub.client.sdk.ent.catalog;
 
 import java.util.Objects;
 
-import org.knime.hub.client.sdk.ent.util.ObjectMapperUtil;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
  * POJO representing the request to upload a single item.
@@ -104,7 +103,7 @@ public final class ItemUploadRequest {
      * @return initialPartCount
      */
     @JsonProperty(JSON_PROPERTY_INITIAL_PART_COUNT)
-    @JsonInclude(value = JsonInclude.Include.ALWAYS)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
     public Integer getInitialPartCount() {
         return m_initialPartCount;
     }
@@ -129,10 +128,6 @@ public final class ItemUploadRequest {
 
     @Override
     public String toString() {
-        try {
-            return ObjectMapperUtil.getObjectMapper().writeValueAsString(this);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize to JSON: ", e);
-        }
+        return EntityUtil.toString(this);
     }
 }

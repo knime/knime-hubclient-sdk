@@ -65,6 +65,8 @@ public final class HubClientAPI implements AutoCloseable {
 
     private final AccountServiceClient m_accountService;
 
+    private final ExecutionServiceClient m_executionService;
+
     /**
      * Create the {@link HubClientAPI} given an {@link ApiClient}
      *
@@ -74,6 +76,7 @@ public final class HubClientAPI implements AutoCloseable {
         m_apiClient = apiClient;
         m_catalog = new CatalogServiceClient(m_apiClient);
         m_accountService = new AccountServiceClient(m_apiClient);
+        m_executionService = new ExecutionServiceClient(apiClient);
     }
 
     /**
@@ -86,7 +89,7 @@ public final class HubClientAPI implements AutoCloseable {
     }
 
     /**
-     * Retrieves the catalog client
+     * Retrieves the catalog client.
      *
      * @return {@link CatalogServiceClient}
      */
@@ -95,12 +98,22 @@ public final class HubClientAPI implements AutoCloseable {
     }
 
     /**
-     * Retrieves the account service client
+     * Retrieves the account service client.
      *
      * @return {@link AccountServiceClient}
      */
     public AccountServiceClient account() {
         return m_accountService;
+    }
+
+    /**
+     * Retrieves the execution service client.
+     *
+     * @return {@link ExecutionServiceClient}
+     * @since 0.2
+     */
+    public ExecutionServiceClient execution() {
+        return m_executionService;
     }
 
     /**
