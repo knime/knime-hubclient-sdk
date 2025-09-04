@@ -115,10 +115,10 @@ class CatalogServiceEntityTest extends AbstractTest {
     private static final String EXPECTED_OWNER = "jdoe";
     private static final String EXPECTED_OWNER_ACCOUNT_ID = "account:team:a885bb42-d808-4557-9a7f-9f10c5777739";
     private static final ZonedDateTime EXPECTED_CREATED_ON =
-            ZonedDateTime.parse("2025-06-24T08:04:14+00:00").withZoneSameInstant(ZoneId.of("UTC"));
+            ZonedDateTime.parse("2025-06-24T08:04:14+00:00").withZoneSameInstant(ZoneId.of("UTC").normalized());
     private static final String EXPECTED_DESCRIPTION = "This is a description";
     private static final ZonedDateTime EXPECTED_LAST_UPLOADED_ON =
-            ZonedDateTime.parse("2025-06-24T08:04:16+00:00").withZoneSameInstant(ZoneId.of("UTC"));
+            ZonedDateTime.parse("2025-06-24T08:04:16+00:00").withZoneSameInstant(ZoneId.of("UTC").normalized());
     private static final long EXPECTED_SIZE = 1337L;
     private static final long EXPECTED_LARGE_SIZE = 5000000000L;
 
