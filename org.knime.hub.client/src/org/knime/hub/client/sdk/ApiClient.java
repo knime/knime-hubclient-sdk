@@ -63,6 +63,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.UnaryOperator;
 
 import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.core.runtime.IPath;
@@ -95,6 +96,7 @@ import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status.Family;
 
 /**
  * API client used to make REST requests.
@@ -583,7 +585,7 @@ public class ApiClient implements AutoCloseable {
          * @return {@link Response}, with the responsibility to close it
          *
          * @throws HubFailureIOException if the request failed
-         * @since 0.2
+         * @since 0.3
          */
         public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body)
             throws HubFailureIOException {
@@ -593,6 +595,35 @@ public class ApiClient implements AutoCloseable {
                 return getAPIResponse(uri, method, body);
             } finally {
                 logDuration(uri, t0, System.currentTimeMillis());
+            }
+        }
+
+        /**
+         * Invoke API by sending HTTP request with the given options and receive a raw {@link Response}.
+         *
+         * @param path              The sub-path of the HTTP URL.
+         * @param method            The request method, one of "GET", "POST", "PUT" and "DELETE".
+         * @param body              The request body object - if it is not binary, otherwise null.
+         * @param messageCallback   A callback to modify the error message, receiving the message from the response
+         *
+         * @return {@link Response}, with the responsibility to close it
+         *
+         * @throws HubFailureIOException if the request failed (non-2xx response code)
+         * @since 0.2
+         * @deprecated use {@link #invokeAPIRaw(IPath, Method, Object)} and apply custom handling of failures
+         */
+        @Deprecated(since = "0.3", forRemoval = true)
+        public @Owning Response invokeAPIRaw(final IPath path, final Method method, final Object body,
+                final UnaryOperator<String> messageCallback) throws HubFailureIOException {
+            final var response = invokeAPIRaw(path, method, body);
+            if (response.getStatusInfo().getFamily() == Family.SUCCESSFUL) {
+                return response;
+            }
+
+            try (response) {
+                final var problemDesc = ResponseUtils.toProblemDescription(response);
+                throw new HubFailureIOException(messageCallback.apply(problemDesc.getTitle()), FailureValue.fromRFC9457(
+                    FailureType.HUB_FAILURE_RESPONSE, response.getStatus(), response.getHeaders(), problemDesc));
             }
         }
 

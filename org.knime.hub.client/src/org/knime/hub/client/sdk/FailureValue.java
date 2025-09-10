@@ -73,13 +73,44 @@ import jakarta.ws.rs.client.ResponseProcessingException;
  * @param details list of details (user-oriented explanation/hint)
  * @param cause throwable cause of the failure, {@code null} if not applicable
  */
-public record FailureValue ( //
-    FailureType type,
-    int status,
-    Map<String, List<Object>> headers,
+public record FailureValue( //
+    FailureType type, //
+    int status, //
+    Map<String, List<Object>> headers, //
     String title, //
     List<String> details, //
     Throwable cause) {
+
+    /**
+     * Constructs a failure value without headers.
+     *
+     * @param type failure type
+     * @param status HTTP status, {@code -1} if not applicable
+     * @param title error title for the failure category
+     * @param details list of details (user-oriented explanation/hint)
+     * @param cause throwable cause of the failure, {@code null} if not applicable
+     * @deprecated use {@link #FailureValue(FailureType, int, Map, String, List, Throwable)} instead
+     */
+    @Deprecated(since = "0.3", forRemoval = true)
+    public FailureValue(final FailureType type, final int status, final String title, final List<String> details,
+        final Throwable cause) {
+        this(type, status, Map.of(), title, details, cause);
+    }
+
+    /**
+     * Creates a failure value from an {@code application/problem+json} Hub response.
+     *
+     * @param type failure type
+     * @param status HTTP status
+     * @param problem problem description
+     * @return failure value
+     * @since 0.1
+     * @deprecated use {@link #fromRFC9457(FailureType, int, Map, ProblemDescription)} instead
+     */
+    @Deprecated(since = "0.3", forRemoval = true)
+    public static FailureValue fromRFC9457(final FailureType type, final int status, final ProblemDescription problem) {
+        return new FailureValue(type, status, Map.of(), problem.getTitle(), problem.getDetails(), null);
+    }
 
     /**
      * Creates a failure value from an {@code application/problem+json} Hub response.
@@ -89,7 +120,7 @@ public record FailureValue ( //
      * @param headers response headers
      * @param problem problem description
      * @return failure value
-     * @since 0.2
+     * @since 0.3
      */
     public static FailureValue fromRFC9457(final FailureType type, final int status,
         final Map<String, List<Object>> headers, final ProblemDescription problem) {
@@ -116,7 +147,7 @@ public record FailureValue ( //
      * @param title error title for the failure category
      * @param details list of details (user-oriented explanation/hint)
      * @return failure value
-     * @since 0.2
+     * @since 0.3
      */
     public static FailureValue withDetails(final FailureType type, final String title, final String... details) {
         return new FailureValue(type, -1, Map.of(), title, Arrays.asList(details), null);
@@ -126,10 +157,25 @@ public record FailureValue ( //
      * Creates a failure value for an unexpected {@link Throwable}.
      *
      * @param title problem title
+     * @param thrw throwable cause
+     * @return failure value
+     * @since 0.1
+     * @deprecated use {@link #fromUnexpectedThrowable(String, List, Throwable)} instead
+     */
+    @Deprecated(since = "0.3", forRemoval = true)
+    public static FailureValue fromUnexpectedThrowable(final String title, final Throwable thrw) {
+        return fromUnexpectedThrowable(title, List.of(), thrw);
+    }
+
+
+    /**
+     * Creates a failure value for an unexpected {@link Throwable}.
+     *
+     * @param title problem title
      * @param details list of details (user-oriented explanation/hint)
      * @param thrw throwable cause
      * @return failure value
-     * @since 0.2
+     * @since 0.3
      */
     public static FailureValue fromUnexpectedThrowable(final String title, final List<String> details,
         final Throwable thrw) {
@@ -141,10 +187,25 @@ public record FailureValue ( //
      *
      * @param type failure type
      * @param title problem title
+     * @param thrw throwable cause
+     * @return failure value
+     * @since 0.1
+     * @deprecated use {@link #fromThrowable(FailureType, String, List, Throwable)} instead
+     */
+    @Deprecated(since = "0.3", forRemoval = true)
+    public static FailureValue fromThrowable(final FailureType type, final String title, final Throwable thrw) {
+        return fromThrowable(type, title, List.of(), thrw);
+    }
+
+    /**
+     * Creates a failure value for an expected {@link Throwable}.
+     *
+     * @param type failure type
+     * @param title problem title
      * @param details list of details (user-oriented explanation/hint)
      * @param thrw throwable cause
      * @return failure value
-     * @since 0.2
+     * @since 0.3
      */
     public static FailureValue fromThrowable(final FailureType type, final String title, final List<String> details,
         final Throwable thrw) {
@@ -206,7 +267,7 @@ public record FailureValue ( //
      * @param title failure title
      * @param e processing exception
      * @return failure value
-     * @since 0.2
+     * @since 0.3
      */
     public static FailureValue fromProcessingException(final String title, final ProcessingException e) {
         final var cause = e.getCause();

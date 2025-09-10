@@ -69,18 +69,18 @@ public enum FailureType {
     DOWNLOAD_STREAM_OPEN_FAILED,
     /**
      * The download could not be initiated.
-     * @since 0.2
+     * @since 0.3
      */
     DOWNLOAD_PREPARATION_FAILED,
     /**
      * An item could not be downloaded from Catalog.
-     * @since 0.2
+     * @since 0.3
      */
     DOWNLOAD_ITEM_FAILED,
 
     /**
      * Upload could not be initiated.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_INITIATION_FAILED,
     /** A part of the multi-part upload could not be uploaded. */
@@ -99,27 +99,27 @@ public enum FailureType {
     PART_UPLOAD_EXHAUSTED_RETRIES,
     /**
      * The upload connection could not be created.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_CONNECTION_CREATION_FAILED,
     /**
      * The upload stream could not be created.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_STREAM_CREATION_FAILED,
     /**
      * The Hub call to report the upload as finished failed.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_FINISHED_CALL_FAILED,
     /**
      * The Hub failed to return an upload part URL.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_PART_REQUEST_FAILED,
     /**
      * The Hub returned a failure when trying to finish the upload.
-     * @since 0.2
+     * @since 0.3
      */
     UPLOAD_FINISHING_FAILED,
 
@@ -135,7 +135,7 @@ public enum FailureType {
     UNEXPECTED_ERROR,
     /**
      * Hub returned a failure result while polling.
-     * @since 0.2
+     * @since 0.3
      */
     POLLING_CALL_FAILURE
 }

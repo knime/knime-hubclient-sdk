@@ -101,7 +101,7 @@ public final class ProblemDescription {
      * @param instance the instance
      * @param details the details
      * @param code the code
-     * @since 0.2
+     * @since 0.3
      */
     @JsonCreator
     public ProblemDescription(
@@ -113,6 +113,28 @@ public final class ProblemDescription {
             @JsonProperty(value = JSON_PROPERTY_CODE, required = false) final String code) {
         m_type = type;
         m_status = status;
+        m_title = title;
+        m_instance = instance;
+        m_details = details;
+        m_code = code;
+    }
+
+    /**
+     * Problem JSON error according to standard RFC9457.
+     *
+     * @param type the type
+     * @param status the status
+     * @param title the title
+     * @param instance the instance
+     * @param details the details
+     * @param code the code
+     * @deprecated use {@link #ProblemDescription(String, Integer, String, String, List, String)} instead
+     */
+    @Deprecated(since = "0.3", forRemoval = true)
+    public ProblemDescription(final String type, final String status, final String title, final String instance,
+        final List<String> details, final String code) {
+        m_type = type;
+        m_status = Integer.parseInt(status);
         m_title = title;
         m_instance = instance;
         m_details = details;

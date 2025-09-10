@@ -10,17 +10,17 @@
 
 	<groupId>org.knime</groupId>
 	<artifactId>knime-hubclient-sdk</artifactId>
-    <version>${revision}${changelist}</version>
+	<version>${revision}${changelist}</version>
 	<packaging>pom</packaging>
 
-    <properties>
-        <revision>0.2.0</revision>
-        <changelist>-SNAPSHOT</changelist>
-        <feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
-        <feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
+	<properties>
+		<revision>0.3.0</revision>
+		<changelist>-SNAPSHOT</changelist>
+		<feature-branch-extension.branchListProperty>git.branch</feature-branch-extension.branchListProperty>
+		<feature-branch-extension.appendArtifactoryProperties>false</feature-branch-extension.appendArtifactoryProperties>
 		<changelog.baseref>2bfb8979f4ec85bdb286cf44d894dc3282767d9a</changelog.baseref>
 		<knime.sonar-env>Sonarcloud</knime.sonar-env>
-    </properties>
+	</properties>
 
 	<modules>
 		<module>org.knime.hub.client</module>
