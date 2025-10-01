@@ -73,6 +73,7 @@ public final class AccountServiceClient {
     /* API Paths */
     private static final String BILLBOARD_API_PATH = "knime/rest";
     private static final String ACCOUNTS_API_PATH = "accounts";
+    private static final String HUB_GLOBAL_API_PATH = "hub:global";
 
     /* Path pieces */
     private static final String PATH_PIECE_IDENTITY = "identity";
@@ -140,7 +141,7 @@ public final class AccountServiceClient {
      */
     public ApiResponse<HubInstallationAccount> getKNIMEHubInstallationInformation(
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
-        final var requestPath = IPath.forPosix(ACCOUNTS_API_PATH).append(PATH_PIECE_IDENTITY);
+        final var requestPath = IPath.forPosix(ACCOUNTS_API_PATH).append(HUB_GLOBAL_API_PATH);
 
         return m_apiClient.createApiRequest() //
                 .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
