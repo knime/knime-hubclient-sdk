@@ -481,7 +481,8 @@ public class ApiClient implements AutoCloseable {
                 throw new HubFailureIOException(
                     FailureValue.fromProcessingException("Failed to authorize Hub request", pe));
             } catch (CouldNotAuthorizeException cnae) {
-                throw new HubFailureIOException(FailureValue.fromAuthFailure(cnae));
+                // throw new HubFailureIOException(FailureValue.fromAuthFailure(cnae));
+                LOGGER.debug("Could not authorize Hub request", cnae);
             }
 
             m_headerParams.remove(HttpHeaders.USER_AGENT);
