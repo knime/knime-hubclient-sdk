@@ -173,6 +173,10 @@ abstract class ChunkingOutputStream extends OutputStream {
     public void close() throws IOException {
         if (m_chunkOutputStream != null) {
             finishChunk(m_chunkOutputStream);
+        } else if (m_currentChunkNo == 0) {
+            // special case: no data written at all, but we still need to create an empty chunk
+            ensureChunkOpen();
+            finishChunk(m_chunkOutputStream);
         }
         m_currentChunkNo = -1;
     }
