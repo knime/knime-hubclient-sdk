@@ -99,6 +99,8 @@ import jakarta.ws.rs.core.Response.Status;
  */
 public final class HubUploader extends AbstractHubTransfer {
 
+    private static final String DISABLE_ARTIFACT_UPLOAD_PROPERTY = "knime.hub.client.disableArtifactUpload";
+
     /** Maximum number of pre-fetched upload URLs per upload. */
     static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
@@ -209,6 +211,9 @@ public final class HubUploader extends AbstractHubTransfer {
      * @return <code>true</code> if asynchronous upload flow is supported
      */
     public static boolean supportsAsyncUpload(final Map<String, Control> spaceParentControls) {
+        if (Boolean.parseBoolean(System.getProperty(DISABLE_ARTIFACT_UPLOAD_PROPERTY))) {
+            return false;
+        }
         return spaceParentControls.containsKey(INITIATE_UPLOAD);
     }
 
