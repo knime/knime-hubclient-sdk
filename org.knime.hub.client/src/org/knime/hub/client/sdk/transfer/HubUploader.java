@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -107,10 +108,6 @@ public final class HubUploader extends AbstractHubTransfer {
     static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HubUploader.class);
-
-    // used for legacy upload of workflow-likes
-    private static final MediaType KNIME_WORKFLOW_LIKE_MEDIATYPE =
-        new MediaType("application", "vnd.knime.workflow+zip");
 
     /**
      * Result of a check for collisions of a potential upload.
@@ -631,45 +628,7 @@ public final class HubUploader extends AbstractHubTransfer {
         throws CancelationException {
 
         if (useLegacyUpload) {
-            try {
-                final var tempFile = tempFileSupplier.createTempFile("KNIMEWorkflowUploadLegacy", ".knwf.tmp", true);
-                try {
-                    final var exportProgress = splitter.createLeafChild("Exporting workflow to temporary area", 0.2);
-                    long bytesWritten = 0L;
-                    try (final var out = new CountingOutputStream(new FileOutputStream(tempFile.toFile()))) {
-                        exporter.exportInto(resources, out, progress -> {
-                            splitter.checkCanceled();
-                            exportProgress.setProgress(progress);
-                        });
-                        bytesWritten = out.getCount();
-                    }
-                    final var uploadProgress = splitter.createLeafChild("Uploading workflow", 0.8);
-                    try (final var fromTemp = Files.newInputStream(tempFile);
-                            final var dataToTransfer = new MonitoringInputStream(fromTemp) {
-
-                        @Override
-                        protected boolean isCanceled() {
-                            // TODO Community Hub upload limit?
-                            return false;
-                        }
-
-                        @Override
-                        protected void addBytesRead(int numBytes) {
-                            uploadProgress.addTransferredBytes(numBytes);
-                        }
-                    }) {
-                        m_catalogClient.uploadItemByPath(IPath.forPosix(path), KNIME_WORKFLOW_LIKE_MEDIATYPE, Map.of(),
-                            dataToTransfer, bytesWritten);
-                    }
-                    return Result.success(null);
-                } finally {
-                    FileUtils.deleteQuietly(tempFile.toFile());
-                }
-            } catch (final IOException ex) {
-                return Result.failure(
-                    FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED, "Failed to upload workflow",
-                        List.of("Upload of '%s' failed: %s".formatted(path, ex.getMessage())), ex));
-            }
+            return uploadWorkflowLikeLegacy(path, exporter, tempFileSupplier, resources, splitter);
         }
 
         // remember all temp files so they can be deleted cleaned up `finally` if something went wrong
@@ -706,6 +665,77 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
+    private Result<Void, FailureValue> uploadWorkflowLikeLegacy(final String path,
+        final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
+        final ResourcesToCopy resources, final BranchingExecMonitor splitter) throws CancelationException {
+        try {
+            final var tempFile = tempFileSupplier.createTempFile("KNIMEWorkflowUploadLegacy", ".knwf.tmp", true);
+            try {
+                final var exportProgress = splitter.createLeafChild("Exporting workflow to temporary area", 0.2);
+                var bytesWritten = 0L;
+                try (final var out = new CountingOutputStream(new FileOutputStream(tempFile.toFile()))) {
+                    exporter.exportInto(resources, out, progress -> {
+                        splitter.checkCanceled();
+                        exportProgress.setProgress(progress);
+                    });
+                    bytesWritten = out.getCount();
+                }
+                final var uploadProgress = splitter.createLeafChild("Uploading workflow", 0.8);
+                try (final var fromTemp = Files.newInputStream(tempFile);
+                        final var dataToTransfer = new MonitoringInputStream(fromTemp) {
+
+                            @Override
+                            protected boolean isCanceled() {
+                                // Community Hub supports the artifact upload flow, so we do not need to check here
+                                return false;
+                            }
+
+                            @Override
+                            protected void addBytesRead(int numBytes) {
+                                uploadProgress.addTransferredBytes(numBytes);
+                            }
+                        }) {
+                    m_catalogClient.uploadItemByPath(IPath.forPosix(path),
+                        AbstractHubTransfer.KNIME_WORKFLOW_TYPE_ZIP, Map.of(), dataToTransfer, bytesWritten);
+                }
+                return Result.success(null);
+            } finally {
+                FileUtils.deleteQuietly(tempFile.toFile());
+            }
+        } catch (final IOException ex) {
+            return Result.failure(
+                FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED, "Failed to upload workflow",
+                    List.of("Upload of '%s' failed: %s".formatted(path, ex.getMessage())), ex));
+        }
+    }
+
+    private Result<Void, FailureValue> uploadDataFileLegacy(final String path, final Path dataFile, final long numBytes,
+        final BranchingExecMonitor splitter) {
+        final var uploadProgress = splitter.createLeafChild("Uploading data file", 1.0);
+        try (final var fis = Files.newInputStream(dataFile, StandardOpenOption.READ);
+                final var dataToTransfer = new MonitoringInputStream(fis) {
+
+                    @Override
+                    protected boolean isCanceled() {
+                        // Community Hub supports the artifact upload flow, so we do not need to check here
+                        return false;
+                    }
+
+                    @Override
+                    protected void addBytesRead(int nb) {
+                        uploadProgress.addTransferredBytes(nb);
+                    }
+                }) {
+            m_catalogClient.uploadItemByPath(IPath.forPosix(path), MediaType.APPLICATION_OCTET_STREAM_TYPE, Map.of(),
+                fis, numBytes);
+        } catch (final IOException ex) {
+            return Result
+                .failure(FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED, "Failed to upload workflow",
+                    List.of("Upload of '%s' failed: %s".formatted(path, ex.getMessage())), ex));
+        }
+        return Result.success(null);
+    }
+
     private Result<Void, FailureValue> uploadDataFile(final boolean useLegacyUpload, final String path,
         final Path dataFile, final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
         throws CancelationException {
@@ -716,6 +746,10 @@ public final class HubUploader extends AbstractHubTransfer {
         } catch (final IOException ioe) {
             return Result.failure(FailureValue.fromUnexpectedThrowable("Failed to upload file",
                 List.of("Could not read file size: " + ioe.getMessage()), ioe));
+        }
+
+        if (useLegacyUpload) {
+            return uploadDataFileLegacy(path, dataFile, numBytes, splitter);
         }
 
         final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads = new ArrayDeque<>();
