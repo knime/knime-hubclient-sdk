@@ -321,9 +321,9 @@ public abstract sealed class RepositoryItem permits Component, Data, Workflow, W
     }
 
     /**
-     * Retrieves the items creation time stamp.
+     * Retrieves the item's owner account ID if it is known.
      *
-     * @return createdOn
+     * @return owner account ID
      * @since 0.2
      */
     @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID)

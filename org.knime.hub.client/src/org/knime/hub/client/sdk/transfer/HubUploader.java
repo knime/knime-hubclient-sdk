@@ -20,6 +20,7 @@
  */
 package org.knime.hub.client.sdk.transfer;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,6 +86,7 @@ import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.io.CountingOutputStream;
 import com.google.common.util.concurrent.AtomicDouble;
 
 import jakarta.ws.rs.core.EntityTag;
@@ -105,6 +107,10 @@ public final class HubUploader extends AbstractHubTransfer {
     static final int MAX_NUM_PREFETCHED_UPLOAD_PARTS = 500;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HubUploader.class);
+
+    // used for legacy upload of workflow-likes
+    private static final MediaType KNIME_WORKFLOW_LIKE_MEDIATYPE =
+        new MediaType("application", "vnd.knime.workflow+zip");
 
     /**
      * Result of a check for collisions of a potential upload.
@@ -131,8 +137,23 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param path path of the item inside the surrounding workflow group
      * @param localItem type and location of the local item to upload
      * @param uploadInstructions upload instructions
+     * @param legacyUpload whether the upload should use the legacy upload flow for compatibility
      */
-    public record ItemToUpload(String path, LocalItem localItem, ItemUploadInstructions uploadInstructions) {}
+    public record ItemToUpload(String path, LocalItem localItem, ItemUploadInstructions uploadInstructions,
+        boolean legacyUpload) {
+
+        /**
+         * Description of an item to be uploaded.
+         *
+         * @param path path of the item inside the surrounding workflow group
+         * @param localItem type and location of the local item to upload
+         * @param uploadInstructions upload instructions
+         */
+        public ItemToUpload(final String path, final LocalItem localItem,
+            final ItemUploadInstructions uploadInstructions) {
+            this(path, localItem, uploadInstructions, false);
+        }
+    }
 
     private final long m_chunkSize;
 
@@ -162,7 +183,7 @@ public final class HubUploader extends AbstractHubTransfer {
      * @return collisions found if the Hub supports multi-part uploads, a {@link Failure} otherwise
      * @throws CancelationException if the upload was canceled
      */
-    public Result<Optional<CollisionReport>, FailureValue> checkCollisions(final ItemID parentId,
+    public Result<Pair<WorkflowGroup, CollisionReport>, FailureValue> checkCollisions(final ItemID parentId,
         final Map<IPath, ItemType> itemToType, final IProgressMonitor progMon) throws CancelationException {
         progMon.beginTask("Checking for conflicts with existing items", IProgressMonitor.UNKNOWN);
         progMon.subTask("Fetching folder contents from Hub...");
@@ -174,10 +195,6 @@ public final class HubUploader extends AbstractHubTransfer {
 
         final var parentGroupAndETag = success.value();
         final var groupItem = parentGroupAndETag.item();
-        final var groupItemControls = groupItem.getMasonControls();
-        if (!supportsAsyncUpload(groupItemControls)) {
-            return Result.success(Optional.empty());
-        }
 
         if (!(groupItem instanceof WorkflowGroup parentGroup)) {
             throw new IllegalArgumentException("Upload target must be a space or folder, '%s' is of type '%s'" //
@@ -190,6 +207,7 @@ public final class HubUploader extends AbstractHubTransfer {
             final var relPath = pathAndType.getKey().makeRelative().removeTrailingSeparator();
             progMon.subTask("Analyzing '%s'".formatted(StringUtils.abbreviateMiddle(relPath.toString(), "...", 64)));
             final var localItemType = pathAndType.getValue();
+            final var groupItemControls = groupItem.getMasonControls();
             final var checkResult = checkForCollision(parentGroup, relPath, localItemType, groupItemControls);
             if (checkResult.isPresent()) {
                 final Pair<IPath, Collision> pathAndCollision = checkResult.get();
@@ -201,7 +219,7 @@ public final class HubUploader extends AbstractHubTransfer {
             }
         }
         final var collisionReport = new CollisionReport(parentGroup, parentGroupAndETag.etag(), collisions, affected);
-        return Result.success(Optional.of(collisionReport));
+        return Result.success(Pair.of(parentGroup, collisionReport));
     }
 
     /**
@@ -320,6 +338,39 @@ public final class HubUploader extends AbstractHubTransfer {
         }
 
         return Optional.of(out);
+    }
+
+    /**
+     * Initiate the legacy (non-artifact) upload flow. Creates workflow groups and prepares the upload of other items.
+     *
+     * @param workflowGroup the target workflow group
+     * @param parentTag expected entity tag of the parent group
+     * @param manifest local items to upload
+     * @return mapping from path to item to upload, in particular with the legacy upload flag set and no
+     *         {@link ItemUploadInstructions upload instructions}
+     * @throws HubFailureIOException in case workflow group creation failed
+     * @since 0.3
+     */
+    public Optional<Map<IPath, ItemToUpload>> initiateLegacyUpload(final WorkflowGroup workflowGroup,
+        final EntityTag parentTag, final Map<IPath, LocalItem> manifest) throws HubFailureIOException {
+        final Map<IPath, ItemToUpload> itemsToUpload = new HashMap<>();
+        final var workflowGroupPath = IPath.forPosix(workflowGroup.getPath());
+        for (final var entry : manifest.entrySet()) {
+            final var item = entry.getValue();
+            final var fullPath = workflowGroupPath.append(entry.getKey());
+            if (ItemType.WORKFLOW_GROUP == item.type()) {
+                // create workflow group now, since legacy upload does not automatically create folders
+                m_catalogClient.createItemByPath(fullPath, /*upload does not create a Space*/ null,
+                    Map.of(HttpHeaders.IF_MATCH, parentTag.getValue()));
+            } else {
+                // workflow or data file will be handled based on the flag
+                final var useLegacyUpload = true;
+                final var localItem = entry.getValue();
+                final var itemUpload = new ItemToUpload(fullPath.toString(), localItem, null, useLegacyUpload);
+                itemsToUpload.put(entry.getKey(), itemUpload);
+            }
+        }
+        return Optional.of(itemsToUpload);
     }
 
     private record FileResources(Map<String, ResourcesToCopy> workflowResources, Map<String, Long> sizes,
@@ -502,14 +553,19 @@ public final class HubUploader extends AbstractHubTransfer {
 
         final Result<Void, FailureValue> uploadResult;
         if (itemToUpload.localItem().type() == ItemType.DATA_FILE) {
-            uploadResult = uploadDataFile(path, itemToUpload.localItem().fsPath(), uploadInstructions, splitter);
-        } else {
-            uploadResult = uploadWorkflowLike(path, exporter, tempFileSupplier, workflowResources.get(path),
+            uploadResult = uploadDataFile(itemToUpload.legacyUpload(), path, itemToUpload.localItem().fsPath(),
                 uploadInstructions, splitter);
+        } else {
+            uploadResult = uploadWorkflowLike(itemToUpload.legacyUpload(), path, exporter, tempFileSupplier,
+                workflowResources.get(path), uploadInstructions, splitter);
         }
 
         if (!uploadResult.successful()) {
             return uploadResult.asFailure();
+        }
+
+        if (itemToUpload.legacyUpload()) {
+            return Result.success("Upload completed.");
         }
 
         final var result = awaitUploadProcessed(m_catalogClient, m_clientHeaders, path,
@@ -569,14 +625,55 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
-    private Result<Void, FailureValue> uploadWorkflowLike(final String path,
+    private Result<Void, FailureValue> uploadWorkflowLike(final boolean useLegacyUpload, final String path,
         final WorkflowExporter<CancelationException> exporter, final TempFileSupplier tempFileSupplier,
         final ResourcesToCopy resources, final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
         throws CancelationException {
 
+        if (useLegacyUpload) {
+            try {
+                final var tempFile = tempFileSupplier.createTempFile("KNIMEWorkflowUploadLegacy", ".knwf.tmp", true);
+                try {
+                    final var exportProgress = splitter.createLeafChild("Exporting workflow to temporary area", 0.2);
+                    long bytesWritten = 0L;
+                    try (final var out = new CountingOutputStream(new FileOutputStream(tempFile.toFile()))) {
+                        exporter.exportInto(resources, out, progress -> {
+                            splitter.checkCanceled();
+                            exportProgress.setProgress(progress);
+                        });
+                        bytesWritten = out.getCount();
+                    }
+                    final var uploadProgress = splitter.createLeafChild("Uploading workflow", 0.8);
+                    try (final var fromTemp = Files.newInputStream(tempFile);
+                            final var dataToTransfer = new MonitoringInputStream(fromTemp) {
+
+                        @Override
+                        protected boolean isCanceled() {
+                            // TODO Community Hub upload limit?
+                            return false;
+                        }
+
+                        @Override
+                        protected void addBytesRead(int numBytes) {
+                            uploadProgress.addTransferredBytes(numBytes);
+                        }
+                    }) {
+                        m_catalogClient.uploadItemByPath(IPath.forPosix(path), KNIME_WORKFLOW_LIKE_MEDIATYPE, Map.of(),
+                            dataToTransfer, bytesWritten);
+                    }
+                    return Result.success(null);
+                } finally {
+                    FileUtils.deleteQuietly(tempFile.toFile());
+                }
+            } catch (final IOException ex) {
+                return Result.failure(
+                    FailureValue.fromThrowable(FailureType.UPLOAD_OF_WORKFLOW_FAILED, "Failed to upload workflow",
+                        List.of("Upload of '%s' failed: %s".formatted(path, ex.getMessage())), ex));
+            }
+        }
+
         // remember all temp files so they can be deleted cleaned up `finally` if something went wrong
         final List<Path> tempFiles = new ArrayList<>();
-
         final Deque<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> pendingUploads = new ArrayDeque<>();
         try {
             final var partSupplier = new UploadPartSupplier(m_catalogClient, m_clientHeaders, instructions);
@@ -609,8 +706,9 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
-    private Result<Void, FailureValue> uploadDataFile(final String path, final Path dataFile,
-        final ItemUploadInstructions instructions, final BranchingExecMonitor splitter) throws CancelationException {
+    private Result<Void, FailureValue> uploadDataFile(final boolean useLegacyUpload, final String path,
+        final Path dataFile, final ItemUploadInstructions instructions, final BranchingExecMonitor splitter)
+        throws CancelationException {
 
         final long numBytes;
         try {
