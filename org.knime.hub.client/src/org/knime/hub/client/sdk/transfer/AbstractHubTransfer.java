@@ -165,6 +165,10 @@ class AbstractHubTransfer {
         m_clientHeaders = additionalHeaders;
     }
 
+    static Optional<String> eTagToString(final EntityTag eTag) {
+        return Optional.ofNullable(eTag).map(ETAG_DELEGATE::toString);
+    }
+
     /**
      * Initiates a multi-part process in which each part may update its progress independently and concurrently.
      *
@@ -316,12 +320,9 @@ class AbstractHubTransfer {
 
         Map<String, String> headers = new HashMap<>(additionalHeaders);
         headers.put(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON);
-        if (ifNoneMatch != null) {
-            headers.put(HttpHeaders.IF_NONE_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(ifNoneMatch));
-        }
-        if (ifMatch != null) {
-            headers.put(HttpHeaders.IF_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(ifMatch));
-        }
+
+        eTagToString(ifNoneMatch).ifPresent(eTagStr -> headers.put(HttpHeaders.IF_NONE_MATCH, eTagStr));
+        eTagToString(ifMatch).ifPresent(eTagStr -> headers.put(HttpHeaders.IF_MATCH, eTagStr));
 
         Map<String, String> nonNullQueryParams = new HashMap<>();
         if (queryParams != null) {

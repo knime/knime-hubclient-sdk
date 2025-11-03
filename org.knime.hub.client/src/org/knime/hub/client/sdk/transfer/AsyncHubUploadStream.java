@@ -240,8 +240,9 @@ public final class AsyncHubUploadStream extends OutputStream {
                             .formatted(thrw.getClass().getSimpleName(), thrw.getMessage())),
                         thrw)));
                 final var finishedPart = result.orElseThrow(HubFailureIOException::new);
-                m_finishedParts.put(finishedPart.getKey(),
-                    AbstractHubTransfer.ETAG_DELEGATE.toString(finishedPart.getValue()));
+                final var partNo = finishedPart.getKey();
+                EntityTag eTag = finishedPart.getValue();
+                m_finishedParts.put(partNo, AbstractHubTransfer.eTagToString(eTag).orElse(null));
             }
         } catch (CancelationException ex) { // NOSONAR ignore because we've already been cancelled
         }

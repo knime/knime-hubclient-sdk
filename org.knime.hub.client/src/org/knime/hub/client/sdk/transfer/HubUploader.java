@@ -710,7 +710,9 @@ public final class HubUploader extends AbstractHubTransfer {
             }
 
             final var partNoAndETag = success.value();
-            finished.put(partNoAndETag.getLeft(), ETAG_DELEGATE.toString(partNoAndETag.getRight()));
+            final var partNo = partNoAndETag.getLeft();
+            final var eTag = partNoAndETag.getRight();
+            finished.put(partNo, eTagToString(eTag).orElse(null));
         }
 
         return Result.success(finished);
@@ -749,9 +751,7 @@ public final class HubUploader extends AbstractHubTransfer {
         final EntityTag eTag) throws HubFailureIOException {
 
         final Map<String, String> headers = new HashMap<>(additionalHeaders);
-        if (eTag != null) {
-            headers.put(HttpHeaders.IF_MATCH, AbstractHubTransfer.ETAG_DELEGATE.toString(eTag));
-        }
+        eTagToString(eTag).ifPresent(eTagStr -> headers.put(HttpHeaders.IF_MATCH, eTagStr));
 
         try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
             final var response =

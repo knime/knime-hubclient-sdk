@@ -107,7 +107,8 @@ public final class URLConnectionUploader implements StreamingUploader {
 
                 final var statusInfo = Response.Status.fromStatusCode(connection.getResponseCode());
                 if (statusInfo.getFamily() == Family.SUCCESSFUL) {
-                    return ETAG_DELEGATE.fromString(connection.getHeaderField(HttpHeaders.ETAG));
+                    final var eTag = connection.getHeaderField(HttpHeaders.ETAG);
+                    return eTag == null ? null : ETAG_DELEGATE.fromString(eTag);
                 }
 
                 try (final var errStream = connection.getErrorStream()) {
