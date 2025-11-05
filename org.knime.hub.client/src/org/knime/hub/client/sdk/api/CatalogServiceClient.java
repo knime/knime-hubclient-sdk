@@ -111,6 +111,7 @@ public final class CatalogServiceClient {
     private static final String UPLOAD_API_PATH = "uploads";
     private static final String DOWNLOAD_API_PATH = "downloads";
     private static final String SPACES_API_PATH = "spaces";
+    private static final String COMPONENTS_API_PATH = "components";
 
     /* Path pieces */
     private static final String PATH_PIECE_USERS = "Users";
@@ -124,6 +125,7 @@ public final class CatalogServiceClient {
     private static final String PATH_PIECE_NAME = "name";
     private static final String PATH_PIECE_WORKING_AREA = "workingArea";
     private static final String PATH_PIECE_VERSIONS = "versions";
+    private static final String PATH_PIECE_UPDATES = "updates";
 
     /* Query parameters */
     private static final String QUERY_PARAM_FROM_VERSION = "fromVersion";
@@ -405,6 +407,44 @@ public final class CatalogServiceClient {
         CheckUtils.checkArgumentNotNull(path);
 
         final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(path + PATH_PIECE_DATA);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(getQueryParameter(version).orElse(null)) //
+            .invokeAPI(requestPath, Method.GET, null, contentHandler);
+    }
+
+    /**
+     * Checks the component with the given ID for updates and downloads it if an update is available. Whether there are
+     * any updates is determined based on the {@code If-Modified-Since} header provided by the client. If the header is
+     * not set or the component has been modified since the specified date, the updated content is returned. If no
+     * updates are available, the response will indicate that no changes have occurred with "304 Not Modified".
+     *
+     * @param id The component's unique ID. It always starts with a "*" and does not change even if the component
+     *            is renamed or moved. May also be a concatenation of path followed by the "~" character and the ID
+     *            without the leading "*" character. This occurs when the request originates from an older API that
+     *            cannot handle the new URI format which adds the ID to the end of the path. (required)
+     * @param version Optional version of the component to retrieve, {@code null} is synonymous with
+     *            {@link CurrentState#getInstance() current-state}. (optional, defaults to current-state)
+     * @param responseType The type of the response body. (required)
+     * @param additionalHeaders Map of additional headers. (optionally with {@code If-Modified-Since})
+     * @param contentHandler The content handler to process the given input stream. (required)
+     * @return {@link ApiResponse}
+     *
+     * @throws IOException if the operation encounters an I/O error
+     * @throws CancelationException if the operation is canceled
+     * @since 1.0
+     */
+    public <R> ApiResponse<R> downloadComponentById(final String id, final ItemVersion version,
+        final MediaType responseType, final Map<String, String> additionalHeaders,
+        final DownloadContentHandler<R> contentHandler) throws IOException, CancelationException {
+        CheckUtils.checkArgumentNotNull(contentHandler);
+        CheckUtils.checkArgumentNotNull(responseType);
+        CheckUtils.checkArgumentNotNull(id);
+
+        // embed ID into "/components/{id}/updates" API path
+        final var requestPath = IPath.forPosix(COMPONENTS_API_PATH).append(id).append(PATH_PIECE_UPDATES);
 
         return m_apiClient.createApiRequest() //
             .withAcceptHeaders(responseType, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
