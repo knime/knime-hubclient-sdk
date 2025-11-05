@@ -84,7 +84,7 @@ public final class ResponseUtils {
         final var status = response.getStatusInfo();
         return switch (status.getFamily()) {
             case SUCCESSFUL -> throw new IllegalStateException("Unexpected successful response");
-            case REDIRECTION -> throw toRedirectException(response); // auto-redirect failed
+            case REDIRECTION -> toRedirectExceptionOrFailureDescription(response);
             case CLIENT_ERROR, SERVER_ERROR -> toFailureDescription(response);
             case INFORMATIONAL, OTHER -> throw new IllegalStateException("Unexpected HTTP response code: %d %s"
                 .formatted(status.getStatusCode(), status.getReasonPhrase()));
@@ -112,7 +112,14 @@ public final class ResponseUtils {
             List.of("Error: " + message), null);
     }
 
-    private static HubFailureIOException toRedirectException(final Response response) {
+    private static ProblemDescription toRedirectExceptionOrFailureDescription(final Response response)
+        throws HubFailureIOException {
+        // A "304 Not Modified" response is the only exemption to redirect exceptions,
+        // since it does not indicate that an auto-redirect failed
+        if (response.getStatus() == Response.Status.NOT_MODIFIED.getStatusCode()) {
+            return toFailureDescription(response);
+        }
+
         // A redirect is not a failure response, so we don't expect `application/problem+json` here
         final String message;
         if (response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl cxfResponse) {
@@ -122,7 +129,7 @@ public final class ResponseUtils {
             message = StringUtils.getIfBlank(response.hasEntity() ? response.readEntity(String.class) :
                 null, () -> response.getStatusInfo().getReasonPhrase());
         }
-        return new HubFailureIOException(new FailureValue(FailureType.REDIRECT_FAILED, response.getStatus(),
+        throw new HubFailureIOException(new FailureValue(FailureType.REDIRECT_FAILED, response.getStatus(),
             response.getHeaders(), "HTTP redirect failed", List.of(message), null));
     }
 }
