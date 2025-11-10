@@ -81,11 +81,9 @@ import jakarta.ws.rs.core.Response.Status.Family;
  */
 public final class RequestUploadStream extends OutputStream {
 
+    private HttpURLConnection m_connection;
+
     private final @Owning OutputStream m_uploadStream;
-
-    private final HttpURLConnection m_connection;
-
-    private boolean m_isCancelled;
 
     /** Chunk size for uploading (10MB). */
     private static final int CHUNK_SIZE = (int)(10 * FileUtils.ONE_MB);
@@ -122,7 +120,7 @@ public final class RequestUploadStream extends OutputStream {
         }
     }
 
-    private static @Owning RequestUploadStream openUploadStream(final @Owning HttpURLConnection connection)
+    private static @Owning RequestUploadStream openUploadStream(final HttpURLConnection connection)
         throws HubFailureIOException {
         try {
             connection.connect();
@@ -135,18 +133,19 @@ public final class RequestUploadStream extends OutputStream {
         }
     }
 
-    private RequestUploadStream(final @Owning HttpURLConnection connection,
-        final @Owning OutputStream outputStream) {
+    private RequestUploadStream(final HttpURLConnection connection, final @Owning OutputStream outputStream) {
         m_connection = connection;
         m_uploadStream = outputStream;
     }
 
     /**
      * Cancel the upload.
+     *
+     * @deprecated never exposed
      */
+    @Deprecated(since = "0.3.1", forRemoval = true)
     public void cancel() {
-        m_connection.disconnect();
-        m_isCancelled = true;
+        // didn't work correctly anyway, no way to tell the catalog that the upload isn't complete
     }
 
     @Override
@@ -187,22 +186,25 @@ public final class RequestUploadStream extends OutputStream {
 
     @Override
     public void close() throws IOException {
-        super.close();
-        if (!m_isCancelled) {
+        try {
+            // guaranteed to be idempotent, can be closed multiple times
             m_uploadStream.close();
-            final var statusInfo = Response.Status.fromStatusCode(m_connection.getResponseCode());
-            if (statusInfo.getFamily() != Family.SUCCESSFUL) {
-                try {
+
+            if (m_connection != null) {
+                // first time, check response
+                final var statusInfo = Response.Status.fromStatusCode(m_connection.getResponseCode());
+                if (statusInfo.getFamily() != Family.SUCCESSFUL) {
                     final var message = URLConnectionUploader.readErrorMessage(m_connection);
                     throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
                         "Failed to upload item: " + StringUtils.firstNonBlank(message,
                             m_connection.getResponseMessage(), statusInfo.getReasonPhrase()));
-                } finally {
-                    m_connection.disconnect();
                 }
             }
-            m_connection.disconnect();
+        } finally {
+            if (m_connection != null) {
+                m_connection.disconnect();
+                m_connection = null;
+            }
         }
     }
-
 }
