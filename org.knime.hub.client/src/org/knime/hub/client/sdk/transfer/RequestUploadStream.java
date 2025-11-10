@@ -52,11 +52,11 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
@@ -67,6 +67,7 @@ import org.knime.hub.client.sdk.FailureType;
 import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
+import org.knime.hub.client.sdk.transfer.internal.URLConnectionUploader;
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -188,19 +189,18 @@ public final class RequestUploadStream extends OutputStream {
     public void close() throws IOException {
         super.close();
         if (!m_isCancelled) {
-            m_uploadStream.close();
-            final var statusInfo = Response.Status.fromStatusCode(m_connection.getResponseCode());
-            if (statusInfo.getFamily() != Family.SUCCESSFUL) {
-                try (final var errStream = m_connection.getErrorStream()) {
-                    final var message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
-                        : statusInfo.getReasonPhrase();
+            try {
+                m_uploadStream.close();
+                final var statusInfo = Response.Status.fromStatusCode(m_connection.getResponseCode());
+                if (statusInfo.getFamily() != Family.SUCCESSFUL) {
+                    final var message = URLConnectionUploader.readErrorMessage(m_connection);
                     throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
-                        "Failed to upload item: " + message);
-                } finally {
-                    m_connection.disconnect();
+                        "Failed to upload item: " + StringUtils.firstNonBlank(message,
+                            m_connection.getResponseMessage(), statusInfo.getReasonPhrase()));
                 }
+            } finally {
+                m_connection.disconnect();
             }
-            m_connection.disconnect();
         }
     }
 
