@@ -48,11 +48,13 @@
  */
 package org.knime.hub.client.sdk.transfer.internal;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -60,7 +62,11 @@ import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
@@ -68,9 +74,12 @@ import org.knime.core.util.exception.HttpExceptionUtils;
 import org.knime.core.util.proxy.URLConnectionFactory;
 import org.knime.hub.client.sdk.CancelationException;
 import org.knime.hub.client.sdk.transfer.FilePartUploader.StreamingUploader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jakarta.ws.rs.core.EntityTag;
 import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status.Family;
 import jakarta.ws.rs.ext.RuntimeDelegate;
@@ -80,6 +89,8 @@ import jakarta.ws.rs.ext.RuntimeDelegate.HeaderDelegate;
  * Uploader using {@link HttpURLConnection}.
  */
 public final class URLConnectionUploader implements StreamingUploader {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(URLConnectionUploader.class);
 
     private static final HeaderDelegate<EntityTag> ETAG_DELEGATE =
         RuntimeDelegate.getInstance().createHeaderDelegate(EntityTag.class);
@@ -111,12 +122,10 @@ public final class URLConnectionUploader implements StreamingUploader {
                     return eTag == null ? null : ETAG_DELEGATE.fromString(eTag);
                 }
 
-                try (final var errStream = connection.getErrorStream()) {
-                    final var message = errStream != null ? new String(errStream.readAllBytes(), StandardCharsets.UTF_8)
-                        : statusInfo.getReasonPhrase();
-                    throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
-                        "Failed to upload artifact: " + message);
-                }
+                final var responseMessage = readErrorMessage(connection);
+                throw HttpExceptionUtils.wrapException(statusInfo.getStatusCode(),
+                    "Failed to upload artifact: " + StringUtils.firstNonBlank(responseMessage,
+                        connection.getResponseMessage(), statusInfo.getReasonPhrase()));
             }
         } finally {
             if (connection != null) {
@@ -178,5 +187,46 @@ public final class URLConnectionUploader implements StreamingUploader {
             out.write(buffer, 0, read);
             writtenBytesAdder.accept(read);
         }
+    }
+
+    /**
+     * Tries to read an error message from an HTTP response, taking compression and character set into account.
+     *
+     * @param connection HTTP connection (failed)
+     * @return error message if it could be read, {@code null} otherwise
+     * @throws IOException
+     */
+    public static String readErrorMessage(final HttpURLConnection connection) throws IOException {
+        try (final var errStream = createErrorStream(connection)) {
+            final var charset = extractCharset(connection.getHeaderField(HttpHeaders.CONTENT_TYPE));
+            return errStream != null ? IOUtils.toString(errStream, charset) : null;
+        } catch (final CompressorException e) {
+            LOGGER.debug("Failed to decompress Hub error", e);
+        }
+        return null;
+    }
+
+    private static @Owning InputStream createErrorStream(final HttpURLConnection connection)
+            throws CompressorException {
+        final var errorStream = connection.getErrorStream();
+        if (errorStream == null) {
+            return null;
+        }
+
+        return StringUtils.isBlank(connection.getHeaderField(HttpHeaders.CONTENT_ENCODING)) ? errorStream
+            : CompressorStreamFactory.getSingleton().createCompressorInputStream(new BufferedInputStream(errorStream));
+    }
+
+    private static Charset extractCharset(final String contentTypeHeader) {
+        if (contentTypeHeader != null) {
+            try {
+                final var mediaType = MediaType.valueOf(contentTypeHeader);
+                return Charset.forName(mediaType.getParameters().getOrDefault(MediaType.CHARSET_PARAMETER,
+                    StandardCharsets.UTF_8.toString()));
+            } catch (final IllegalArgumentException e) {
+                LOGGER.debug("Failed to read encoding of Hub error", e);
+            }
+        }
+        return StandardCharsets.UTF_8;
     }
 }
