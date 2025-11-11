@@ -2,10 +2,10 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Unit-Tests for org.knime.hub.client
 Bundle-SymbolicName: org.knime.hub.client.tests;singleton:=true
-Bundle-Version: 0.3.0.qualifier
+Bundle-Version: 1.0.0.qualifier
 Bundle-ClassPath: .
 Bundle-Vendor: KNIME AG, Zurich, Switzerland
-Fragment-Host: org.knime.hub.client;bundle-version="[0.2.0,1.0.0)"
+Fragment-Host: org.knime.hub.client;bundle-version="[1.0.0,2.0.0)"
 Require-Bundle: org.knime.testing;bundle-version="[5.6.0,6.0.0)",
  com.github.tomakehurst.wiremock-jre8-standalone;bundle-version="[2.33.2,3.0.0)",
  json-path;bundle-version="[2.9.0,3.0.0)",
