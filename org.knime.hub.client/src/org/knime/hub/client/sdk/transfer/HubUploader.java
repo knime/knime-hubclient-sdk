@@ -200,7 +200,7 @@ public final class HubUploader extends AbstractHubTransfer {
      * @param progMon to enable cancellation
      * @return parent group metadata and found collisions
      * @throws CancelationException if the upload was canceled
-     * @since 0.3
+     * @since 1.0
      */
     public Result<Pair<WorkflowGroup, CollisionReport>, FailureValue> determineCollisions(final ItemID parentId,
         final Map<IPath, ItemType> itemToType, final IProgressMonitor progMon) throws CancelationException {
@@ -367,7 +367,7 @@ public final class HubUploader extends AbstractHubTransfer {
      * @return mapping from path to item to upload, in particular with the legacy upload flag set and no
      *         {@link ItemUploadInstructions upload instructions}
      * @throws HubFailureIOException in case workflow group creation failed
-     * @since 0.3
+     * @since 1.0
      */
     public Optional<Map<IPath, ItemToUpload>> initiateLegacyUpload(final IPath workflowGroupPath,
         final Map<IPath, LocalItem> manifest) throws HubFailureIOException {
