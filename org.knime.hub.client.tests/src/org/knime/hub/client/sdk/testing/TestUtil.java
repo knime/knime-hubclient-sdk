@@ -73,6 +73,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.NumericNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
@@ -130,6 +131,19 @@ public class TestUtil {
     }
 
     /**
+     * Reads a resource into a string.
+     *
+     * @param resourceUrl the resource URL
+     * @return content as string
+     * @throws IOException if reading fails
+     */
+    public static String readResourceToString(final URL resourceUrl) throws IOException {
+        try (var is = resourceUrl.openStream()) {
+            return new String(is.readAllBytes());
+        }
+    }
+
+    /**
      * Asserts the JSON properties of the API response entity given expected JSON paths.
      *
      * @param <R> response entity type
@@ -160,6 +174,15 @@ public class TestUtil {
             // For expected JSON attributes which are represented by ZonedDateTime, we have to first parse
             // the string into a ZonedDateTime before we can compare with the actual values.
             expectedJSONProperties = parseJSONPropertiesAsZonedDateTime(mapper, expectedJSONProperties, jsonPath);
+
+            // JsonPath coerces integers to the smallest fitting number type per node;
+            // compare numeric value instead of concrete IntNode/LongNode classes.
+            if (actualJSONProperties instanceof NumericNode actualNumber
+                    && expectedJSONProperties instanceof NumericNode expectedNumber) {
+                assertEquals(expectedNumber.numberValue(), actualNumber.numberValue(),
+                    "Unexpected properties for JSON path '%s'".formatted(jsonPath));
+                continue;
+            }
 
             assertEquals(expectedJSONProperties, actualJSONProperties,
                 "Unexpected properties for JSON path '%s'".formatted(jsonPath));

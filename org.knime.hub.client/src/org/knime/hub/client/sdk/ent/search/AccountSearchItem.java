@@ -1,7 +1,8 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
- *  Website: http://www.knime.com; Email: contact@knime.com
+ *  Website: http://www.knime.org; Email: contact@knime.org
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License, Version 3, as
@@ -40,102 +41,84 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
- *
- * History
- *   Nov 6, 2024 (magnus): created
+ * ---------------------------------------------------------------------
  */
+package org.knime.hub.client.sdk.ent.search;
 
-package org.knime.hub.client.sdk.api;
+import java.util.Objects;
+import java.util.Optional;
 
-import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
-import org.knime.hub.client.sdk.ApiClient;
-import org.knime.hub.client.sdk.api.SearchServiceClient;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Hub Client API for KNIME Hub.
+ * Account search suggestion result.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
+ * @since 1.1
  */
-public final class HubClientAPI implements AutoCloseable {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@SuppressWarnings({"java:S1176", "MissingJavadoc"})
+public final class AccountSearchItem {
 
-    private final @Owning ApiClient m_apiClient;
+    private static final String JSON_PROPERTY_ID = "id";
+    private final String m_id;
 
-    private final CatalogServiceClient m_catalog;
+    private static final String JSON_PROPERTY_NAME = "name";
+    private final String m_name;
 
-    private final AccountServiceClient m_accountService;
+    private static final String JSON_PROPERTY_DISPLAY_NAME = "displayName";
+    private final String m_displayName;
 
-    private final ExecutionServiceClient m_executionService;
-
-    private final SearchServiceClient m_searchService;
-
-    /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
-     *
-     * @param apiClient {@link ApiClient}
-     */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
-        m_apiClient = apiClient;
-        m_catalog = new CatalogServiceClient(m_apiClient);
-        m_accountService = new AccountServiceClient(m_apiClient);
-        m_executionService = new ExecutionServiceClient(apiClient);
-        m_searchService = new SearchServiceClient(apiClient);
+    @JsonCreator
+    private AccountSearchItem(@JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
+        @JsonProperty(JSON_PROPERTY_DISPLAY_NAME) final String displayName) {
+        m_id = id;
+        m_name = name;
+        m_displayName = displayName;
     }
 
-    /**
-     * Retrieves the associated {@link ApiClient}.
-     *
-     * @return {@link ApiClient}
-     */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
+    @JsonProperty(JSON_PROPERTY_ID)
+    public String getId() {
+        return m_id;
     }
 
-    /**
-     * Retrieves the catalog client.
-     *
-     * @return {@link CatalogServiceClient}
-     */
-    public CatalogServiceClient catalog() {
-        return m_catalog;
+    @JsonProperty(JSON_PROPERTY_NAME)
+    public String getName() {
+        return m_name;
     }
 
-    /**
-     * Retrieves the account service client.
-     *
-     * @return {@link AccountServiceClient}
-     */
-    public AccountServiceClient account() {
-        return m_accountService;
+    @JsonProperty(JSON_PROPERTY_DISPLAY_NAME)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDisplayName() {
+        return Optional.ofNullable(m_displayName);
     }
 
-    /**
-     * Retrieves the execution service client.
-     *
-     * @return {@link ExecutionServiceClient}
-     * @since 0.2
-     */
-    public ExecutionServiceClient execution() {
-        return m_executionService;
-    }
-
-    /**
-     * Retrieves the search service client.
-     *
-     * @return {@link SearchServiceClient}
-     * @since 1.1
-     */
-    public SearchServiceClient search() {
-        return m_searchService;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void close() {
-        m_apiClient.close();
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (AccountSearchItem)o;
+        return Objects.equals(m_id, that.m_id)
+            && Objects.equals(m_name, that.m_name)
+            && Objects.equals(m_displayName, that.m_displayName);
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_id, m_name, m_displayName);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
+    }
 }
