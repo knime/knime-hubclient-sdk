@@ -125,6 +125,24 @@ public abstract class AbstractTest {
     }
 
     /**
+     * Returns the shared {@link ApiClient} used by tests.
+     *
+     * @return api client instance
+     */
+    protected static ApiClient getApiClient() {
+        return apiClient;
+    }
+
+    /**
+     * Returns the WireMock server instance.
+     *
+     * @return server mock
+     */
+    protected static WireMockServer getServerMock() {
+        return serverMock;
+    }
+
+    /**
      * Creates a mocked GET /repository/pathOrId request
      *
      * @param testFileName file name of the JSON body

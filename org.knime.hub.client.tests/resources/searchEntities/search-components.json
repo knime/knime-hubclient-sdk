@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "icon": {
+        "hasDynInPorts": false,
+        "hasDynOutPorts": false,
+        "inPorts": [],
+        "outPorts": [],
+        "deprecated": false,
+        "streamable": false,
+        "type": "Visualizer"
+      },
+      "downloadCount": 821,
+      "lastEditedOn": "2023-10-25T12:18:22+00:00",
+      "isEncrypted": false,
+      "tags": [],
+      "itemType": "Component",
+      "title": "Header for Data Apps",
+      "private": false,
+      "pathToResource": "/Users/josegallardo/Public/Header for Data Apps",
+      "ownerAccountId": "account:user:88720be7-8cc0-4264-87b1-2cb0cdcbc397",
+      "kudosCount": 1,
+      "id": "*4H0xvD1ha6NmoZYY",
+      "description": "",
+      "owner": "josegallardo",
+      "isVersioned": true,
+      "versionCreatedOn": "2023-10-25T13:06:58+00:00",
+      "version": 1
+    }
+  ],
+  "suggestedUsernames": [],
+  "suggestedTeamnames": [],
+  "suggestedExternalGroups": [],
+  "countByCategory": {
+    "all": 761,
+    "nodes": 24,
+    "workflows": 670,
+    "extensions": 35,
+    "components": 31,
+    "collections": 1
+  },
+  "suggestedTags": [],
+  "relatedTags": [
+    "Workflow Applications",
+    "Workflow Application",
+    "Checker Components",
+    "AI",
+    "REST",
+    "GenAI",
+    "Workflow Validation",
+    "Action Component",
+    "ChEMBL",
+    "Chemistry"
+  ],
+  "relatedPathTags": []
+}

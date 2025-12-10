@@ -51,6 +51,7 @@ package org.knime.hub.client.sdk.api;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.eclipse.jdt.annotation.Owning;
 import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.api.SearchServiceClient;
 
 /**
  * Hub Client API for KNIME Hub.
@@ -67,6 +68,8 @@ public final class HubClientAPI implements AutoCloseable {
 
     private final ExecutionServiceClient m_executionService;
 
+    private final SearchServiceClient m_searchService;
+
     /**
      * Create the {@link HubClientAPI} given an {@link ApiClient}
      *
@@ -77,6 +80,7 @@ public final class HubClientAPI implements AutoCloseable {
         m_catalog = new CatalogServiceClient(m_apiClient);
         m_accountService = new AccountServiceClient(m_apiClient);
         m_executionService = new ExecutionServiceClient(apiClient);
+        m_searchService = new SearchServiceClient(apiClient);
     }
 
     /**
@@ -114,6 +118,15 @@ public final class HubClientAPI implements AutoCloseable {
      */
     public ExecutionServiceClient execution() {
         return m_executionService;
+    }
+
+    /**
+     * Retrieves the search service client.
+     *
+     * @return {@link SearchServiceClient}
+     */
+    public SearchServiceClient search() {
+        return m_searchService;
     }
 
     /**
