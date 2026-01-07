@@ -41,9 +41,6 @@
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
  * -------------------------------------------------------------------
- *
- * History
- *   Dec 10, 2025 (assistant): created
  */
 
 package org.knime.hub.client.sdk.api;
