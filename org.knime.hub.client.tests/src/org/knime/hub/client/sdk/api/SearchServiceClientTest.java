@@ -69,30 +69,6 @@ class SearchServiceClientTest extends AbstractTest {
         "$['relatedTags']" //
     );
 
-    private static final List<String> INSTANT_SEARCH_JSON_PATHS = List.of( //
-        "$['countByCategory']['all']", //
-        "$['countByCategory']['components']", //
-        "$['results'][*]['itemType']", //
-        "$['results'][*]['id']", //
-        "$['results'][*]['title']", //
-        "$['results'][*]['isVersioned']", //
-        "$['results'][*]['version']", //
-        "$['results'][*]['downloadCount']", //
-        "$['results'][*]['tags']", //
-        "$['suggestedTags']", //
-        "$['suggestedUsernames']", //
-        "$['suggestedTeamnames']", //
-        "$['suggestedExternalGroups'][*]['id']", //
-        "$['relatedTags']", //
-        "$['relatedPathTags']", //
-        "$['took']", //
-        "$['esQuery']", //
-        "$['esResult']" //
-    );
-
-    private static final List<String> COUNT_JSON_PATHS =
-        List.of("$['all']", "$['workflows']", "$['nodes']", "$['extensions']", "$['components']", "$['collections']");
-
     @BeforeAll
     static void setUp() throws Exception {
         initializeServerMockTests();
@@ -136,47 +112,6 @@ class SearchServiceClientTest extends AbstractTest {
         assertEquals(200, response.statusCode());
         TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
             getJsonPathConfig());
-    }
-
-    @Test
-    void testInstantSearchDeserializesComponentHit() throws IOException {
-        final String fixture = "instant-search.json";
-        final JsonNode expectedResponse = stubSearchResponse( //
-            fixture, //
-            "/instant-search", //
-            Map.of( //
-                "query", "instant", //
-                "limit", "3", //
-                "privateSearchMode", "auto", //
-                "debug", "true" //
-            ));
-
-        final ApiResponse<SearchResults> response = SEARCH_CLIENT.instantSearch( //
-            "instant", //
-            3, //
-            PrivateSearchMode.AUTO, //
-            true, //
-            Map.of() //
-        );
-
-        assertEquals(200, response.statusCode());
-        TestUtil.assertJSONProperties(response, expectedResponse, INSTANT_SEARCH_JSON_PATHS, getMapper(),
-            getJsonPathConfig());
-    }
-
-    @Test
-    void testGetCountsDeserializesCounts() throws IOException {
-        final String fixture = "search-counts.json";
-        final JsonNode expectedResponse = stubSearchResponse( //
-            fixture, //
-            "/search-counts", //
-            Map.of() //
-        );
-
-        final ApiResponse<SearchResultsCountByCategory> response = SEARCH_CLIENT.getCounts(Map.of());
-
-        assertEquals(200, response.statusCode());
-        TestUtil.assertJSONProperties(response, expectedResponse, COUNT_JSON_PATHS, getMapper(), getJsonPathConfig());
     }
 
     private static JsonNode stubSearchResponse(final String testFileName, final String urlPath,

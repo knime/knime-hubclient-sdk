@@ -74,8 +74,6 @@ import jakarta.ws.rs.core.MediaType;
 public final class SearchServiceClient {
 
     private static final String SEARCH_API_PATH = "search";
-    private static final String INSTANT_SEARCH_API_PATH = "instant-search";
-    private static final String SEARCH_COUNTS_API_PATH = "search-counts";
 
     private static final String QUERY_PARAM_QUERY = "query";
     private static final String QUERY_PARAM_TYPE = "type";
@@ -143,49 +141,6 @@ public final class SearchServiceClient {
             .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
     }
 
-    /**
-     * Executes an instant-search request.
-     *
-     * @param query search text (empty string matches all)
-     * @param limit number of results, {@code null} to use service default
-     * @param privateSearchMode include/exclude/auto private items
-     * @param debug enable debug output
-     * @param additionalHeaders additional headers to forward
-     * @return {@link ApiResponse} containing {@link SearchResults}
-     * @throws HubFailureIOException if the request fails
-     */
-    public ApiResponse<SearchResults> instantSearch(final String query, final Integer limit,
-        final PrivateSearchMode privateSearchMode, final Boolean debug, final Map<String, String> additionalHeaders)
-        throws HubFailureIOException {
-        // TODO test
-        final var requestPath = IPath.forPosix(INSTANT_SEARCH_API_PATH);
-        return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
-            .withHeaders(additionalHeaders) //
-            .withQueryParam(QUERY_PARAM_QUERY, query) //
-            .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
-            .withQueryParam(QUERY_PARAM_PRIVATE_SEARCH_MODE,
-                Optional.ofNullable(privateSearchMode).map(PrivateSearchMode::getPrivateSearchMode).orElse(null)) //
-            .withQueryParam(QUERY_PARAM_DEBUG, toString(debug)) //
-            .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
-    }
-
-    /**
-     * Retrieves counts per index (workflows, nodes, extensions, components, collections).
-     *
-     * @param additionalHeaders additional headers to forward
-     * @return {@link ApiResponse} containing {@link SearchResultsCountByCategory}
-     * @throws HubFailureIOException if the request fails
-     */
-    public ApiResponse<SearchResultsCountByCategory> getCounts(final Map<String, String> additionalHeaders)
-        throws HubFailureIOException {
-        // TODO test
-        final var requestPath = IPath.forPosix(SEARCH_COUNTS_API_PATH);
-        return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
-            .withHeaders(additionalHeaders) //
-            .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS_COUNT);
-    }
 
     private static String toString(final Number number) {
         return number == null ? null : number.toString();
