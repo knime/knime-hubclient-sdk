@@ -73,6 +73,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.NumericNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
@@ -173,6 +174,15 @@ public class TestUtil {
             // For expected JSON attributes which are represented by ZonedDateTime, we have to first parse
             // the string into a ZonedDateTime before we can compare with the actual values.
             expectedJSONProperties = parseJSONPropertiesAsZonedDateTime(mapper, expectedJSONProperties, jsonPath);
+
+            // JsonPath coerces integers to the smallest fitting number type per node;
+            // compare numeric value instead of concrete IntNode/LongNode classes.
+            if (actualJSONProperties instanceof NumericNode actualNumber
+                    && expectedJSONProperties instanceof NumericNode expectedNumber) {
+                assertEquals(expectedNumber.numberValue(), actualNumber.numberValue(),
+                    "Unexpected properties for JSON path '%s'".formatted(jsonPath));
+                continue;
+            }
 
             assertEquals(expectedJSONProperties, actualJSONProperties,
                 "Unexpected properties for JSON path '%s'".formatted(jsonPath));
