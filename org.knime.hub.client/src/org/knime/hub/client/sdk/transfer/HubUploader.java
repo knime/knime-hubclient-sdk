@@ -882,7 +882,7 @@ public final class HubUploader extends AbstractHubTransfer {
             final var partNoAndETag = success.value();
             final var partNo = partNoAndETag.getLeft();
             final var eTag = partNoAndETag.getRight();
-            finished.put(partNo, eTagToString(eTag).orElse(null));
+            finished.put(partNo, eTagToString(eTag).orElse(""));
         }
 
         return Result.success(finished);
