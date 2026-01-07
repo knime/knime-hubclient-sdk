@@ -119,9 +119,19 @@ class SearchServiceClientTest extends AbstractTest {
                 "privateSearchMode", "include" //
             ));
 
-        final ApiResponse<SearchResults> response =
-            SEARCH_CLIENT.search("foo", SearchServiceClient.SearchType.COMPONENT, 5, 0,
-                SearchServiceClient.SearchSort.BEST, PrivateSearchMode.INCLUDE, List.of(), null, null, null, Map.of());
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
+            "foo", //
+            SearchServiceClient.SearchType.COMPONENT, //
+            5, //
+            0, //
+            SearchServiceClient.SearchSort.BEST, //
+            PrivateSearchMode.INCLUDE, //
+            List.of(), //
+            null, //
+            null, //
+            null, //
+            Map.of() //
+        );
 
         assertEquals(200, response.statusCode());
         TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
@@ -141,8 +151,13 @@ class SearchServiceClientTest extends AbstractTest {
                 "debug", "true" //
             ));
 
-        final ApiResponse<SearchResults> response =
-            SEARCH_CLIENT.instantSearch("instant", 3, PrivateSearchMode.AUTO, true, Map.of());
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.instantSearch( //
+            "instant", //
+            3, //
+            PrivateSearchMode.AUTO, //
+            true, //
+            Map.of() //
+        );
 
         assertEquals(200, response.statusCode());
         TestUtil.assertJSONProperties(response, expectedResponse, INSTANT_SEARCH_JSON_PATHS, getMapper(),
