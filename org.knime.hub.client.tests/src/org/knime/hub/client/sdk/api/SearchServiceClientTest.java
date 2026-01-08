@@ -17,9 +17,6 @@
  *  along with this program; if not, see <http://www.gnu.org/licenses>.
  *
  * ---------------------------------------------------------------------
- *
- * History
- *   Dec 10, 2025 (assistant): created
  */
 package org.knime.hub.client.sdk.api;
 
@@ -118,8 +115,7 @@ class SearchServiceClientTest extends AbstractTest {
         final var filePath =
             IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append("searchEntities").append(testFileName);
         final var resourceUrl = TestUtil.resolveToURL(filePath);
-        final var jsonBody = TestUtil.readResourceToString(resourceUrl);
-        final var jsonNode = getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResults.class));
+        final var jsonNode = getMapper().valueToTree(getMapper().readValue(resourceUrl, SearchResults.class));
 
         var mapping = get(urlPathEqualTo(urlPath));
         queryParams.forEach((k, v) -> mapping.withQueryParam(k, equalTo(v)));
@@ -127,7 +123,7 @@ class SearchServiceClientTest extends AbstractTest {
         getServerMock().stubFor(mapping.willReturn(aResponse() //
             .withStatus(200) //
             .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON) //
-            .withBody(jsonBody)));
+            .withBody(getMapper().writeValueAsString(jsonNode))));
 
         return jsonNode;
     }
