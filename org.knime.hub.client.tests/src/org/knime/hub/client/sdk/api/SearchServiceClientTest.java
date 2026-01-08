@@ -41,7 +41,6 @@ import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.ent.search.PrivateSearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
-import org.knime.hub.client.sdk.ent.search.SearchResultsCountByCategory;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -120,7 +119,7 @@ class SearchServiceClientTest extends AbstractTest {
             IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append("searchEntities").append(testFileName);
         final var resourceUrl = TestUtil.resolveToURL(filePath);
         final var jsonBody = TestUtil.readResourceToString(resourceUrl);
-        final var jsonNode = toExpectedJsonNode(urlPath, jsonBody);
+        final var jsonNode = getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResults.class));
 
         var mapping = get(urlPathEqualTo(urlPath));
         queryParams.forEach((k, v) -> mapping.withQueryParam(k, equalTo(v)));
@@ -133,14 +132,4 @@ class SearchServiceClientTest extends AbstractTest {
         return jsonNode;
     }
 
-    private static JsonNode toExpectedJsonNode(final String urlPath, final String jsonBody) throws IOException {
-        // Re-marshal through the domain model so numeric fields use their declared Java types (long vs int).
-        if ("/search".equals(urlPath) || "/instant-search".equals(urlPath)) {
-            return getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResults.class));
-        }
-        if ("/search-counts".equals(urlPath)) {
-            return getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResultsCountByCategory.class));
-        }
-        return getMapper().readTree(jsonBody);
-    }
 }
