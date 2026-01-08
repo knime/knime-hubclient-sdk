@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Counts of search results per category.
+ *
+ * @since 1.1.0
  */
 public final class SearchResultsCountByCategory {
 

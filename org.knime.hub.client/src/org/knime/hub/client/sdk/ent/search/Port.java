@@ -3,6 +3,11 @@ package org.knime.hub.client.sdk.ent.search;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+/**
+ * Port description used in search result icons.
+ *
+ * @since 1.1.0
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Port {
 

@@ -14,6 +14,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Base class for search hits returned by the Hub search-service.
+ *
+ * @since 1.1.0
  */
 @JsonIgnoreProperties(value = SearchItem.JSON_PROPERTY_ITEM_TYPE, allowSetters = true, ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY,

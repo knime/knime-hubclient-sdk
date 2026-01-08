@@ -7,6 +7,11 @@ import java.util.Optional;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+/**
+ * Search response payload.
+ *
+ * @since 1.1.0
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class SearchResults {
 

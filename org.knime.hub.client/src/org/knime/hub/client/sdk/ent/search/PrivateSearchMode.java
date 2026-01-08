@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 /**
  * Private search mode flags: include/exclude/auto.
+ *
+ * @since 1.1.0
  */
 public enum PrivateSearchMode {
     INCLUDE("include"),
