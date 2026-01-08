@@ -68,7 +68,7 @@ import jakarta.ws.rs.core.MediaType;
 /**
  * Search service client for KNIME Hub search-service.
  *
- * @since 1.1.0
+ * @since 1.1
  */
 public final class SearchServiceClient {
 

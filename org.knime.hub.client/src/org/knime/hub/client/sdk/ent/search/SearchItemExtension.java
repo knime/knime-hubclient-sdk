@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Extension search result.
  *
- * @since 1.1.0
+ * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public final class SearchItemExtension extends SearchItem {

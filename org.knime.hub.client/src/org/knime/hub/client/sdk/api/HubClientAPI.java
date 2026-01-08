@@ -124,7 +124,7 @@ public final class HubClientAPI implements AutoCloseable {
      * Retrieves the search service client.
      *
      * @return {@link SearchServiceClient}
-     * @since 1.1.0
+     * @since 1.1
      */
     public SearchServiceClient search() {
         return m_searchService;

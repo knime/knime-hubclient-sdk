@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Port description used in search result icons.
  *
- * @since 1.1.0
+ * @since 1.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Port {
