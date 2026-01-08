@@ -131,6 +131,19 @@ public class TestUtil {
     }
 
     /**
+     * Reads a resource into a string.
+     *
+     * @param resourceUrl the resource URL
+     * @return content as string
+     * @throws IOException if reading fails
+     */
+    public static String readResourceToString(final URL resourceUrl) throws IOException {
+        try (var is = resourceUrl.openStream()) {
+            return new String(is.readAllBytes());
+        }
+    }
+
+    /**
      * Asserts the JSON properties of the API response entity given expected JSON paths.
      *
      * @param <R> response entity type
