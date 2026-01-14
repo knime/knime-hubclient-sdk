@@ -198,15 +198,22 @@ public class ApiClient implements AutoCloseable {
     }
 
     private static ObjectMapper createObjectMapper() {
-        // Configure the object mapper for the JSON provider
-        return new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL)
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                .configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false)
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
-                .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
-                .registerModule(new JavaTimeModule())
-                .registerModule(new Jdk8Module()); // Needed for Optional support.
+        // configure the object mapper for the JSON provider
+        final var mapper = new ObjectMapper()
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false)
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+            .enable(DeserializationFeature.READ_ENUMS_USING_TO_STRING)
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module()); // Needed for Optional support.
+
+        // preserve nulls inside explicitly serialized maps
+        mapper.configOverride(Map.class)
+            .setInclude(JsonInclude.Value.construct(JsonInclude.Include.ALWAYS, JsonInclude.Include.ALWAYS));
+
+        return mapper;
     }
 
     /**
