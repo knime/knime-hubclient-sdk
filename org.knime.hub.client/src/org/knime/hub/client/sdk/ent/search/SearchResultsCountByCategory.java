@@ -79,12 +79,12 @@ public final class SearchResultsCountByCategory {
     private final long m_collections;
 
     @JsonCreator
-    private SearchResultsCountByCategory(@JsonProperty(JSON_PROPERTY_ALL) final long all,
-        @JsonProperty(JSON_PROPERTY_WORKFLOWS) final long workflows,
-        @JsonProperty(JSON_PROPERTY_NODES) final long nodes,
-        @JsonProperty(JSON_PROPERTY_EXTENSIONS) final long extensions,
-        @JsonProperty(JSON_PROPERTY_COMPONENTS) final long components,
-        @JsonProperty(JSON_PROPERTY_COLLECTIONS) final long collections) {
+    private SearchResultsCountByCategory(@JsonProperty(value = JSON_PROPERTY_ALL, required = true) final long all,
+        @JsonProperty(value = JSON_PROPERTY_WORKFLOWS, required = true) final long workflows,
+        @JsonProperty(value = JSON_PROPERTY_NODES, required = true) final long nodes,
+        @JsonProperty(value = JSON_PROPERTY_EXTENSIONS, required = true) final long extensions,
+        @JsonProperty(value = JSON_PROPERTY_COMPONENTS, required = true) final long components,
+        @JsonProperty(value = JSON_PROPERTY_COLLECTIONS, required = true) final long collections) {
         m_all = all;
         m_workflows = workflows;
         m_nodes = nodes;

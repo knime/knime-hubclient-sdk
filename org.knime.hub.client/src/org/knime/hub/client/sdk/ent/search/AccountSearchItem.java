@@ -46,6 +46,7 @@
 package org.knime.hub.client.sdk.ent.search;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -72,8 +73,8 @@ public final class AccountSearchItem {
     private final String m_displayName;
 
     @JsonCreator
-    private AccountSearchItem(@JsonProperty(JSON_PROPERTY_ID) final String id,
-        @JsonProperty(JSON_PROPERTY_NAME) final String name,
+    private AccountSearchItem(@JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name,
         @JsonProperty(JSON_PROPERTY_DISPLAY_NAME) final String displayName) {
         m_id = id;
         m_name = name;
@@ -91,8 +92,9 @@ public final class AccountSearchItem {
     }
 
     @JsonProperty(JSON_PROPERTY_DISPLAY_NAME)
-    public String getDisplayName() {
-        return m_displayName;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDisplayName() {
+        return Optional.ofNullable(m_displayName);
     }
 
     @Override

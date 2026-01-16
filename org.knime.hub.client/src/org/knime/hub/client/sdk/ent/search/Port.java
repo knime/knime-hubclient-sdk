@@ -49,8 +49,11 @@ import java.util.Objects;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
+import java.util.Optional;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -81,9 +84,9 @@ public final class Port {
     private final String m_objectClass;
 
     @JsonCreator
-    private Port(@JsonProperty(JSON_PROPERTY_COLOR) final String color,
-        @JsonProperty(JSON_PROPERTY_OPTIONAL) final Boolean optional,
-        @JsonProperty(JSON_PROPERTY_DATA_TYPE) final String dataType,
+    private Port(@JsonProperty(value = JSON_PROPERTY_COLOR, required = true) final String color,
+        @JsonProperty(value = JSON_PROPERTY_OPTIONAL, required = true) final Boolean optional,
+        @JsonProperty(value = JSON_PROPERTY_DATA_TYPE, required = true) final String dataType,
         @JsonProperty(JSON_PROPERTY_NAME) final String name,
         @JsonProperty(JSON_PROPERTY_DESCRIPTION) final String description,
         @JsonProperty(JSON_PROPERTY_OBJECT_CLASS) final String objectClass) {
@@ -111,18 +114,21 @@ public final class Port {
     }
 
     @JsonProperty(JSON_PROPERTY_NAME)
-    public String getName() {
-        return m_name;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getName() {
+        return Optional.ofNullable(m_name);
     }
 
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
-    public String getDescription() {
-        return m_description;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDescription() {
+        return Optional.ofNullable(m_description);
     }
 
     @JsonProperty(JSON_PROPERTY_OBJECT_CLASS)
-    public String getObjectClass() {
-        return m_objectClass;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getObjectClass() {
+        return Optional.ofNullable(m_objectClass);
     }
 
     @Override

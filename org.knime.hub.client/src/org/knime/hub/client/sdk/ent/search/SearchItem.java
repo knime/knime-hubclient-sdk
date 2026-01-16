@@ -45,12 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Optional;
-
-import org.knime.hub.client.sdk.ent.util.EntityUtil;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -58,6 +52,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Base class for search hits returned by the Hub search-service.
@@ -122,16 +121,16 @@ public abstract class SearchItem {
     protected SearchItem(@JsonProperty(JSON_PROPERTY_TITLE) final String title,
         @JsonProperty(JSON_PROPERTY_TITLE_HIGHLIGHTED) final String titleHighlighted,
         @JsonProperty(JSON_PROPERTY_DESCRIPTION) final String description,
-        @JsonProperty(JSON_PROPERTY_ITEM_TYPE) final SearchItemType itemType,
-        @JsonProperty(JSON_PROPERTY_PATH) final String pathToResource,
-        @JsonProperty(JSON_PROPERTY_ID) final String id,
-        @JsonProperty(JSON_PROPERTY_OWNER) final String owner,
+        @JsonProperty(value = JSON_PROPERTY_ITEM_TYPE, required = true) final SearchItemType itemType,
+        @JsonProperty(value = JSON_PROPERTY_PATH, required = true) final String pathToResource,
+        @JsonProperty(value = JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = JSON_PROPERTY_OWNER, required = true) final String owner,
         @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
         @JsonProperty(JSON_PROPERTY_EXPLANATION) final String explanation,
         @JsonProperty(JSON_PROPERTY_MATCHED_QUERIES) final String[] matchedQueries,
         @JsonProperty(JSON_PROPERTY_SCORE) final Float score,
         @JsonProperty(JSON_PROPERTY_KUDOS) final Integer kudosCount,
-        @JsonProperty(JSON_PROPERTY_PRIVATE) final Boolean isPrivate) {
+        @JsonProperty(value = JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate) {
         m_title = title;
         m_titleHighlighted = titleHighlighted;
         m_description = description;
@@ -148,18 +147,21 @@ public abstract class SearchItem {
     }
 
     @JsonProperty(JSON_PROPERTY_TITLE)
-    public String getTitle() {
-        return m_title;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getTitle() {
+        return Optional.ofNullable(m_title);
     }
 
     @JsonProperty(JSON_PROPERTY_TITLE_HIGHLIGHTED)
-    public String getTitleHighlighted() {
-        return m_titleHighlighted;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getTitleHighlighted() {
+        return Optional.ofNullable(m_titleHighlighted);
     }
 
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
-    public String getDescription() {
-        return m_description;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getDescription() {
+        return Optional.ofNullable(m_description);
     }
 
     /**
@@ -188,28 +190,33 @@ public abstract class SearchItem {
     }
 
     @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID)
-    public String getOwnerAccountId() {
-        return m_ownerAccountId;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getOwnerAccountId() {
+        return Optional.ofNullable(m_ownerAccountId);
     }
 
     @JsonProperty(JSON_PROPERTY_EXPLANATION)
-    public String getExplanation() {
-        return m_explanation;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getExplanation() {
+        return Optional.ofNullable(m_explanation);
     }
 
     @JsonProperty(JSON_PROPERTY_MATCHED_QUERIES)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String[]> getMatchedQueries() {
         return Optional.ofNullable(m_matchedQueries).map(qs -> Arrays.copyOf(qs, qs.length));
     }
 
     @JsonProperty(JSON_PROPERTY_SCORE)
-    public Float getScore() {
-        return m_score;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<Float> getScore() {
+        return Optional.ofNullable(m_score);
     }
 
     @JsonProperty(JSON_PROPERTY_KUDOS)
-    public Integer getKudosCount() {
-        return m_kudosCount;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<Integer> getKudosCount() {
+        return Optional.ofNullable(m_kudosCount);
     }
 
     @JsonProperty(JSON_PROPERTY_PRIVATE)

@@ -47,6 +47,7 @@ package org.knime.hub.client.sdk.ent.search;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -89,13 +90,13 @@ public final class Icon {
 
     @JsonCreator
     private Icon(@JsonProperty(JSON_PROPERTY_DATA) final String data,
-        @JsonProperty(JSON_PROPERTY_TYPE) final String type,
-        @JsonProperty(JSON_PROPERTY_DEPRECATED) final boolean deprecated,
-        @JsonProperty(JSON_PROPERTY_STREAMABLE) final boolean streamable,
-        @JsonProperty(JSON_PROPERTY_IN_PORTS) final List<Port> inPorts,
-        @JsonProperty(JSON_PROPERTY_OUT_PORTS) final List<Port> outPorts,
-        @JsonProperty(JSON_PROPERTY_HAS_DYN_IN_PORTS) final boolean hasDynInPorts,
-        @JsonProperty(JSON_PROPERTY_HAS_DYN_OUT_PORTS) final boolean hasDynOutPorts) {
+        @JsonProperty(value = JSON_PROPERTY_TYPE, required = true) final String type,
+        @JsonProperty(value = JSON_PROPERTY_DEPRECATED, required = true) final boolean deprecated,
+        @JsonProperty(value = JSON_PROPERTY_STREAMABLE, required = true) final boolean streamable,
+        @JsonProperty(value = JSON_PROPERTY_IN_PORTS, required = true) final List<Port> inPorts,
+        @JsonProperty(value = JSON_PROPERTY_OUT_PORTS, required = true) final List<Port> outPorts,
+        @JsonProperty(value = JSON_PROPERTY_HAS_DYN_IN_PORTS, required = true) final boolean hasDynInPorts,
+        @JsonProperty(value = JSON_PROPERTY_HAS_DYN_OUT_PORTS, required = true) final boolean hasDynOutPorts) {
         m_data = data;
         m_type = type;
         m_deprecated = deprecated;
@@ -107,8 +108,9 @@ public final class Icon {
     }
 
     @JsonProperty(JSON_PROPERTY_DATA)
-    public String getData() {
-        return m_data;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getData() {
+        return Optional.ofNullable(m_data);
     }
 
     @JsonProperty(JSON_PROPERTY_TYPE)

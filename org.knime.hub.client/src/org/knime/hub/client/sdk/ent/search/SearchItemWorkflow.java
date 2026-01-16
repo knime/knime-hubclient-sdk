@@ -47,6 +47,7 @@ package org.knime.hub.client.sdk.ent.search;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -85,19 +86,19 @@ public final class SearchItemWorkflow extends SearchItem {
     private SearchItemWorkflow(@JsonProperty(SearchItem.JSON_PROPERTY_TITLE) final String title,
         @JsonProperty(SearchItem.JSON_PROPERTY_TITLE_HIGHLIGHTED) final String titleHighlighted,
         @JsonProperty(SearchItem.JSON_PROPERTY_DESCRIPTION) final String description,
-        @JsonProperty(SearchItem.JSON_PROPERTY_ITEM_TYPE) final SearchItemType itemType,
-        @JsonProperty(SearchItem.JSON_PROPERTY_PATH) final String pathToResource,
-        @JsonProperty(SearchItem.JSON_PROPERTY_ID) final String id,
-        @JsonProperty(SearchItem.JSON_PROPERTY_OWNER) final String owner,
+        @JsonProperty(value = SearchItem.JSON_PROPERTY_ITEM_TYPE, required = true) final SearchItemType itemType,
+        @JsonProperty(value = SearchItem.JSON_PROPERTY_PATH, required = true) final String pathToResource,
+        @JsonProperty(value = SearchItem.JSON_PROPERTY_ID, required = true) final String id,
+        @JsonProperty(value = SearchItem.JSON_PROPERTY_OWNER, required = true) final String owner,
         @JsonProperty(SearchItem.JSON_PROPERTY_OWNER_ACCOUNT_ID) final String ownerAccountId,
         @JsonProperty(SearchItem.JSON_PROPERTY_EXPLANATION) final String explanation,
         @JsonProperty(SearchItem.JSON_PROPERTY_MATCHED_QUERIES) final String[] matchedQueries,
         @JsonProperty(SearchItem.JSON_PROPERTY_SCORE) final Float score,
         @JsonProperty(SearchItem.JSON_PROPERTY_KUDOS) final Integer kudosCount,
-        @JsonProperty(SearchItem.JSON_PROPERTY_PRIVATE) final Boolean isPrivate,
-        @JsonProperty(JSON_PROPERTY_TAGS) final List<String> tags,
+        @JsonProperty(value = SearchItem.JSON_PROPERTY_PRIVATE, required = true) final Boolean isPrivate,
+        @JsonProperty(value = JSON_PROPERTY_TAGS, required = true) final List<String> tags,
         @JsonProperty(JSON_PROPERTY_DOWNLOAD_COUNT) final Integer downloadCount,
-        @JsonProperty(JSON_PROPERTY_IS_VERSIONED) final boolean isVersioned,
+        @JsonProperty(value = JSON_PROPERTY_IS_VERSIONED, required = true) final boolean isVersioned,
         @JsonProperty(JSON_PROPERTY_VERSION) final Integer version,
         @JsonProperty(JSON_PROPERTY_VERSION_CREATED_ON) final String versionCreatedOn,
         @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON) final String lastEditedOn) {
@@ -117,8 +118,9 @@ public final class SearchItemWorkflow extends SearchItem {
     }
 
     @JsonProperty(JSON_PROPERTY_DOWNLOAD_COUNT)
-    public Integer getDownloadCount() {
-        return m_downloadCount;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<Integer> getDownloadCount() {
+        return Optional.ofNullable(m_downloadCount);
     }
 
     @JsonProperty(JSON_PROPERTY_IS_VERSIONED)
@@ -127,18 +129,21 @@ public final class SearchItemWorkflow extends SearchItem {
     }
 
     @JsonProperty(JSON_PROPERTY_VERSION)
-    public Integer getVersion() {
-        return m_version;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<Integer> getVersion() {
+        return Optional.ofNullable(m_version);
     }
 
     @JsonProperty(JSON_PROPERTY_VERSION_CREATED_ON)
-    public String getVersionCreatedOn() {
-        return m_versionCreatedOn;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getVersionCreatedOn() {
+        return Optional.ofNullable(m_versionCreatedOn);
     }
 
     @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON)
-    public String getLastEditedOn() {
-        return m_lastEditedOn;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<String> getLastEditedOn() {
+        return Optional.ofNullable(m_lastEditedOn);
     }
 
     @Override

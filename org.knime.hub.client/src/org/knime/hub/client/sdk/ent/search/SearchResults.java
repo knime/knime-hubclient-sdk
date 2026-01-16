@@ -99,14 +99,16 @@ public final class SearchResults {
 
     @JsonCreator
     private SearchResults(
-        @JsonProperty(JSON_PROPERTY_COUNT_BY_CATEGORY) final SearchResultsCountByCategory countByCategory,
-        @JsonProperty(JSON_PROPERTY_RESULTS) final List<SearchItem> results,
-        @JsonProperty(JSON_PROPERTY_SUGGESTED_TAGS) final List<String> suggestedTags,
-        @JsonProperty(JSON_PROPERTY_SUGGESTED_USERNAMES) final List<String> suggestedUsernames,
-        @JsonProperty(JSON_PROPERTY_SUGGESTED_TEAMNAMES) final List<String> suggestedTeamnames,
-        @JsonProperty(JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS) final List<AccountSearchItem> suggestedExternalGroups,
-        @JsonProperty(JSON_PROPERTY_RELATED_TAGS) final List<String> relatedTags,
-        @JsonProperty(JSON_PROPERTY_RELATED_PATH_TAGS) final List<String> relatedPathTags,
+        @JsonProperty(value = JSON_PROPERTY_COUNT_BY_CATEGORY, required = true)
+        final SearchResultsCountByCategory countByCategory,
+        @JsonProperty(value = JSON_PROPERTY_RESULTS, required = true) final List<SearchItem> results,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TAGS, required = true) final List<String> suggestedTags,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_USERNAMES, required = true) final List<String> suggestedUsernames,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TEAMNAMES, required = true) final List<String> suggestedTeamnames,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS, required = true)
+        final List<AccountSearchItem> suggestedExternalGroups,
+        @JsonProperty(value = JSON_PROPERTY_RELATED_TAGS, required = true) final List<String> relatedTags,
+        @JsonProperty(value = JSON_PROPERTY_RELATED_PATH_TAGS, required = true) final List<String> relatedPathTags,
         @JsonProperty(JSON_PROPERTY_TOOK) final Long took,
         @JsonProperty(JSON_PROPERTY_ES_QUERY) final String esQuery,
         @JsonProperty(JSON_PROPERTY_ES_RESULT) final String esResult) {
@@ -164,16 +166,19 @@ public final class SearchResults {
     }
 
     @JsonProperty(JSON_PROPERTY_TOOK)
-    public Long getTook() {
-        return m_took;
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    public Optional<Long> getTook() {
+        return Optional.ofNullable(m_took);
     }
 
     @JsonProperty(JSON_PROPERTY_ES_QUERY)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getEsQuery() {
         return Optional.ofNullable(m_esQuery);
     }
 
     @JsonProperty(JSON_PROPERTY_ES_RESULT)
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getEsResult() {
         return Optional.ofNullable(m_esResult);
     }
