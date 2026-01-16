@@ -2,6 +2,9 @@ package org.knime.hub.client.sdk.ent.search;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -91,5 +94,36 @@ public final class SearchItemWorkflow extends SearchItem {
     @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON)
     public String getLastEditedOn() {
         return m_lastEditedOn;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+        var that = (SearchItemWorkflow)o;
+        return m_isVersioned == that.m_isVersioned
+            && Objects.equals(m_tags, that.m_tags)
+            && Objects.equals(m_downloadCount, that.m_downloadCount)
+            && Objects.equals(m_version, that.m_version)
+            && Objects.equals(m_versionCreatedOn, that.m_versionCreatedOn)
+            && Objects.equals(m_lastEditedOn, that.m_lastEditedOn);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_tags, m_downloadCount, m_isVersioned, m_version, m_versionCreatedOn, m_lastEditedOn,
+            super.hashCode());
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

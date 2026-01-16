@@ -1,5 +1,9 @@
 package org.knime.hub.client.sdk.ent.search;
 
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -73,5 +77,32 @@ public final class Port {
     @JsonProperty(JSON_PROPERTY_OBJECT_CLASS)
     public String getObjectClass() {
         return m_objectClass;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (Port)o;
+        return Objects.equals(m_color, that.m_color)
+            && Objects.equals(m_optional, that.m_optional)
+            && Objects.equals(m_dataType, that.m_dataType)
+            && Objects.equals(m_name, that.m_name)
+            && Objects.equals(m_description, that.m_description)
+            && Objects.equals(m_objectClass, that.m_objectClass);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_color, m_optional, m_dataType, m_name, m_description, m_objectClass);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

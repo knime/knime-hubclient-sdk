@@ -2,6 +2,9 @@ package org.knime.hub.client.sdk.ent.search;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -96,5 +99,35 @@ public final class Icon {
     @JsonProperty(JSON_PROPERTY_HAS_DYN_OUT_PORTS)
     public boolean hasDynamicOutPorts() {
         return m_hasDynOutPorts;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (Icon)o;
+        return m_deprecated == that.m_deprecated
+            && m_streamable == that.m_streamable
+            && m_hasDynInPorts == that.m_hasDynInPorts
+            && m_hasDynOutPorts == that.m_hasDynOutPorts
+            && Objects.equals(m_data, that.m_data)
+            && Objects.equals(m_type, that.m_type)
+            && Objects.equals(m_inPorts, that.m_inPorts)
+            && Objects.equals(m_outPorts, that.m_outPorts);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_data, m_type, m_deprecated, m_streamable, m_inPorts, m_outPorts, m_hasDynInPorts,
+            m_hasDynOutPorts);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

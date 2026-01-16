@@ -1,5 +1,9 @@
 package org.knime.hub.client.sdk.ent.search;
 
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -71,5 +75,32 @@ public final class SearchResultsCountByCategory {
     @JsonProperty(JSON_PROPERTY_COLLECTIONS)
     public long getCollections() {
         return m_collections;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (SearchResultsCountByCategory)o;
+        return m_all == that.m_all
+            && m_workflows == that.m_workflows
+            && m_nodes == that.m_nodes
+            && m_extensions == that.m_extensions
+            && m_components == that.m_components
+            && m_collections == that.m_collections;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_all, m_workflows, m_nodes, m_extensions, m_components, m_collections);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

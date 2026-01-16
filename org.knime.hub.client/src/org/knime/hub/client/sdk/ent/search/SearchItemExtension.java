@@ -1,5 +1,9 @@
 package org.knime.hub.client.sdk.ent.search;
 
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -48,5 +52,31 @@ public final class SearchItemExtension extends SearchItem {
     @JsonProperty(JSON_PROPERTY_TRUSTED)
     public Boolean isTrusted() {
         return m_trusted;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+        var that = (SearchItemExtension)o;
+        return Objects.equals(m_vendor, that.m_vendor)
+            && Objects.equals(m_trusted, that.m_trusted);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_vendor, m_trusted, super.hashCode());
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

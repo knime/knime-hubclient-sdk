@@ -3,6 +3,9 @@ package org.knime.hub.client.sdk.ent.search;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
+
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -127,5 +130,38 @@ public final class SearchResults {
     @JsonProperty(JSON_PROPERTY_ES_RESULT)
     public Optional<String> getEsResult() {
         return Optional.ofNullable(m_esResult);
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (SearchResults)o;
+        return Objects.equals(m_countByCategory, that.m_countByCategory)
+            && Objects.equals(m_results, that.m_results)
+            && Objects.equals(m_suggestedTags, that.m_suggestedTags)
+            && Objects.equals(m_suggestedUsernames, that.m_suggestedUsernames)
+            && Objects.equals(m_suggestedTeamnames, that.m_suggestedTeamnames)
+            && Objects.equals(m_suggestedExternalGroups, that.m_suggestedExternalGroups)
+            && Objects.equals(m_relatedTags, that.m_relatedTags)
+            && Objects.equals(m_relatedPathTags, that.m_relatedPathTags)
+            && Objects.equals(m_took, that.m_took)
+            && Objects.equals(m_esQuery, that.m_esQuery)
+            && Objects.equals(m_esResult, that.m_esResult);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_countByCategory, m_results, m_suggestedTags, m_suggestedUsernames, m_suggestedTeamnames,
+            m_suggestedExternalGroups, m_relatedTags, m_relatedPathTags, m_took, m_esQuery, m_esResult);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 }

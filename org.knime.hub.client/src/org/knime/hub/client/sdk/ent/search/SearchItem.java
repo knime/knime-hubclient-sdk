@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -166,6 +168,41 @@ public abstract class SearchItem {
     @JsonProperty(JSON_PROPERTY_PRIVATE)
     public Boolean isPrivate() {
         return m_private;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (SearchItem)o;
+        return Objects.equals(m_title, that.m_title)
+            && Objects.equals(m_titleHighlighted, that.m_titleHighlighted)
+            && Objects.equals(m_description, that.m_description)
+            && Objects.equals(m_itemType, that.m_itemType)
+            && Objects.equals(m_pathToResource, that.m_pathToResource)
+            && Objects.equals(m_id, that.m_id)
+            && Objects.equals(m_owner, that.m_owner)
+            && Objects.equals(m_ownerAccountId, that.m_ownerAccountId)
+            && Objects.equals(m_explanation, that.m_explanation)
+            && Arrays.equals(m_matchedQueries, that.m_matchedQueries)
+            && Objects.equals(m_score, that.m_score)
+            && Objects.equals(m_kudosCount, that.m_kudosCount)
+            && Objects.equals(m_private, that.m_private);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_title, m_titleHighlighted, m_description, m_itemType, m_pathToResource, m_id, m_owner,
+            m_ownerAccountId, m_explanation, Arrays.hashCode(m_matchedQueries), m_score, m_kudosCount, m_private);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
     }
 
     /**
