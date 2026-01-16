@@ -89,12 +89,12 @@ public final class Icon {
     }
 
     @JsonProperty(JSON_PROPERTY_HAS_DYN_IN_PORTS)
-    public boolean isHasDynInPorts() {
+    public boolean hasDynamicInPorts() {
         return m_hasDynInPorts;
     }
 
     @JsonProperty(JSON_PROPERTY_HAS_DYN_OUT_PORTS)
-    public boolean isHasDynOutPorts() {
+    public boolean hasDynamicOutPorts() {
         return m_hasDynOutPorts;
     }
 }
