@@ -86,6 +86,7 @@ import jakarta.ws.rs.core.MediaType;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
+@SuppressWarnings({"java:S1694", "java:S1118"}) // S1694, S1118: abstract test base class
 public abstract class AbstractTest {
 
     private static ApiClient apiClient;
@@ -122,6 +123,24 @@ public abstract class AbstractTest {
                 .mappingProvider(new JacksonMappingProvider())
                 .options(Option.DEFAULT_PATH_LEAF_TO_NULL)
                 .build();
+    }
+
+    /**
+     * Returns the shared {@link ApiClient} used by tests.
+     *
+     * @return api client instance
+     */
+    protected static ApiClient getApiClient() {
+        return apiClient;
+    }
+
+    /**
+     * Returns the WireMock server instance.
+     *
+     * @return server mock
+     */
+    protected static WireMockServer getServerMock() {
+        return serverMock;
     }
 
     /**
@@ -184,7 +203,7 @@ public abstract class AbstractTest {
      * @param filename the name of the file in the resource folder
      * @param clazz the {@link Class} of the entity
      * @return the created entity
-     * @throws IOException
+     * @throws IOException if the fixture cannot be read
      */
     public static <T> T load(final EntityFolders entityFolder, final String filename, final Class<T> clazz)
         throws IOException {
