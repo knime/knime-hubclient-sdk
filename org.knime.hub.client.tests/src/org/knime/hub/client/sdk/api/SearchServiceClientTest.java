@@ -81,14 +81,14 @@ class SearchServiceClientTest extends AbstractTest {
 
     @Test
     void testSearchDeserializesComponentHit() throws IOException {
-        final String fixture = "search-components.json";
+        final var fixture = "search-components.json";
         final JsonNode expectedResponse = stubSearchResponse( //
             fixture, //
             "/search", //
             Map.of( //
                 "query", "foo", //
                 "type", "component", //
-                "limit", "5", ///
+                "limit", "5", //
                 "offset", "0", //
                 "sort", "best", //
                 "privateSearchMode", "include" //

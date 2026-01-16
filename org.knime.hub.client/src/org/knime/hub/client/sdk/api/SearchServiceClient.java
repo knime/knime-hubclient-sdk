@@ -85,7 +85,6 @@ public final class SearchServiceClient {
     private static final String QUERY_PARAM_OWNER = "owner";
 
     private static final GenericType<SearchResults> SEARCH_RESULTS = new GenericType<>() {};
-    private static final GenericType<SearchResultsCountByCategory> SEARCH_RESULTS_COUNT = new GenericType<>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -115,6 +114,7 @@ public final class SearchServiceClient {
      * @return {@link ApiResponse} containing {@link SearchResults}
      * @throws HubFailureIOException if the request fails
      */
+    @SuppressWarnings("java:S107") // S107: API signature mirrors search-service parameters
     public ApiResponse<SearchResults> search(final String query, final SearchType type, final Integer limit,
         final Integer offset, final SearchSort sort, final PrivateSearchMode privateSearchMode,
         final List<String> tags, final String owner, final Boolean debug, final Integer scoreLimit,
