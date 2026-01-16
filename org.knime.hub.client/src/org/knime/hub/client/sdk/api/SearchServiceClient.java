@@ -61,6 +61,9 @@ import org.knime.hub.client.sdk.ent.search.PrivateSearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.ent.search.SearchResultsCountByCategory;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
 
@@ -166,7 +169,8 @@ public final class SearchServiceClient {
         NODE("node"),
         EXTENSION("extension"),
         COLLECTION("collection"),
-        ALL("all");
+        ALL("all"),
+        UNKNOWN("unknown");
 
         private final String m_value;
 
@@ -174,8 +178,19 @@ public final class SearchServiceClient {
             m_value = value;
         }
 
+        @JsonValue
         public String getValue() {
             return m_value;
+        }
+
+        @JsonCreator
+        public static SearchType fromValue(final String value) {
+            for (var type : SearchType.values()) {
+                if (Objects.equals(type.m_value, value)) {
+                    return type;
+                }
+            }
+            return UNKNOWN;
         }
     }
 
@@ -189,7 +204,8 @@ public final class SearchServiceClient {
         MAX_DOWNLOADS("maxDownloads"),
         MIN_DOWNLOADS("minDownloads"),
         MAX_KUDOS("maxKudos"),
-        MIN_KUDOS("minKudos");
+        MIN_KUDOS("minKudos"),
+        UNKNOWN("unknown");
 
         private final String m_value;
 
@@ -197,8 +213,19 @@ public final class SearchServiceClient {
             m_value = value;
         }
 
+        @JsonValue
         public String getValue() {
             return m_value;
+        }
+
+        @JsonCreator
+        public static SearchSort fromValue(final String value) {
+            for (var sort : SearchSort.values()) {
+                if (Objects.equals(sort.m_value, value)) {
+                    return sort;
+                }
+            }
+            return UNKNOWN;
         }
     }
 }

@@ -13,7 +13,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum PrivateSearchMode {
     INCLUDE("include"),
     EXCLUDE("exclude"),
-    AUTO("auto");
+    AUTO("auto"),
+    UNKNOWN("unknown");
 
     private final String m_mode;
 
@@ -33,8 +34,7 @@ public enum PrivateSearchMode {
 
     @JsonCreator
     public static PrivateSearchMode fromValue(final String value) {
-        return fromString(value).orElseThrow(
-            () -> new IllegalArgumentException("Unexpected privateSearchMode '" + value + "'"));
+        return fromString(value).orElse(UNKNOWN);
     }
 
     public static Optional<PrivateSearchMode> fromString(final String value) {
