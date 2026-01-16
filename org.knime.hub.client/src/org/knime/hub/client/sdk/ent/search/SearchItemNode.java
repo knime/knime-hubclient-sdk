@@ -45,7 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -98,8 +97,8 @@ public final class SearchItemNode extends SearchItem {
             matchedQueries, score, kudosCount, isPrivate);
         m_icon = icon;
         m_featureSymbolicName = featureSymbolicName;
-        m_tags = tags == null ? new ArrayList<>() : tags;
-        m_keywords = keywords == null ? new ArrayList<>() : keywords;
+        m_tags = tags;
+        m_keywords = keywords;
     }
 
     @JsonProperty(JSON_PROPERTY_ICON)

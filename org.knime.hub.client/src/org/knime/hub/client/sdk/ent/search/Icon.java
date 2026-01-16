@@ -45,7 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -101,8 +100,8 @@ public final class Icon {
         m_type = type;
         m_deprecated = deprecated;
         m_streamable = streamable;
-        m_inPorts = inPorts == null ? new ArrayList<>() : inPorts;
-        m_outPorts = outPorts == null ? new ArrayList<>() : outPorts;
+        m_inPorts = inPorts;
+        m_outPorts = outPorts;
         m_hasDynInPorts = hasDynInPorts;
         m_hasDynOutPorts = hasDynOutPorts;
     }

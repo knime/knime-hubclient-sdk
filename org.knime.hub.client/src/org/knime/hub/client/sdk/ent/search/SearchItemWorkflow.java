@@ -45,7 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -104,7 +103,7 @@ public final class SearchItemWorkflow extends SearchItem {
         @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON) final String lastEditedOn) {
         super(title, titleHighlighted, description, itemType, pathToResource, id, owner, ownerAccountId, explanation,
             matchedQueries, score, kudosCount, isPrivate);
-        m_tags = tags == null ? new ArrayList<>() : tags;
+        m_tags = tags;
         m_downloadCount = downloadCount;
         m_isVersioned = isVersioned || version != null;
         m_version = version;

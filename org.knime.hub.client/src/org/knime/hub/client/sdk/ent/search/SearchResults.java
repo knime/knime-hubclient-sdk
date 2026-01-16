@@ -45,7 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
@@ -112,13 +111,13 @@ public final class SearchResults {
         @JsonProperty(JSON_PROPERTY_ES_QUERY) final String esQuery,
         @JsonProperty(JSON_PROPERTY_ES_RESULT) final String esResult) {
         m_countByCategory = countByCategory;
-        m_results = results == null ? new ArrayList<>() : results;
-        m_suggestedTags = suggestedTags == null ? new ArrayList<>() : suggestedTags;
-        m_suggestedUsernames = suggestedUsernames == null ? new ArrayList<>() : suggestedUsernames;
-        m_suggestedTeamnames = suggestedTeamnames == null ? new ArrayList<>() : suggestedTeamnames;
-        m_suggestedExternalGroups = suggestedExternalGroups == null ? new ArrayList<>() : suggestedExternalGroups;
-        m_relatedTags = relatedTags == null ? new ArrayList<>() : relatedTags;
-        m_relatedPathTags = relatedPathTags == null ? new ArrayList<>() : relatedPathTags;
+        m_results = results;
+        m_suggestedTags = suggestedTags;
+        m_suggestedUsernames = suggestedUsernames;
+        m_suggestedTeamnames = suggestedTeamnames;
+        m_suggestedExternalGroups = suggestedExternalGroups;
+        m_relatedTags = relatedTags;
+        m_relatedPathTags = relatedPathTags;
         m_took = took;
         m_esQuery = esQuery;
         m_esResult = esResult;

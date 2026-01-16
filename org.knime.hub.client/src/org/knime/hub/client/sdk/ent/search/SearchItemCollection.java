@@ -45,7 +45,6 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -84,7 +83,7 @@ public final class SearchItemCollection extends SearchItem {
         @JsonProperty(JSON_PROPERTY_TAGS) final List<String> tags) {
         super(title, titleHighlighted, description, itemType, pathToResource, id, owner, ownerAccountId, explanation,
             matchedQueries, score, kudosCount, isPrivate);
-        m_tags = tags == null ? new ArrayList<>() : tags;
+        m_tags = tags;
     }
 
     @JsonProperty(JSON_PROPERTY_TAGS)
