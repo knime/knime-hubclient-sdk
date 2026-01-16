@@ -69,6 +69,7 @@ public abstract class SearchItem {
     protected static final String JSON_PROPERTY_PRIVATE = "private";
     private final Boolean m_private;
 
+    @JsonCreator
     protected SearchItem(@JsonProperty(JSON_PROPERTY_TITLE) final String title,
         @JsonProperty(JSON_PROPERTY_TITLE_HIGHLIGHTED) final String titleHighlighted,
         @JsonProperty(JSON_PROPERTY_DESCRIPTION) final String description,
@@ -97,16 +98,6 @@ public abstract class SearchItem {
         m_private = isPrivate;
     }
 
-    /**
-     * Returns the item type.
-     *
-     * @return type
-     */
-    @JsonProperty(JSON_PROPERTY_ITEM_TYPE)
-    public SearchItemType getItemType() {
-        return m_itemType;
-    }
-
     @JsonProperty(JSON_PROPERTY_TITLE)
     public String getTitle() {
         return m_title;
@@ -120,6 +111,16 @@ public abstract class SearchItem {
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
     public String getDescription() {
         return m_description;
+    }
+
+    /**
+     * Returns the item type.
+     *
+     * @return type
+     */
+    @JsonProperty(JSON_PROPERTY_ITEM_TYPE)
+    public SearchItemType getItemType() {
+        return m_itemType;
     }
 
     @JsonProperty(JSON_PROPERTY_PATH)
