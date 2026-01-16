@@ -53,7 +53,6 @@ import java.util.stream.Collectors;
 
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
-import org.knime.core.node.util.CheckUtils;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
