@@ -1,0 +1,41 @@
+{
+  "@namespaces" : {
+    "knime" : {
+      "name" : "http://www.knime.com/server/rels#"
+    }
+  },
+  "@controls" : {
+    "self" : {
+      "href" : "https://api.hub.knime.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d",
+      "isHrefTemplate" : true,
+      "method" : "GET"
+    },
+    "knime:show-group" : {
+      "href" : "https://api.hub.knime.com/accounts/account:user:395acdbe-324d-4da4-800e-2f2a3a142b0d/groups/{group-id}",
+      "isHrefTemplate" : true,
+      "method" : "GET"
+    }
+  },
+  "type" : "TEAM",
+  "id" : "account:team:b22d2848-a7f3-4a4f-ab80-aef024513b2f",
+  "name" : "Development",
+  "creationDate" : "2023-06-07T11:50:10Z",
+  "lastModificationDate" : "2025-05-15T09:28:29Z",
+  "description" : "",
+  "avatarUrl" : "",
+  "groups" : [ {
+    "name" : "accountAdmin",
+    "displayName" : "Admins",
+    "id" : "account:team:b22d2848-a7f3-4a4f-ab80-aef024513b2f:group:accountAdmin",
+    "members" : [ "account:user:92bfd35e-29bd-4bb1-8cc0-1fc57ebb799d" ]
+  }, {
+    "name" : "accountMember",
+    "displayName" : "Members",
+    "id" : "account:team:b22d2848-a7f3-4a4f-ab80-aef024513b2f:group:accountMember",
+    "members" : [ "account:user:299a1ddf-8ff7-4416-9ba8-cd297969715b" ]
+  } ],
+  "members" : [  {
+    "id" : "account:user:92bfd35e-29bd-4bb1-8cc0-1fc57ebb799d",
+    "name" : "member1"
+  } ]
+}

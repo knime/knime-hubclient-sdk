@@ -75,10 +75,11 @@ import com.fasterxml.jackson.annotation.OptBoolean;
         requireTypeIdForSubtypes = OptBoolean.TRUE
 )
 @JsonSubTypes({ //
-        @JsonSubTypes.Type(value = UserAccount.class, name = UserAccount.TYPE) //
+        @JsonSubTypes.Type(value = UserAccount.class, name = UserAccount.TYPE), //
+        @JsonSubTypes.Type(value = TeamAccount.class, name = TeamAccount.TYPE) //
 })
 @JsonPropertyOrder({ AccountIdentity.JSON_PROPERTY_TYPE, AccountIdentity.JSON_PROPERTY_ID }) // Serialize first
-public abstract sealed class AccountIdentity permits UserAccount {
+public abstract sealed class AccountIdentity permits UserAccount, TeamAccount {
 
     /**
      * Repository item type enum.
@@ -86,8 +87,13 @@ public abstract sealed class AccountIdentity permits UserAccount {
     public enum AccountIdentityType {
         /** user type */
         USER(UserAccount.TYPE), //
+        /**
+         * team type
+         * @since 1.1
+         */
+        TEAM(TeamAccount.TYPE), //
         /** application type */
-        APPLICATION("APPLICATION"),
+        APPLICATION("APPLICATION"), //
         /** service type */
         SERVICE("SERVICE");
 
