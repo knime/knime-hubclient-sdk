@@ -66,12 +66,28 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Team {
 
+    private static final String JSON_PROPERTY_ID = "id";
     private static final String JSON_PROPERTY_NAME = "name";
+    private final String m_id;
     private final String m_name;
 
     @JsonCreator
-    private Team(@JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name) {
+    private Team(@JsonProperty(value = JSON_PROPERTY_ID) final String id,
+        @JsonProperty(value = JSON_PROPERTY_NAME, required = true) final String name) {
+        m_id = id;
         m_name = name;
+    }
+
+    /**
+     * Retrieves the team id.
+     *
+     * @return the team id, or null if it was not provided
+     * @since 1.2
+     */
+    @JsonProperty(JSON_PROPERTY_ID)
+    @JsonInclude(value = JsonInclude.Include.NON_NULL)
+    public String getId() {
+        return m_id;
     }
 
     /**
@@ -94,12 +110,12 @@ public final class Team {
             return false;
         }
         var team = (Team) o;
-        return Objects.equals(this.m_name, team.m_name);
+        return Objects.equals(this.m_id, team.m_id) && Objects.equals(this.m_name, team.m_name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_name);
+        return Objects.hash(m_id, m_name);
     }
 
     @Override
