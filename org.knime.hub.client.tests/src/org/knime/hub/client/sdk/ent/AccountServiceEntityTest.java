@@ -76,7 +76,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@SuppressWarnings("java:S2701") // ignore the warning regarding nulls in assertions because of access restriction
+@SuppressWarnings({"java:S2701", "java:S1192"}) // ignore the warning regarding nulls in assertions because of access restriction
 class AccountServiceEntityTest extends AbstractTest {
 
     @Test
