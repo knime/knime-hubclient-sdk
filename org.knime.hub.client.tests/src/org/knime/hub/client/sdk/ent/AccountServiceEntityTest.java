@@ -76,7 +76,7 @@ import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
  *
  * @author Magnus Gohm, KNIME AG, Konstanz, Germany
  */
-@SuppressWarnings("java:S2701") // ignore the warning regarding nulls in assertions because of access restriction
+@SuppressWarnings({"java:S2701", "java:S1192"}) // ignore the warning regarding nulls in assertions because of access restriction
 class AccountServiceEntityTest extends AbstractTest {
 
     @Test
@@ -170,6 +170,7 @@ class AccountServiceEntityTest extends AbstractTest {
         final var teams = userAccountIdentity.getTeams();
         assertTrue(!teams.isEmpty(), "Expected teams");
         final var team = teams.get(0);
+        assertEquals("account:team:f2ace523-5566-4cd7-bb69-9b61fb63b16e", team.getId(), "Unexpected team id");
         assertEquals("Space Explorer Team", team.getName(), "Unexpected team name");
     }
 
