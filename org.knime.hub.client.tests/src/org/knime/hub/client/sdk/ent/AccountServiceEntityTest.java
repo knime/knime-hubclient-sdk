@@ -170,6 +170,7 @@ class AccountServiceEntityTest extends AbstractTest {
         final var teams = userAccountIdentity.getTeams();
         assertTrue(!teams.isEmpty(), "Expected teams");
         final var team = teams.get(0);
+        assertEquals("account:team:f2ace523-5566-4cd7-bb69-9b61fb63b16e", team.getId(), "Unexpected team id");
         assertEquals("Space Explorer Team", team.getName(), "Unexpected team name");
     }
 
