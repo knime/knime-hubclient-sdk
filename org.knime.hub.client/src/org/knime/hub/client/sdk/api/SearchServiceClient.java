@@ -45,7 +45,10 @@
 
 package org.knime.hub.client.sdk.api;
 
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -55,9 +58,14 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.annotation.NotOwning;
 import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
+import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.Result;
+import org.knime.hub.client.sdk.ent.search.SearchItem;
+import org.knime.hub.client.sdk.ent.search.SearchItemComponent;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
+import org.knime.hub.client.sdk.ent.search.SearchResultsCountByCategory;
 
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
@@ -71,6 +79,8 @@ public final class SearchServiceClient {
 
     private static final String SEARCH_API_PATH = "search";
     private static final String SEARCH_COMPONENTS_API_PATH = "search/components";
+    private static final String COMPONENT_SEARCH_FIXTURE_PATH =
+        "resources/searchEntities/search-components-mock.json";
 
     private static final String QUERY_PARAM_QUERY = "query";
     private static final String QUERY_PARAM_TYPE = "type";
@@ -80,6 +90,7 @@ public final class SearchServiceClient {
     private static final String QUERY_PARAM_PRIVATE_SEARCH_MODE = "privateSearchMode";
     private static final String QUERY_PARAM_SEARCH_MODE = "searchMode";
     private static final String QUERY_PARAM_PORT_TYPE = "portType";
+    private static final String QUERY_PARAM_SIDE = "side";
     private static final String QUERY_PARAM_DEBUG = "debug";
     private static final String QUERY_PARAM_SCORE_LIMIT = "scoreLimit";
     private static final String QUERY_PARAM_TAG = "tag";
@@ -146,6 +157,7 @@ public final class SearchServiceClient {
      * @param query search text (empty string matches all)
      * @param portType optional port type filter
      * @param searchMode scope selector for the search result
+     * @param side optional side filter ({@code input} or {@code output})
      * @param offset first result offset, {@code null} to use service default
      * @param limit number of results to return, {@code null} to use service default
      * @param additionalHeaders additional headers to forward
@@ -153,21 +165,100 @@ public final class SearchServiceClient {
      * @throws HubFailureIOException if the request fails
      */
     public ApiResponse<SearchResults> componentSearch(final String query, final String portType,
-        final SearchMode searchMode, final Integer offset, final Integer limit,
+        final SearchMode searchMode, final String side, final Integer offset, final Integer limit,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        final var searchResults = loadComponentSearchFixture();
+        final var filteredResults = filterComponentSearchResults(searchResults, side, portType, offset, limit);
+        return new ApiResponse<>(Map.of(), 200, "OK", Optional.empty(), Result.success(filteredResults));
+    }
 
-        final var requestPath = IPath.forPosix(SEARCH_COMPONENTS_API_PATH);
+    private SearchResults loadComponentSearchFixture() throws HubFailureIOException {
+        try (var fixtureStream = SearchServiceClient.class.getClassLoader()
+            .getResourceAsStream(COMPONENT_SEARCH_FIXTURE_PATH)) {
+            if (fixtureStream == null) {
+                throw new IOException("Missing component search fixture: " + COMPONENT_SEARCH_FIXTURE_PATH);
+            }
+            return m_apiClient.getObjectMapper().readValue(fixtureStream, SearchResults.class);
+        } catch (final IOException ex) {
+            throw new HubFailureIOException(FailureValue.fromUnexpectedThrowable(
+                "Failed to load component search fixture", List.of(), ex));
+        }
+    }
 
-        return m_apiClient.createApiRequest() //
-            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
-            .withHeaders(additionalHeaders) //
-            .withQueryParam(QUERY_PARAM_QUERY, query) //
-            .withQueryParam(QUERY_PARAM_PORT_TYPE, portType) //
-            .withQueryParam(QUERY_PARAM_SEARCH_MODE, Optional.ofNullable(searchMode).map(SearchMode::getValue)
-                .orElse(null)) //
-            .withQueryParam(QUERY_PARAM_OFFSET, toString(offset)) //
-            .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
-            .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
+    private SearchResults filterComponentSearchResults(final SearchResults searchResults, final String side,
+        final String portTypeId, final Integer offset, final Integer limit) {
+        final var normalizedSide = normalizeSide(side);
+        final var normalizedPortTypeId = normalizePortTypeId(portTypeId);
+
+        final var filtered = searchResults.getResults().stream() //
+            .filter(item -> matchesPortFilter(item, normalizedSide, normalizedPortTypeId)) //
+            .collect(Collectors.toList());
+
+        final var totalCount = filtered.size();
+        final var paged = applyOffsetLimit(filtered, offset, limit);
+        final var countByCategory = new SearchResultsCountByCategory(totalCount, 0, 0, 0, totalCount, 0);
+
+        return new SearchResults(countByCategory, paged, searchResults.getSuggestedTags(),
+            searchResults.getSuggestedUsernames(), searchResults.getSuggestedTeamnames(),
+            searchResults.getSuggestedExternalGroups(), searchResults.getRelatedTags(),
+            searchResults.getRelatedPathTags(), searchResults.getTook().orElse(null),
+            searchResults.getEsQuery().orElse(null), searchResults.getEsResult().orElse(null));
+    }
+
+    private static String normalizeSide(final String side) {
+        if (side == null) {
+            return null;
+        }
+        final var normalized = side.trim().toLowerCase(Locale.ROOT);
+        return "input".equals(normalized) || "output".equals(normalized) ? normalized : null;
+    }
+
+    private static String normalizePortTypeId(final String portTypeId) {
+        if (portTypeId == null || portTypeId.isBlank()) {
+            return null;
+        }
+        return portTypeId.trim();
+    }
+
+    private static boolean matchesPortFilter(final SearchItem item, final String side, final String portTypeId) {
+        if (side == null && portTypeId == null) {
+            return true;
+        }
+        if (!(item instanceof SearchItemComponent component)) {
+            return false;
+        }
+
+        final var icon = component.getIcon().orElse(null);
+        if (icon == null) {
+            return false;
+        }
+
+        final var candidates = new ArrayList<>(icon.getInPorts());
+        if ("input".equals(side)) {
+            candidates.clear();
+            candidates.addAll(icon.getInPorts());
+        } else if ("output".equals(side)) {
+            candidates.clear();
+            candidates.addAll(icon.getOutPorts());
+        } else {
+            candidates.addAll(icon.getOutPorts());
+        }
+
+        if (portTypeId == null) {
+            return !candidates.isEmpty();
+        }
+
+        return candidates.stream().anyMatch(port -> portTypeId.equals(port.getObjectClass().orElse(null)));
+    }
+
+    private static List<SearchItem> applyOffsetLimit(final List<SearchItem> items, final Integer offset,
+        final Integer limit) {
+        final var start = offset == null ? 0 : Math.max(0, offset);
+        if (start >= items.size()) {
+            return List.of();
+        }
+        final var end = limit == null ? items.size() : Math.min(items.size(), start + Math.max(0, limit));
+        return List.copyOf(items.subList(start, end));
     }
 
 
