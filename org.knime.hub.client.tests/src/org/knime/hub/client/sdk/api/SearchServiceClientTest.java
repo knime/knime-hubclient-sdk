@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.api.SearchServiceClient.PrivateSearchMode;
+import org.knime.hub.client.sdk.api.SearchServiceClient.SearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
@@ -105,6 +106,34 @@ class SearchServiceClientTest extends AbstractTest {
             null, //
             null, //
             null, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
+            getJsonPathConfig());
+    }
+
+    @Test
+    void testComponentSearchEndpointDeserializesResults() throws IOException {
+        final var fixture = "search-components-endpoint.json";
+        final JsonNode expectedResponse = stubSearchResponse( //
+            fixture, //
+            "/search/components", //
+            Map.of( //
+                "query", "knime", //
+                "portType", "org.knime.core.node.port.data.table.DataTablePortObject", //
+                "searchMode", "global", //
+                "offset", "0", //
+                "limit", "10" //
+            ));
+
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.componentSearch( //
+            "knime", //
+            "org.knime.core.node.port.data.table.DataTablePortObject", //
+            SearchMode.GLOBAL, //
+            0, //
+            10, //
             Map.of() //
         );
 

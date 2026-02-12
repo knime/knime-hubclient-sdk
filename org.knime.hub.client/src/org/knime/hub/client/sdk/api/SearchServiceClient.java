@@ -70,6 +70,7 @@ import jakarta.ws.rs.core.MediaType;
 public final class SearchServiceClient {
 
     private static final String SEARCH_API_PATH = "search";
+    private static final String SEARCH_COMPONENTS_API_PATH = "search/components";
 
     private static final String QUERY_PARAM_QUERY = "query";
     private static final String QUERY_PARAM_TYPE = "type";
@@ -77,6 +78,8 @@ public final class SearchServiceClient {
     private static final String QUERY_PARAM_OFFSET = "offset";
     private static final String QUERY_PARAM_SORT = "sort";
     private static final String QUERY_PARAM_PRIVATE_SEARCH_MODE = "privateSearchMode";
+    private static final String QUERY_PARAM_SEARCH_MODE = "searchMode";
+    private static final String QUERY_PARAM_PORT_TYPE = "portType";
     private static final String QUERY_PARAM_DEBUG = "debug";
     private static final String QUERY_PARAM_SCORE_LIMIT = "scoreLimit";
     private static final String QUERY_PARAM_TAG = "tag";
@@ -134,6 +137,36 @@ public final class SearchServiceClient {
             .withQueryParam(QUERY_PARAM_SCORE_LIMIT, toString(scoreLimit)) //
             .withQueryParam(tagsToQueryParameter(tags).orElse(null)) //
             .withQueryParam(QUERY_PARAM_OWNER, owner) //
+            .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
+    }
+
+    /**
+     * Executes a component search request against the Hub search-service.
+     *
+     * @param query search text (empty string matches all)
+     * @param portType optional port type filter
+     * @param searchMode scope selector for the search result
+     * @param offset first result offset, {@code null} to use service default
+     * @param limit number of results to return, {@code null} to use service default
+     * @param additionalHeaders additional headers to forward
+     * @return {@link ApiResponse} containing {@link SearchResults}
+     * @throws HubFailureIOException if the request fails
+     */
+    public ApiResponse<SearchResults> componentSearch(final String query, final String portType,
+        final SearchMode searchMode, final Integer offset, final Integer limit,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+
+        final var requestPath = IPath.forPosix(SEARCH_COMPONENTS_API_PATH);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_QUERY, query) //
+            .withQueryParam(QUERY_PARAM_PORT_TYPE, portType) //
+            .withQueryParam(QUERY_PARAM_SEARCH_MODE, Optional.ofNullable(searchMode).map(SearchMode::getValue)
+                .orElse(null)) //
+            .withQueryParam(QUERY_PARAM_OFFSET, toString(offset)) //
+            .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
             .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
     }
 
@@ -211,6 +244,24 @@ public final class SearchServiceClient {
         private final String m_value;
 
         PrivateSearchMode(final String value) {
+            m_value = value;
+        }
+
+        public String getValue() {
+            return m_value;
+        }
+    }
+
+    /**
+     * Search mode selector for component search.
+     */
+    public enum SearchMode {
+        GLOBAL("global"),
+        SCOPED("scoped");
+
+        private final String m_value;
+
+        SearchMode(final String value) {
             m_value = value;
         }
 
