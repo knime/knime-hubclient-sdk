@@ -3,28 +3,115 @@
     {
       "icon": {
         "hasDynInPorts": false,
+        "hasDynOutPorts": true,
+        "inPorts": [
+          {
+            "color": "#4c78a8",
+            "optional": false,
+            "dataType": "Data Table",
+            "objectClass": "org.knime.core.node.port.data.table.DataTablePortObject",
+            "name": "Input Table"
+          },
+          {
+            "color": "#f58518",
+            "optional": true,
+            "dataType": "Flow Variables",
+            "objectClass": "org.knime.core.node.port.flowvariable.FlowVariablePortObject",
+            "name": "Flow Variables"
+          }
+        ],
+        "outPorts": [
+          {
+            "color": "#54a24b",
+            "optional": false,
+            "dataType": "Data Table",
+            "objectClass": "org.knime.core.node.port.data.table.DataTablePortObject",
+            "name": "Output Table"
+          },
+          {
+            "color": "#b79a20",
+            "optional": false,
+            "dataType": "Model",
+            "objectClass": "org.knime.core.node.port.model.ModelPortObject",
+            "name": "Model"
+          }
+        ],
+        "deprecated": false,
+        "streamable": true,
+        "type": "Manipulator"
+      },
+      "downloadCount": 144,
+      "lastEditedOn": "2024-09-18T09:22:11+00:00",
+      "isEncrypted": false,
+      "tags": ["component", "table"],
+      "itemType": "Component",
+      "title": "Data Table Profiler",
+      "private": false,
+      "pathToResource": "/Users/knime/Public/Data Table Profiler",
+      "ownerAccountId": "account:user:12345678-1234-5678-1234-567812345678",
+      "kudosCount": 2,
+      "id": "*4H0xvD1ha6NmoZXX",
+      "description": "Profile a data table and emit a model.",
+      "owner": "knime",
+      "isVersioned": true,
+      "versionCreatedOn": "2024-09-18T09:30:00+00:00",
+      "version": 3
+    },
+    {
+      "icon": {
+        "hasDynInPorts": true,
         "hasDynOutPorts": false,
-        "inPorts": [],
-        "outPorts": [],
+        "inPorts": [
+          {
+            "color": "#e45756",
+            "optional": false,
+            "dataType": "Data Table",
+            "objectClass": "org.knime.core.node.port.data.table.DataTablePortObject",
+            "name": "Data Table"
+          },
+          {
+            "color": "#72b7b2",
+            "optional": false,
+            "dataType": "Model",
+            "objectClass": "org.knime.core.node.port.model.ModelPortObject",
+            "name": "Model"
+          }
+        ],
+        "outPorts": [
+          {
+            "color": "#9d755d",
+            "optional": false,
+            "dataType": "View",
+            "objectClass": "org.knime.core.node.port.view.ViewPortObject",
+            "name": "View"
+          },
+          {
+            "color": "#bab0ac",
+            "optional": true,
+            "dataType": "Flow Variables",
+            "objectClass": "org.knime.core.node.port.flowvariable.FlowVariablePortObject",
+            "name": "Flow Variables"
+          }
+        ],
         "deprecated": false,
         "streamable": false,
         "type": "Visualizer"
       },
-      "downloadCount": 821,
-      "lastEditedOn": "2023-10-25T12:18:22+00:00",
+      "downloadCount": 67,
+      "lastEditedOn": "2024-10-02T15:08:00+00:00",
       "isEncrypted": false,
-      "tags": [],
+      "tags": ["component", "model"],
       "itemType": "Component",
-      "title": "Header for Data Apps",
+      "title": "Model View Builder",
       "private": false,
-      "pathToResource": "/Users/josegallardo/Public/Header for Data Apps",
-      "ownerAccountId": "account:user:88720be7-8cc0-4264-87b1-2cb0cdcbc397",
-      "kudosCount": 1,
-      "id": "*4H0xvD1ha6NmoZYY",
-      "description": "",
-      "owner": "josegallardo",
+      "pathToResource": "/Users/knime/Public/Model View Builder",
+      "ownerAccountId": "account:user:87654321-4321-8765-4321-876543210987",
+      "kudosCount": 0,
+      "id": "*9Z7xvD1ha6NmoZAA",
+      "description": "Combine a model with data to render a view.",
+      "owner": "knime",
       "isVersioned": true,
-      "versionCreatedOn": "2023-10-25T13:06:58+00:00",
+      "versionCreatedOn": "2024-10-02T15:20:00+00:00",
       "version": 1
     }
   ],
@@ -32,25 +119,19 @@
   "suggestedTeamnames": [],
   "suggestedExternalGroups": [],
   "countByCategory": {
-    "all": 761,
-    "nodes": 24,
-    "workflows": 670,
-    "extensions": 35,
-    "components": 31,
-    "collections": 1
+    "all": 2,
+    "nodes": 0,
+    "workflows": 0,
+    "extensions": 0,
+    "components": 2,
+    "collections": 0
   },
   "suggestedTags": [],
   "relatedTags": [
-    "Workflow Applications",
-    "Workflow Application",
-    "Checker Components",
-    "AI",
-    "REST",
-    "GenAI",
-    "Workflow Validation",
-    "Action Component",
-    "ChEMBL",
-    "Chemistry"
+    "Component",
+    "Table",
+    "Model",
+    "View"
   ],
   "relatedPathTags": []
 }

@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.api.SearchServiceClient.PrivateSearchMode;
+import org.knime.hub.client.sdk.api.SearchServiceClient.SearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
@@ -112,6 +113,35 @@ class SearchServiceClientTest extends AbstractTest {
         TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
             getJsonPathConfig());
     }
+
+    /*
+     * Disabled while component search uses a temporary mock response fixture.
+     * Reintroduce once the SDK uses the real endpoint response.
+     */
+//    @Test
+//    void testComponentSearchEndpointDeserializesResults() throws IOException {
+//        final var fixture = "search-components.json";
+//        final var filePath =
+//            IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append("searchEntities").append(fixture);
+//        final var resourceUrl = TestUtil.resolveToURL(filePath);
+//        final var jsonBody = TestUtil.readResourceToString(resourceUrl);
+//        final JsonNode expectedResponse =
+//            getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResults.class));
+//
+//        final ApiResponse<SearchResults> response = SEARCH_CLIENT.componentSearch( //
+//            "knime", //
+//            "org.knime.core.node.port.data.table.DataTablePortObject", //
+//            SearchMode.GLOBAL, //
+//            "input", //
+//            0, //
+//            10, //
+//            Map.of() //
+//        );
+//
+//        assertEquals(200, response.statusCode());
+//        TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
+//            getJsonPathConfig());
+//    }
 
     private static JsonNode stubSearchResponse(final String testFileName, final String urlPath,
         final Map<String, String> queryParams) throws IOException {
