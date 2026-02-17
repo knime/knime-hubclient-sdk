@@ -77,6 +77,7 @@ import org.knime.hub.client.sdk.FailureValue;
 import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.Result;
 import org.knime.hub.client.sdk.Result.Failure;
+import org.knime.hub.client.sdk.Result.Success;
 import org.knime.hub.client.sdk.api.CatalogServiceClient;
 import org.knime.hub.client.sdk.ent.ProblemDescription;
 import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
@@ -163,6 +164,44 @@ public final class AsyncHubUploadStream extends OutputStream {
         // Obtain upload instructions and create supplier for additional upload parts
         final var itemInstructions = preparedUploadOpt.get().getItems();
         final var uploadInstructions = CheckUtils.checkNotNull(itemInstructions.get(itemName));
+        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, chunkSize);
+    }
+
+    /**
+     * Creates a new asynchronous upload stream that overwrites an existing item by its ID.
+     *
+     * @param catalogClient catalog service client
+     * @param clientHeaders additional headers for the catalog service client
+     * @param itemId ID of the item to overwrite
+     * @param itemName name of the item (used for logging only)
+     * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
+     * @param itemETag entity tag of the item to overwrite, may be {@code null}
+     * @param chunkSize Preferred chunk size, ignored if it is smaller than S3's minimum chunk size (currently 5MB)
+     * @return upload stream, may be {@code null} if the item has changed
+     * @throws HubFailureIOException if an error occurred
+     * @since 1.3
+     */
+    @SuppressWarnings("java:S2301") // boolean flag as parameter
+    public static @Owning AsyncHubUploadStream createById(final CatalogServiceClient catalogClient,
+        final Map<String, String> clientHeaders, final String itemId, final String itemName,
+        final boolean isWorkflowLike, final EntityTag itemETag, final int chunkSize) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(catalogClient);
+        CheckUtils.checkArgumentNotNull(itemId);
+        CheckUtils.checkArgumentNotNull(itemName);
+
+        final var mediaType = isWorkflowLike ? AbstractHubTransfer.KNIME_WORKFLOW_TYPE_ZIP.toString()
+            : MediaType.APPLICATION_OCTET_STREAM;
+        final var uploadParts =
+            Math.min(HubUploader.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
+
+        final var request = new ItemUploadRequest(mediaType, uploadParts);
+        final var preparedUploadOpt = HubUploader.initiateUploadById(catalogClient, clientHeaders,
+            new ItemID(itemId), request, itemETag).orElseThrow(HubFailureIOException::new);
+        if (preparedUploadOpt.isEmpty()) {
+            return null;
+        }
+
+        final var uploadInstructions = CheckUtils.checkNotNull(preparedUploadOpt.get());
         return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, chunkSize);
     }
 

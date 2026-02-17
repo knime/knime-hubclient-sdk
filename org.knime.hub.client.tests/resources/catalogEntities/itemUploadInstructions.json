@@ -1,0 +1,10 @@
+{
+  "uploadId": "upload-123",
+  "parts": {
+    "1": {
+      "method": "PUT",
+      "url": "https://example.com/upload",
+      "header": {}
+    }
+  }
+}
