@@ -73,6 +73,8 @@ import org.knime.hub.client.sdk.HubFailureIOException;
 import org.knime.hub.client.sdk.ent.catalog.CopyOrMoveRequestBody;
 import org.knime.hub.client.sdk.ent.catalog.CreateNamedItemVersionRequestBody;
 import org.knime.hub.client.sdk.ent.catalog.DownloadStatus;
+import org.knime.hub.client.sdk.ent.catalog.ItemUploadInstructions;
+import org.knime.hub.client.sdk.ent.catalog.ItemUploadRequest;
 import org.knime.hub.client.sdk.ent.catalog.NamedItemVersion;
 import org.knime.hub.client.sdk.ent.catalog.NamedItemVersionList;
 import org.knime.hub.client.sdk.ent.catalog.PreparedDownload;
@@ -146,6 +148,7 @@ public final class CatalogServiceClient {
     private static final GenericType<UploadStatus> UPLOAD_STATUS = new GenericType<>() {};
     private static final GenericType<UploadStarted> UPLOAD_STARTED = new GenericType<>() {};
     private static final GenericType<UploadTarget> UPLOAD_TARGET = new GenericType<>() {};
+    private static final GenericType<ItemUploadInstructions> ITEM_UPLOAD_INSTRUCTIONS = new GenericType<>() {};
     private static final GenericType<PreparedDownload> PREPARED_DOWNLOAD = new GenericType<>() {};
     private static final GenericType<DownloadStatus> DONWLOAD_STATUS = new GenericType<>() {};
     private static final GenericType<NamedItemVersion> NAMED_ITEM_VERSION = new GenericType<>() {};
@@ -1073,6 +1076,30 @@ public final class CatalogServiceClient {
     }
 
     /**
+     * Prepares the upload of a repository item by its ID, replacing the existing artifact.
+     *
+     * @param id The ID of the repository item whose artifact should be replaced. (required)
+     * @param requestBody The request body (optional)
+     * @param additionalHeaders Map of additional headers
+     * @return {@link ApiResponse}
+     *
+     * @throws HubFailureIOException if an I/O error occurred
+     * @since 1.2
+     */
+    public ApiResponse<ItemUploadInstructions> prepareUploadById(final String id, final ItemUploadRequest requestBody,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(id);
+
+        final var requestPath = IPath.forPosix(REPOSITORY_API_PATH).append(id).append(PATH_PIECE_ARTIFACT);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withContentTypeHeader(MediaType.APPLICATION_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .invokeAPI(requestPath, Method.PUT, requestBody, ITEM_UPLOAD_INSTRUCTIONS);
+    }
+
+    /**
      * Prepares the upload of a repository item as a direct child of the item with the given ID, and with the given
      * content type. This will create any necessary nested Workflow Groups lazily. Additionally, this endpoint will lock
      * all requested paths until the upload completes.
@@ -1189,6 +1216,23 @@ public final class CatalogServiceClient {
         final String parentId, final EntityTag parentEtag, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
         return AsyncHubUploadStream.create(this, additionalHeaders, parentId, parentEtag, itemName, isWorkflowLike, -1);
+    }
+
+    /**
+     * Creates an asynchronous upload stream to overwrite an existing item by its ID.
+     *
+     * @param itemId the ID of the item to overwrite
+     * @param itemName the name of the item (used for logging only)
+     * @param isWorkflowLike <code>true</code> if the item which is uploaded is a workflow or component
+     * @param additionalHeaders additional header parameters
+     *
+     * @return {@link AsyncHubUploadStream}
+     * @throws HubFailureIOException if an I/O error occurred during the upload
+     * @since 1.2
+     */
+    public @Owning AsyncHubUploadStream createAsyncHubUploadStreamForId(final String itemId, final String itemName,
+        final boolean isWorkflowLike, final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        return AsyncHubUploadStream.createForItemId(this, additionalHeaders, itemId, itemName, isWorkflowLike, -1);
     }
 
     /**

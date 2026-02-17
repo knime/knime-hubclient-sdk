@@ -166,6 +166,40 @@ public final class AsyncHubUploadStream extends OutputStream {
         return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, chunkSize);
     }
 
+    /**
+     * Creates a new asynchronous upload stream that overwrites an existing item by its ID.
+     *
+     * @param catalogClient catalog service client
+     * @param clientHeaders additional headers for the catalog service client
+     * @param itemId ID of the item to overwrite
+     * @param itemName name of the item (used for logging only)
+     * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
+     * @param chunkSize Preferred chunk size, ignored if it is smaller than S3's minimum chunk size (currently 5MB)
+     * @return upload stream
+     * @throws HubFailureIOException if an error occurred
+     * @since 1.2
+     */
+    @SuppressWarnings("java:S2301") // boolean flag as parameter
+    public static @Owning AsyncHubUploadStream createForItemId(final CatalogServiceClient catalogClient,
+        final Map<String, String> clientHeaders, final String itemId, final String itemName,
+        final boolean isWorkflowLike, final int chunkSize) throws HubFailureIOException {
+        CheckUtils.checkArgumentNotNull(catalogClient);
+        CheckUtils.checkArgumentNotNull(itemId);
+        CheckUtils.checkArgumentNotNull(itemName);
+
+        final var mediaType = isWorkflowLike ? AbstractHubTransfer.KNIME_WORKFLOW_TYPE_ZIP.toString()
+            : MediaType.APPLICATION_OCTET_STREAM;
+        final var uploadParts =
+            Math.min(HubUploader.MAX_NUM_PREFETCHED_UPLOAD_PARTS, NUMBER_OF_INITIAL_PARTS);
+
+        final var request = new ItemUploadRequest(mediaType, uploadParts);
+        final var response = catalogClient.prepareUploadById(itemId, request, clientHeaders);
+        final var uploadInstructions =
+            response.checkSuccessful(msg -> "Failed to prepare upload by ID: " + msg);
+
+        return new AsyncHubUploadStream(catalogClient, clientHeaders, itemName, uploadInstructions, chunkSize);
+    }
+
     private AsyncHubUploadStream(final CatalogServiceClient hubClient, final Map<String, String> clientHeaders,
         final String itemName, final ItemUploadInstructions uploadInstructions, final int chunkSize) {
         m_hubClient = hubClient;
