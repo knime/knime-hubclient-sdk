@@ -938,6 +938,38 @@ public final class HubUploader extends AbstractHubTransfer {
         }
     }
 
+    /**
+     * Requests a single-file upload to the given item by ID.
+     *
+     * @param catalogClient catalog client
+     * @param additionalHeaders additional header parameters
+     * @param itemId ID of the item to overwrite
+     * @param uploadRequest upload request
+     * @param eTag expected entity tag for the item, may be {@code null}
+     * @return file upload instruction, or {@link Optional#empty()} if the item has changed
+     * @throws HubFailureIOException if an I/O error occurred
+     */
+    static Result<Optional<ItemUploadInstructions>, FailureValue> initiateUploadById(
+        final CatalogServiceClient catalogClient, final Map<String, String> additionalHeaders, final ItemID itemId,
+        final ItemUploadRequest uploadRequest, final EntityTag eTag) throws HubFailureIOException {
+
+        final Map<String, String> headers = new HashMap<>(additionalHeaders);
+        eTagToString(eTag).ifPresent(eTagStr -> headers.put(HttpHeaders.IF_MATCH, eTagStr));
+
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var response = catalogClient.initiateUploadById(itemId.id(), uploadRequest, headers);
+            if (response.statusCode() == Status.PRECONDITION_FAILED.getStatusCode()) {
+                return Result.success(Optional.empty());
+            } else if (response.result() instanceof Success<ItemUploadInstructions, ?> success) {
+                return Result.success(Optional.of(success.value()));
+            } else {
+                final var problem = response.result().asFailure().failure();
+                throw new HubFailureIOException(FailureValue.fromRFC9457(FailureType.UPLOAD_INITIATION_FAILED,
+                    response.statusCode(), response.headers(), problem));
+            }
+        }
+    }
+
     private @Owning ChunkingFileOutputStream uploadingOutputStream(final String path,
         final UploadPartSupplier partSupplier, final TempFileSupplier tempFileSupplier,
         final Consumer<Future<Result<Pair<Integer, EntityTag>, FailureValue>>> partUploads, final List<Path> chunks,
