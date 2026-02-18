@@ -78,25 +78,39 @@ import jakarta.ws.rs.core.MediaType;
 public final class SearchServiceClient {
 
     private static final String SEARCH_API_PATH = "search";
+
     private static final String SEARCH_COMPONENTS_API_PATH = "search/components";
-    private static final String COMPONENT_SEARCH_FIXTURE_PATH =
-        "resources/searchEntities/search-components-mock.json";
+
+    private static final String COMPONENT_SEARCH_FIXTURE_PATH = "resources/searchEntities/search-components-mock.json";
 
     private static final String QUERY_PARAM_QUERY = "query";
+
     private static final String QUERY_PARAM_TYPE = "type";
+
     private static final String QUERY_PARAM_LIMIT = "limit";
+
     private static final String QUERY_PARAM_OFFSET = "offset";
+
     private static final String QUERY_PARAM_SORT = "sort";
+
     private static final String QUERY_PARAM_PRIVATE_SEARCH_MODE = "privateSearchMode";
+
     private static final String QUERY_PARAM_SEARCH_MODE = "searchMode";
-    private static final String QUERY_PARAM_PORT_TYPE = "portType";
-    private static final String QUERY_PARAM_SIDE = "side";
+
+    private static final String QUERY_PARAM_PORT_ID = "portId";
+
+    private static final String QUERY_PARAM_PORT_SIDE = "portSide";
+
     private static final String QUERY_PARAM_DEBUG = "debug";
+
     private static final String QUERY_PARAM_SCORE_LIMIT = "scoreLimit";
+
     private static final String QUERY_PARAM_TAG = "tag";
+
     private static final String QUERY_PARAM_OWNER = "owner";
 
-    private static final GenericType<SearchResults> SEARCH_RESULTS = new GenericType<>() {};
+    private static final GenericType<SearchResults> SEARCH_RESULTS = new GenericType<>() {
+    };
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -128,9 +142,9 @@ public final class SearchServiceClient {
      */
     @SuppressWarnings("java:S107") // S107: API signature mirrors search-service parameters
     public ApiResponse<SearchResults> search(final String query, final SearchType type, final Integer limit,
-        final Integer offset, final SearchSort sort, final PrivateSearchMode privateSearchMode,
-        final List<String> tags, final String owner, final Boolean debug, final Integer scoreLimit,
-        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        final Integer offset, final SearchSort sort, final PrivateSearchMode privateSearchMode, final List<String> tags,
+        final String owner, final Boolean debug, final Integer scoreLimit, final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
 
         final var requestPath = IPath.forPosix(SEARCH_API_PATH);
 
@@ -155,43 +169,43 @@ public final class SearchServiceClient {
      * Executes a component search request against the Hub search-service.
      *
      * @param query search text (empty string matches all)
-     * @param portType optional port type filter
+     * @param portId optional port type filter
      * @param searchMode scope selector for the search result
-     * @param side optional side filter ({@code input} or {@code output})
+     * @param portSide optional side filter ({@code input} or {@code output})
      * @param offset first result offset, {@code null} to use service default
      * @param limit number of results to return, {@code null} to use service default
      * @param additionalHeaders additional headers to forward
      * @return {@link ApiResponse} containing {@link SearchResults}
      * @throws HubFailureIOException if the request fails
      */
-    public ApiResponse<SearchResults> componentSearch(final String query, final String portType,
-        final SearchMode searchMode, final String side, final Integer offset, final Integer limit,
+    public ApiResponse<SearchResults> componentSearch(final String query, final String portId,
+        final SearchMode searchMode, final String portSide, final Integer offset, final Integer limit,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
         final var searchResults = loadComponentSearchFixture();
-        final var filteredResults = filterComponentSearchResults(searchResults, side, portType, offset, limit);
+        final var filteredResults = filterComponentSearchResults(searchResults, portSide, portId, offset, limit);
         return new ApiResponse<>(Map.of(), 200, "OK", Optional.empty(), Result.success(filteredResults));
     }
 
     private SearchResults loadComponentSearchFixture() throws HubFailureIOException {
-        try (var fixtureStream = SearchServiceClient.class.getClassLoader()
-            .getResourceAsStream(COMPONENT_SEARCH_FIXTURE_PATH)) {
+        try (var fixtureStream =
+            SearchServiceClient.class.getClassLoader().getResourceAsStream(COMPONENT_SEARCH_FIXTURE_PATH)) {
             if (fixtureStream == null) {
                 throw new IOException("Missing component search fixture: " + COMPONENT_SEARCH_FIXTURE_PATH);
             }
             return m_apiClient.getObjectMapper().readValue(fixtureStream, SearchResults.class);
         } catch (final IOException ex) {
-            throw new HubFailureIOException(FailureValue.fromUnexpectedThrowable(
-                "Failed to load component search fixture", List.of(), ex));
+            throw new HubFailureIOException(
+                FailureValue.fromUnexpectedThrowable("Failed to load component search fixture", List.of(), ex));
         }
     }
 
-    private SearchResults filterComponentSearchResults(final SearchResults searchResults, final String side,
-        final String portTypeId, final Integer offset, final Integer limit) {
-        final var normalizedSide = normalizeSide(side);
-        final var normalizedPortTypeId = normalizePortTypeId(portTypeId);
+    private SearchResults filterComponentSearchResults(final SearchResults searchResults, final String portSide,
+        final String portId, final Integer offset, final Integer limit) {
+        final var normalizedSide = normalizeSide(portSide);
+        final var normalizedPortId = normalizePortId(portId);
 
         final var filtered = searchResults.getResults().stream() //
-            .filter(item -> matchesPortFilter(item, normalizedSide, normalizedPortTypeId)) //
+            .filter(item -> matchesPortFilter(item, normalizedSide, normalizedPortId)) //
             .collect(Collectors.toList());
 
         final var totalCount = filtered.size();
@@ -213,15 +227,15 @@ public final class SearchServiceClient {
         return "input".equals(normalized) || "output".equals(normalized) ? normalized : null;
     }
 
-    private static String normalizePortTypeId(final String portTypeId) {
-        if (portTypeId == null || portTypeId.isBlank()) {
+    private static String normalizePortId(final String portId) {
+        if (portId == null || portId.isBlank()) {
             return null;
         }
-        return portTypeId.trim();
+        return portId.trim();
     }
 
-    private static boolean matchesPortFilter(final SearchItem item, final String side, final String portTypeId) {
-        if (side == null && portTypeId == null) {
+    private static boolean matchesPortFilter(final SearchItem item, final String side, final String portId) {
+        if (side == null && portId == null) {
             return true;
         }
         if (!(item instanceof SearchItemComponent component)) {
@@ -244,11 +258,11 @@ public final class SearchServiceClient {
             candidates.addAll(icon.getOutPorts());
         }
 
-        if (portTypeId == null) {
+        if (portId == null) {
             return !candidates.isEmpty();
         }
 
-        return candidates.stream().anyMatch(port -> portTypeId.equals(port.getObjectClass().orElse(null)));
+        return candidates.stream().anyMatch(port -> portId.equals(port.getObjectClass().orElse(null)));
     }
 
     private static List<SearchItem> applyOffsetLimit(final List<SearchItem> items, final Integer offset,
@@ -260,7 +274,6 @@ public final class SearchServiceClient {
         final var end = limit == null ? items.size() : Math.min(items.size(), start + Math.max(0, limit));
         return List.copyOf(items.subList(start, end));
     }
-
 
     private static String toString(final Object value) {
         return value == null ? null : value.toString();
@@ -283,12 +296,8 @@ public final class SearchServiceClient {
      * Search type filter.
      */
     public enum SearchType {
-        WORKFLOW("workflow"),
-        COMPONENT("component"),
-        NODE("node"),
-        EXTENSION("extension"),
-        COLLECTION("collection"),
-        ALL("all");
+            WORKFLOW("workflow"), COMPONENT("component"), NODE("node"), EXTENSION("extension"),
+            COLLECTION("collection"), ALL("all");
 
         private final String m_value;
 
@@ -305,13 +314,8 @@ public final class SearchServiceClient {
      * Sort modes supported by the search-service.
      */
     public enum SearchSort {
-        NEW("new"),
-        OLD("old"),
-        BEST("best"),
-        MAX_DOWNLOADS("maxDownloads"),
-        MIN_DOWNLOADS("minDownloads"),
-        MAX_KUDOS("maxKudos"),
-        MIN_KUDOS("minKudos");
+            NEW("new"), OLD("old"), BEST("best"), MAX_DOWNLOADS("maxDownloads"), MIN_DOWNLOADS("minDownloads"),
+            MAX_KUDOS("maxKudos"), MIN_KUDOS("minKudos");
 
         private final String m_value;
 
@@ -328,9 +332,7 @@ public final class SearchServiceClient {
      * Private search mode flags: include/exclude/auto.
      */
     public enum PrivateSearchMode {
-        INCLUDE("include"),
-        EXCLUDE("exclude"),
-        AUTO("auto");
+            INCLUDE("include"), EXCLUDE("exclude"), AUTO("auto");
 
         private final String m_value;
 
@@ -347,8 +349,7 @@ public final class SearchServiceClient {
      * Search mode selector for component search.
      */
     public enum SearchMode {
-        GLOBAL("global"),
-        SCOPED("scoped");
+            GLOBAL("global"), SCOPED("scoped");
 
         private final String m_value;
 
