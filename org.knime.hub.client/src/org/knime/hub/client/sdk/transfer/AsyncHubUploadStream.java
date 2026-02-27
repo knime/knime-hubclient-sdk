@@ -175,7 +175,9 @@ public final class AsyncHubUploadStream extends OutputStream {
      * @param itemId ID of the item to overwrite
      * @param itemName name of the item (used for logging only)
      * @param isWorkflowLike flag indicating whether or not the item is a workflow or component
-     * @param itemETag entity tag of the item to overwrite, may be {@code null}
+     * @param itemETag expected entity tag (If-Match). If {@code null}, the upload is unconditional and this method
+     *            always returns a non-{@code null} stream. If non-{@code null}, it represents the expected current state
+     *            of the item to be overwritten; if the actual state differs, this method returns {@code null}
      * @param chunkSize Preferred chunk size, ignored if it is smaller than S3's minimum chunk size (currently 5MB)
      * @return upload stream, may be {@code null} if the item has changed
      * @throws HubFailureIOException if an error occurred

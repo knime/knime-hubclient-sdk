@@ -1229,7 +1229,9 @@ public final class CatalogServiceClient {
      * @param itemId the ID of the item to overwrite
      * @param itemName the name of the item (used for logging only)
      * @param isWorkflowLike <code>true</code> if the item which is uploaded is a workflow or component
-     * @param itemETag the entity tag of the item, may be {@code null}
+     * @param itemETag expected entity tag (If-Match). If {@code null}, the upload is unconditional and this method
+     *            always returns a non-{@code null} stream. If non-{@code null}, it represents the expected current state
+     *            of the item to be overwritten; if the actual state differs, this method returns {@code null}
      * @param additionalHeaders additional header parameters
      *
      * @return {@link AsyncHubUploadStream} or {@code null} if the item has changed
