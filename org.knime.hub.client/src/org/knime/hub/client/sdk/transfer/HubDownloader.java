@@ -23,6 +23,7 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -44,6 +45,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
@@ -362,6 +364,7 @@ public final class HubDownloader extends AbstractHubTransfer {
         private final TempFileSupplier m_tempFileSupplier;
         private final LeafExecMonitor m_monitor;
         private final boolean m_supportsArtifactDownload;
+        private final FilePartDownloader m_partDownloader;
 
         DownloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
             final LeafExecMonitor monitor, final boolean supportsArtifactDownload) {
@@ -369,6 +372,7 @@ public final class HubDownloader extends AbstractHubTransfer {
             m_tempFileSupplier = tempFileSupplier;
             m_monitor = monitor;
             m_supportsArtifactDownload = supportsArtifactDownload;
+            m_partDownloader = new FilePartDownloader(m_catalogClient.getApiClient());
         }
 
         @Override
@@ -428,12 +432,39 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private Result<Path, FailureValue> performArtifactDownload(final AtomicReference<Path> tempFile)
             throws IOException, CancelationException {
-            try (final var downloadStream = m_catalogClient.createArtifactDownloadStream(m_download.id(), null,
-                m_clientHeaders, m_monitor.cancelChecker())) {
-                // prefer size from the HTTP request if available, fall back to Catalog information otherwise
+            final var downloadUrl =
+                ArtifactDownloadStream.resolveDownloadUrl(m_catalogClient, m_clientHeaders, m_download.id(), null,
+                    m_monitor.cancelChecker());
+
+            // Probe for byte-range support and attempt parallel download if the file is large enough.
+            final var cap = m_partDownloader.probeRanges(downloadUrl);
+            if (cap.supported() && cap.totalSize() >= FilePartDownloader.MIN_PARALLEL_SIZE) {
+                LOGGER.atDebug() //
+                    .addArgument(m_download.item().path()) //
+                    .addArgument(cap.totalSize()) //
+                    .log("Downloading '{}' ({} bytes) in parallel using byte ranges");
+                final var result = m_partDownloader.downloadInParallel(downloadUrl, cap.totalSize(), tempFile.get(),
+                    m_monitor, m_monitor.cancelChecker());
+                if (result instanceof Result.Failure<?, FailureValue> failure) {
+                    return Result.failure(failure.failure());
+                }
+                return Result.success(tempFile.getAndSet(null));
+            }
+
+            // Fall back to sequential streaming download.
+            try (final var downloadStream = openSequentialStream(downloadUrl)) {
                 final var numBytes = downloadStream.getContentLength().orElse(m_download.size().orElse(-1));
                 writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), m_monitor);
                 return Result.success(tempFile.getAndSet(null));
+            }
+        }
+
+        private @Owning ArtifactDownloadStream openSequentialStream(final URL downloadUrl)
+            throws HubFailureIOException {
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                final var invocationBuilder =
+                    m_catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
+                return ArtifactDownloadStream.openSequentialStream(invocationBuilder.get());
             }
         }
     }
