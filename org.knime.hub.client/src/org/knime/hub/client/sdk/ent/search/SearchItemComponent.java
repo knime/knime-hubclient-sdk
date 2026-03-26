@@ -62,7 +62,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchItemComponent extends SearchItem {
 
     static final String TYPE = "Component";
@@ -91,6 +90,31 @@ public final class SearchItemComponent extends SearchItem {
     private static final String JSON_PROPERTY_LAST_EDITED_ON = "lastEditedOn";
     private final String m_lastEditedOn;
 
+    /**
+     * Search result item representing a component on the KNIME Hub.
+     *
+     * @param title the title of the component, may be {@code null}
+     * @param titleHighlighted the title with HTML markup highlighting matched query terms, may be {@code null}
+     * @param description the description of the component, may be {@code null}
+     * @param pathToResource the path to the component resource, must not be {@code null}
+     * @param id the unique identifier of the component, must not be {@code null}
+     * @param owner the owner of the component, must not be {@code null}
+     * @param ownerAccountId the account ID of the owner, may be {@code null}
+     * @param explanation an optional explanation of why this item matched the search query, may be {@code null}
+     * @param matchedQueries an optional array of matched query terms, may be {@code null}
+     * @param score an optional relevance score for this search result, may be {@code null}
+     * @param kudosCount an optional count of kudos received by this component, may be {@code null}
+     * @param isPrivate whether this component is private
+     * @param icon the icon metadata for this component, may be {@code null} if no icon information is available
+     * @param tags the list of tags associated with this component, must not be {@code null} but may be empty
+     * @param downloadCount an optional count of downloads for this component, may be {@code null}
+     * @param isEncrypted whether this component's content is encrypted
+     * @param isVersioned whether this component has a published version
+     * @param version an optional version number for this component, if it has been versioned; may be {@code null}
+     * @param versionCreatedOn an optional ISO-8601 timestamp at which this component was versioned; may be
+     * {@code null}
+     * @param lastEditedOn an optional ISO-8601 timestamp of the last edit of this component; may be {@code null}
+     */
     @JsonCreator
     public SearchItemComponent(@JsonProperty(SearchItem.JSON_PROPERTY_TITLE) final String title,
         @JsonProperty(SearchItem.JSON_PROPERTY_TITLE_HIGHLIGHTED) final String titleHighlighted,
@@ -129,45 +153,85 @@ public final class SearchItemComponent extends SearchItem {
         return SearchItemType.COMPONENT;
     }
 
+    /**
+     * Returns the icon metadata for this component, if available.
+     *
+     * @return the optional icon
+     */
     @JsonProperty(JSON_PROPERTY_ICON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Icon> getIcon() {
         return Optional.ofNullable(m_icon);
     }
 
+    /**
+     * Returns the tags associated with this component. The list may be empty but is never {@code null}.
+     *
+     * @return the list of tags
+     */
     @JsonProperty(JSON_PROPERTY_TAGS)
     public List<String> getTags() {
         return m_tags;
     }
 
+    /**
+     * Returns the number of times this component has been downloaded, if present.
+     *
+     * @return the optional download count
+     */
     @JsonProperty(JSON_PROPERTY_DOWNLOAD_COUNT)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Integer> getDownloadCount() {
         return Optional.ofNullable(m_downloadCount);
     }
 
+    /**
+     * Returns whether the content of this component is encrypted.
+     *
+     * @return {@code true} if the component is encrypted
+     */
     @JsonProperty(JSON_PROPERTY_IS_ENCRYPTED)
     public boolean isEncrypted() {
         return m_isEncrypted;
     }
 
+    /**
+     * Returns whether this component has a published version.
+     *
+     * @return {@code true} if the component is versioned
+     */
     @JsonProperty(JSON_PROPERTY_IS_VERSIONED)
     public boolean isVersioned() {
         return m_isVersioned;
     }
 
+    /**
+     * Returns the version number of this component, if it has been versioned.
+     *
+     * @return the optional version number
+     */
     @JsonProperty(JSON_PROPERTY_VERSION)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Integer> getVersion() {
         return Optional.ofNullable(m_version);
     }
 
+    /**
+     * Returns the ISO-8601 timestamp at which this component was versioned, if present.
+     *
+     * @return the optional version creation timestamp
+     */
     @JsonProperty(JSON_PROPERTY_VERSION_CREATED_ON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getVersionCreatedOn() {
         return Optional.ofNullable(m_versionCreatedOn);
     }
 
+    /**
+     * Returns the ISO-8601 timestamp of the last edit of this component, if present.
+     *
+     * @return the optional last-edited timestamp
+     */
     @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getLastEditedOn() {

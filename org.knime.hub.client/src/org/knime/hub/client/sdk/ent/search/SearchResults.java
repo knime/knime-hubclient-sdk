@@ -46,8 +46,8 @@
 package org.knime.hub.client.sdk.ent.search;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
@@ -56,13 +56,18 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Search response payload.
+ * Response payload returned by the KNIME Hub search-service ({@code GET /search} and
+ * {@code GET /instant-search} endpoints).
+ * <p>
+ * Contains the ranked list of matched {@link SearchItem}s, per-category hit counts, and
+ * supplementary suggestion lists (tags, usernames, team names, external groups) that are only
+ * populated for instant-search requests.
+ * </p>
  *
  * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchResults {
 
     private static final String JSON_PROPERTY_COUNT_BY_CATEGORY = "countByCategory";
@@ -98,6 +103,21 @@ public final class SearchResults {
     private static final String JSON_PROPERTY_ES_RESULT = "esResult";
     private final String m_esResult;
 
+    /**
+     * Search results returned by the KNIME Hub search service.
+     *
+     * @param countByCategory the hit counts broken down by item category
+     * @param results the list of matched search items in ranked order
+     * @param suggestedTags tags that match the search query (instant-search only)
+     * @param suggestedUsernames usernames that match the search query (instant-search only)
+     * @param suggestedTeamnames team names that match the search query (instant-search only)
+     * @param suggestedExternalGroups external groups that match the search query (instant-search only)
+     * @param relatedTags tags that appear in the tag lists of matched documents
+     * @param relatedPathTags tags that appear in the path-tag lists of matched documents
+     * @param took the time taken by the search engine to execute the query in milliseconds, if present
+     * @param esQuery the serialized Elasticsearch query sent by the search service (debug only), if present
+     * @param esResult the raw Elasticsearch response received by the search service (debug only), if present
+     */
     @JsonCreator
     public SearchResults(
         @JsonProperty(value = JSON_PROPERTY_COUNT_BY_CATEGORY, required = true)
@@ -126,58 +146,113 @@ public final class SearchResults {
         m_esResult = esResult;
     }
 
+    /**
+     * Returns the hit counts broken down by item category.
+     *
+     * @return the counts per category
+     */
     @JsonProperty(JSON_PROPERTY_COUNT_BY_CATEGORY)
     public SearchResultsCountByCategory getCountByCategory() {
         return m_countByCategory;
     }
 
+    /**
+     * Returns the list of matched search items in ranked order.
+     *
+     * @return the search results
+     */
     @JsonProperty(JSON_PROPERTY_RESULTS)
     public List<SearchItem> getResults() {
         return m_results;
     }
 
+    /**
+     * Returns tags that match the search query (instant-search only).
+     *
+     * @return the suggested tags
+     */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_TAGS)
     public List<String> getSuggestedTags() {
         return m_suggestedTags;
     }
 
+    /**
+     * Returns usernames that match the search query (instant-search only).
+     *
+     * @return the suggested usernames
+     */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_USERNAMES)
     public List<String> getSuggestedUsernames() {
         return m_suggestedUsernames;
     }
 
+    /**
+     * Returns team names that match the search query (instant-search only).
+     *
+     * @return the suggested team names
+     */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_TEAMNAMES)
     public List<String> getSuggestedTeamnames() {
         return m_suggestedTeamnames;
     }
 
+    /**
+     * Returns external groups that match the search query (instant-search only).
+     *
+     * @return the suggested external groups
+     */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS)
     public List<AccountSearchItem> getSuggestedExternalGroups() {
         return m_suggestedExternalGroups;
     }
 
+    /**
+     * Returns tags that appear in the tag lists of matched documents.
+     *
+     * @return the related tags
+     */
     @JsonProperty(JSON_PROPERTY_RELATED_TAGS)
     public List<String> getRelatedTags() {
         return m_relatedTags;
     }
 
+    /**
+     * Returns tags that appear in the path-tag lists of matched documents.
+     *
+     * @return the related path tags
+     */
     @JsonProperty(JSON_PROPERTY_RELATED_PATH_TAGS)
     public List<String> getRelatedPathTags() {
         return m_relatedPathTags;
     }
 
+    /**
+     * Returns the time taken by the search engine to execute the query in milliseconds, if present.
+     *
+     * @return the optional query execution time
+     */
     @JsonProperty(JSON_PROPERTY_TOOK)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Long> getTook() {
         return Optional.ofNullable(m_took);
     }
 
+    /**
+     * Returns the serialized Elasticsearch query sent by the search service (debug only), if present.
+     *
+     * @return the optional ES query string
+     */
     @JsonProperty(JSON_PROPERTY_ES_QUERY)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getEsQuery() {
         return Optional.ofNullable(m_esQuery);
     }
 
+    /**
+     * Returns the raw Elasticsearch response received by the search service (debug only), if present.
+     *
+     * @return the optional ES result string
+     */
     @JsonProperty(JSON_PROPERTY_ES_RESULT)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getEsResult() {

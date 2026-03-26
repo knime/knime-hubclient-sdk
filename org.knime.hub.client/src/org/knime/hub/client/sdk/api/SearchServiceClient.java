@@ -63,7 +63,12 @@ import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
 
 /**
- * Search service client for KNIME Hub search-service.
+ * Client for the KNIME Hub search-service {@code GET /search} endpoint.
+ * <p>
+ * Supports filtering by item type, owner, and tags; pagination via limit/offset; and multiple sort
+ * modes. The response is deserialized into a {@link SearchResults} object containing ranked
+ * {@link org.knime.hub.client.sdk.ent.search.SearchItem} instances.
+ * </p>
  *
  * @since 1.1
  */
@@ -159,11 +164,17 @@ public final class SearchServiceClient {
      * Search type filter.
      */
     public enum SearchType {
+        /** Filter to workflow items only. */
         WORKFLOW("workflow"),
+        /** Filter to component items only. */
         COMPONENT("component"),
+        /** Filter to node items only. */
         NODE("node"),
+        /** Filter to extension items only. */
         EXTENSION("extension"),
+        /** Filter to collection items only. */
         COLLECTION("collection"),
+        /** No type filter – return all item types. */
         ALL("all");
 
         private final String m_value;
@@ -172,6 +183,11 @@ public final class SearchServiceClient {
             m_value = value;
         }
 
+        /**
+         * Returns the lower-case string value sent as the {@code type} query parameter.
+         *
+         * @return the API value
+         */
         public String getValue() {
             return m_value;
         }
@@ -181,12 +197,19 @@ public final class SearchServiceClient {
      * Sort modes supported by the search-service.
      */
     public enum SearchSort {
+        /** Sort by newest first (creation date descending). */
         NEW("new"),
+        /** Sort by oldest first (creation date ascending). */
         OLD("old"),
+        /** Sort by relevance score (default). */
         BEST("best"),
+        /** Sort by download count descending. */
         MAX_DOWNLOADS("maxDownloads"),
+        /** Sort by download count ascending. */
         MIN_DOWNLOADS("minDownloads"),
+        /** Sort by kudos count descending. */
         MAX_KUDOS("maxKudos"),
+        /** Sort by kudos count ascending. */
         MIN_KUDOS("minKudos");
 
         private final String m_value;
@@ -195,6 +218,11 @@ public final class SearchServiceClient {
             m_value = value;
         }
 
+        /**
+         * Returns the string value sent as the {@code sort} query parameter.
+         *
+         * @return the API value
+         */
         public String getValue() {
             return m_value;
         }
@@ -204,8 +232,11 @@ public final class SearchServiceClient {
      * Private search mode flags: include/exclude/auto.
      */
     public enum PrivateSearchMode {
+        /** Include items from private spaces (requires authentication). */
         INCLUDE("include"),
+        /** Exclude items from private spaces. */
         EXCLUDE("exclude"),
+        /** Let the service decide based on authentication state. */
         AUTO("auto");
 
         private final String m_value;
@@ -214,6 +245,11 @@ public final class SearchServiceClient {
             m_value = value;
         }
 
+        /**
+         * Returns the string value sent as the {@code privateSearchMode} query parameter.
+         *
+         * @return the API value
+         */
         public String getValue() {
             return m_value;
         }

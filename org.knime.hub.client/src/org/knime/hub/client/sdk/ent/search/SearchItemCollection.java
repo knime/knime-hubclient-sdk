@@ -61,7 +61,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchItemCollection extends SearchItem {
 
     static final String TYPE = "Collection";
@@ -93,6 +92,11 @@ public final class SearchItemCollection extends SearchItem {
         return SearchItemType.COLLECTION;
     }
 
+    /**
+     * Returns the tags associated with this collection. The list may be empty but is never {@code null}.
+     *
+     * @return the list of tags
+     */
     @JsonProperty(JSON_PROPERTY_TAGS)
     public List<String> getTags() {
         return m_tags;

@@ -45,11 +45,12 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Objects;
+
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
-import java.util.Objects;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Counts of search results per category.
@@ -57,7 +58,6 @@ import java.util.Objects;
  * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
  * @since 1.1
  */
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchResultsCountByCategory {
 
     private static final String JSON_PROPERTY_ALL = "all";
@@ -78,6 +78,16 @@ public final class SearchResultsCountByCategory {
     private static final String JSON_PROPERTY_COLLECTIONS = "collections";
     private final long m_collections;
 
+    /**
+     * Search result counts by category.
+     *
+     * @param all total hit count across all categories
+     * @param workflows workflow hit count
+     * @param nodes node hit count
+     * @param extensions extension hit count
+     * @param components component hit count
+     * @param collections collection hit count
+     */
     @JsonCreator
     public SearchResultsCountByCategory(@JsonProperty(value = JSON_PROPERTY_ALL, required = true) final long all,
         @JsonProperty(value = JSON_PROPERTY_WORKFLOWS, required = true) final long workflows,
@@ -93,31 +103,61 @@ public final class SearchResultsCountByCategory {
         m_collections = collections;
     }
 
+    /**
+     * Returns the total number of search hits across all categories.
+     *
+     * @return total hit count
+     */
     @JsonProperty(JSON_PROPERTY_ALL)
     public long getAll() {
         return m_all;
     }
 
+    /**
+     * Returns the number of workflow search hits.
+     *
+     * @return workflow hit count
+     */
     @JsonProperty(JSON_PROPERTY_WORKFLOWS)
     public long getWorkflows() {
         return m_workflows;
     }
 
+    /**
+     * Returns the number of node search hits.
+     *
+     * @return node hit count
+     */
     @JsonProperty(JSON_PROPERTY_NODES)
     public long getNodes() {
         return m_nodes;
     }
 
+    /**
+     * Returns the number of extension search hits.
+     *
+     * @return extension hit count
+     */
     @JsonProperty(JSON_PROPERTY_EXTENSIONS)
     public long getExtensions() {
         return m_extensions;
     }
 
+    /**
+     * Returns the number of component search hits.
+     *
+     * @return component hit count
+     */
     @JsonProperty(JSON_PROPERTY_COMPONENTS)
     public long getComponents() {
         return m_components;
     }
 
+    /**
+     * Returns the number of collection search hits.
+     *
+     * @return collection hit count
+     */
     @JsonProperty(JSON_PROPERTY_COLLECTIONS)
     public long getCollections() {
         return m_collections;

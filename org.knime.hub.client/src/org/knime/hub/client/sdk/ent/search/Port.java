@@ -46,10 +46,9 @@
 package org.knime.hub.client.sdk.ent.search;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
-
-import java.util.Optional;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -63,7 +62,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class Port {
 
     private static final String JSON_PROPERTY_COLOR = "color";
@@ -84,6 +82,16 @@ public final class Port {
     private static final String JSON_PROPERTY_OBJECT_CLASS = "objectClass";
     private final String m_objectClass;
 
+    /**
+     * Port description of a node on the KNIME Hub.
+     *
+     * @param color the port color as a CSS hex string (e.g., {@code #FF0000})
+     * @param optional whether this port is optional (i.e., the node can execute without a connection)
+     * @param dataType the data type name carried by this port
+     * @param name the human-readable name of this port, if present
+     * @param description the description of this port, if present
+     * @param objectClass the fully-qualified Java class name of the port's data object, if present
+     */
     @JsonCreator
     public Port(@JsonProperty(value = JSON_PROPERTY_COLOR, required = true) final String color,
         @JsonProperty(value = JSON_PROPERTY_OPTIONAL, required = true) final Boolean optional,
@@ -99,33 +107,63 @@ public final class Port {
         m_objectClass = objectClass;
     }
 
+    /**
+     * Returns the port color as a CSS hex string (e.g., {@code #FF0000}).
+     *
+     * @return the port color
+     */
     @JsonProperty(JSON_PROPERTY_COLOR)
     public String getColor() {
         return m_color;
     }
 
+    /**
+     * Returns whether this port is optional (i.e., the node can execute without a connection).
+     *
+     * @return {@code true} if the port is optional
+     */
     @JsonProperty(JSON_PROPERTY_OPTIONAL)
     public Boolean getOptional() {
         return m_optional;
     }
 
+    /**
+     * Returns the data type name carried by this port.
+     *
+     * @return the port data type
+     */
     @JsonProperty(JSON_PROPERTY_DATA_TYPE)
     public String getDataType() {
         return m_dataType;
     }
 
+    /**
+     * Returns the human-readable name of this port, if present.
+     *
+     * @return the optional port name
+     */
     @JsonProperty(JSON_PROPERTY_NAME)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getName() {
         return Optional.ofNullable(m_name);
     }
 
+    /**
+     * Returns the description of this port, if present.
+     *
+     * @return the optional port description
+     */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDescription() {
         return Optional.ofNullable(m_description);
     }
 
+    /**
+     * Returns the fully-qualified Java class name of the port's data object, if present.
+     *
+     * @return the optional object class name
+     */
     @JsonProperty(JSON_PROPERTY_OBJECT_CLASS)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getObjectClass() {

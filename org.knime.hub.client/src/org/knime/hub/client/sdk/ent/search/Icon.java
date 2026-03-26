@@ -45,23 +45,28 @@
  */
 package org.knime.hub.client.sdk.ent.search;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.knime.hub.client.sdk.ent.util.EntityUtil;
-
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
- * Icon metadata for search results.
+ * Information required to render the icon of a node in a search result.
+ * <p>
+ * If any of the fields ({@code data}, {@code type}, {@code inPorts}, {@code outPorts}) is missing
+ * in the upstream data, the entire {@code Icon} object is omitted from the response. Clients should
+ * therefore fall back to a default icon whenever this object is absent.
+ * </p>
  *
  * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class Icon {
 
     private static final String JSON_PROPERTY_DATA = "data";
@@ -88,6 +93,18 @@ public final class Icon {
     private static final String JSON_PROPERTY_HAS_DYN_OUT_PORTS = "hasDynOutPorts";
     private final boolean m_hasDynOutPorts;
 
+    /**
+     * Icon of a node on KNIME Hub.
+     *
+     * @param data base64-encoded (byte format) PNG image data for the node icon, if available
+     * @param type node type string (e.g., {@code Learner}, {@code LoopEnd}, {@code LoopStart}, {@code Manipulator})
+     * @param deprecated whether the node is deprecated
+     * @param streamable whether the node supports streaming execution
+     * @param inPorts list of input ports (potentially empty but never {@code null})
+     * @param outPorts list of output ports (potentially empty but never {@code null})
+     * @param hasDynInPorts whether the node has dynamic input ports (i.e., the user can add more)
+     * @param hasDynOutPorts whether the node has dynamic output ports (i.e., the user can add more)
+     */
     @JsonCreator
     public Icon(@JsonProperty(JSON_PROPERTY_DATA) final String data,
         @JsonProperty(value = JSON_PROPERTY_TYPE) final String type,
@@ -107,43 +124,84 @@ public final class Icon {
         m_hasDynOutPorts = hasDynOutPorts;
     }
 
+    /**
+     * Returns the base64-encoded (byte format) PNG image data for the node icon, if available.
+     *
+     * @return the optional icon image data (base64 encoded)
+     */
     @JsonProperty(JSON_PROPERTY_DATA)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getData() {
         return Optional.ofNullable(m_data);
     }
 
+    /**
+     * Returns the node type string (e.g., {@code Learner}, {@code LoopEnd}, {@code LoopStart},
+     * {@code Manipulator}).
+     *
+     * @return the node type
+     */
     @JsonProperty(JSON_PROPERTY_TYPE)
     public String getType() {
         return m_type;
     }
 
+    /**
+     * Returns whether the node is deprecated.
+     *
+     * @return {@code true} if the node is deprecated
+     */
     @JsonProperty(JSON_PROPERTY_DEPRECATED)
     public boolean isDeprecated() {
         return m_deprecated;
     }
 
+    /**
+     * Returns whether the node supports streaming execution.
+     *
+     * @return {@code true} if the node is streamable
+     */
     @JsonProperty(JSON_PROPERTY_STREAMABLE)
     public boolean isStreamable() {
         return m_streamable;
     }
 
+    /**
+     * Returns the list of input ports. The list is potentially empty but never {@code null}.
+     *
+     * @return the input ports
+     */
     @JsonProperty(JSON_PROPERTY_IN_PORTS)
     public List<Port> getInPorts() {
         return m_inPorts;
     }
 
+    /**
+     * Returns the list of output ports. The list is potentially empty but never {@code null}.
+     *
+     * @return the output ports
+     */
     @JsonProperty(JSON_PROPERTY_OUT_PORTS)
     public List<Port> getOutPorts() {
         return m_outPorts;
     }
 
+    /**
+     * Returns whether the node has dynamic input ports (i.e., the user can add more).
+     *
+     * @return {@code true} if the node has dynamic input ports
+     */
     @JsonProperty(JSON_PROPERTY_HAS_DYN_IN_PORTS)
     @SuppressWarnings("java:S1176") // S1176: accessor naming is self-descriptive
     public boolean hasDynamicInPorts() {
         return m_hasDynInPorts;
     }
 
+    /**
+     * Returns whether the node has dynamic output ports (i.e., the user can add more).
+     *
+     * @return {@code true} if the node has dynamic output ports
+     */
     @JsonProperty(JSON_PROPERTY_HAS_DYN_OUT_PORTS)
     @SuppressWarnings("java:S1176") // S1176: accessor naming is self-descriptive
     public boolean hasDynamicOutPorts() {
