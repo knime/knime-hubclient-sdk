@@ -61,7 +61,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class AccountSearchItem {
 
     private static final String JSON_PROPERTY_ID = "id";
@@ -82,16 +81,31 @@ public final class AccountSearchItem {
         m_displayName = displayName;
     }
 
+    /**
+     * Returns the unique identifier of this account.
+     *
+     * @return the account ID
+     */
     @JsonProperty(JSON_PROPERTY_ID)
     public String getId() {
         return m_id;
     }
 
+    /**
+     * Returns the login name of this account.
+     *
+     * @return the account name
+     */
     @JsonProperty(JSON_PROPERTY_NAME)
     public String getName() {
         return m_name;
     }
 
+    /**
+     * Returns the human-readable display name of this account, if present.
+     *
+     * @return the optional display name
+     */
     @JsonProperty(JSON_PROPERTY_DISPLAY_NAME)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDisplayName() {

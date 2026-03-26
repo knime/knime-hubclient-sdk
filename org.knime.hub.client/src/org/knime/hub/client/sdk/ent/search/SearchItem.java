@@ -76,10 +76,11 @@ import com.fasterxml.jackson.annotation.JsonValue;
     @JsonSubTypes.Type(value = SearchItemCollection.class, name = SearchItemCollection.TYPE)
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1694", "MissingJavadoc"}) // S1694: abstract base for JSON polymorphism, not a utility class
+@SuppressWarnings("java:S1694") // S1694: abstract base for JSON polymorphism, not a utility class
 public abstract sealed class SearchItem
     permits SearchItemWorkflow, SearchItemNode, SearchItemExtension, SearchItemComponent, SearchItemCollection {
 
+    /** JSON key name for the item type property */
     protected static final String JSON_PROPERTY_ITEM_TYPE = "itemType";
 
     /**
@@ -87,10 +88,15 @@ public abstract sealed class SearchItem
      */
     public enum SearchItemType {
 
+        /** A KNIME workflow. */
         WORKFLOW(SearchItemWorkflow.TYPE),
+        /** A KNIME node contributed by an extension. */
         NODE(SearchItemNode.TYPE),
+        /** A KNIME extension (feature / update-site entry). */
         EXTENSION(SearchItemExtension.TYPE),
+        /** A KNIME component (reusable sub-workflow). */
         COMPONENT(SearchItemComponent.TYPE),
+        /** A KNIME Hub collection. */
         COLLECTION(SearchItemCollection.TYPE);
 
         private final String m_value;
@@ -99,6 +105,11 @@ public abstract sealed class SearchItem
             m_value = value;
         }
 
+        /**
+         * Returns the string representation used in JSON serialization and API parameters.
+         *
+         * @return the item type value
+         */
         @JsonValue
         public String getValue() {
             return m_value;
@@ -120,42 +131,71 @@ public abstract sealed class SearchItem
         }
     }
 
+    /** JSON key name for the title property */
     protected static final String JSON_PROPERTY_TITLE = "title";
     private final String m_title;
 
+    /** JSON key name for the highlighted title property */
     protected static final String JSON_PROPERTY_TITLE_HIGHLIGHTED = "titleHighlighted";
     private final String m_titleHighlighted;
 
+    /** JSON key name for the description property */
     protected static final String JSON_PROPERTY_DESCRIPTION = "description";
     private final String m_description;
 
+    /** JSON key name for the path to resource property */
     protected static final String JSON_PROPERTY_PATH = "pathToResource";
     private final String m_pathToResource;
 
+    /** JSON key name for the ID property */
     protected static final String JSON_PROPERTY_ID = "id";
     private final String m_id;
 
+    /** JSON key name for the owner property */
     protected static final String JSON_PROPERTY_OWNER = "owner";
     private final String m_owner;
 
+    /** JSON key name for the owner account ID property */
     protected static final String JSON_PROPERTY_OWNER_ACCOUNT_ID = "ownerAccountId";
     private final String m_ownerAccountId;
 
+    /** JSON key name for the explanation property */
     protected static final String JSON_PROPERTY_EXPLANATION = "explanation";
     private final String m_explanation;
 
+    /** JSON key name for the matched queries property */
     protected static final String JSON_PROPERTY_MATCHED_QUERIES = "matchedQueries";
     private final String[] m_matchedQueries;
 
+    /** JSON key name for the score property */
     protected static final String JSON_PROPERTY_SCORE = "score";
     private final Float m_score;
 
+    /** JSON key name for the kudos count property */
     protected static final String JSON_PROPERTY_KUDOS = "kudosCount";
     private final Integer m_kudosCount;
 
+    /** JSON key name for the private flag property */
     protected static final String JSON_PROPERTY_PRIVATE = "private";
     private final Boolean m_private;
 
+    /**
+     * Search item returned by the KNIME Hub search-service.
+     *
+     * @param title the optional display title of this search item
+     * @param titleHighlighted the title with search-term matches highlighted (HTML markup), if available
+     * @param description the optional description of this search item
+     * @param pathToResource the Hub-relative path to this item's resource
+     * @param id the unique identifier of this item on KNIME Hub
+     * @param owner the username of the space owner that contains this item
+     * @param ownerAccountId the account ID of the owner, if present
+     * @param explanation a human-readable explanation of why this item was returned
+     * (debug / relevance detail), if present
+     * @param matchedQueries the names of Elasticsearch queries this item matched, if present
+     * @param score the relevance score assigned by the search engine, if present
+     * @param kudosCount the number of kudos given to this item by the community, if present
+     * @param isPrivate whether this item is in a private space
+     */
     @JsonCreator
     protected SearchItem(@JsonProperty(JSON_PROPERTY_TITLE) final String title,
         @JsonProperty(JSON_PROPERTY_TITLE_HIGHLIGHTED) final String titleHighlighted,
@@ -183,18 +223,33 @@ public abstract sealed class SearchItem
         m_private = isPrivate;
     }
 
+    /**
+     * Returns the optional display title of this search item.
+     *
+     * @return the optional title
+     */
     @JsonProperty(JSON_PROPERTY_TITLE)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getTitle() {
         return Optional.ofNullable(m_title);
     }
 
+    /**
+     * Returns the title with search-term matches highlighted (HTML markup), if available.
+     *
+     * @return the optional highlighted title
+     */
     @JsonProperty(JSON_PROPERTY_TITLE_HIGHLIGHTED)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getTitleHighlighted() {
         return Optional.ofNullable(m_titleHighlighted);
     }
 
+    /**
+     * Returns the optional description of this search item.
+     *
+     * @return the optional description
+     */
     @JsonProperty(JSON_PROPERTY_DESCRIPTION)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getDescription() {
@@ -209,51 +264,96 @@ public abstract sealed class SearchItem
     @JsonProperty(JSON_PROPERTY_ITEM_TYPE)
     public abstract SearchItemType getItemType();
 
+    /**
+     * Returns the Hub-relative path to this item's resource.
+     *
+     * @return the path to the resource
+     */
     @JsonProperty(JSON_PROPERTY_PATH)
     public String getPathToResource() {
         return m_pathToResource;
     }
 
+    /**
+     * Returns the unique identifier of this item on KNIME Hub.
+     *
+     * @return the item ID
+     */
     @JsonProperty(JSON_PROPERTY_ID)
     public String getId() {
         return m_id;
     }
 
+    /**
+     * Returns the username of the space owner that contains this item.
+     *
+     * @return the owner username
+     */
     @JsonProperty(JSON_PROPERTY_OWNER)
     public String getOwner() {
         return m_owner;
     }
 
+    /**
+     * Returns the account ID of the owner, if present.
+     *
+     * @return the optional owner account ID
+     */
     @JsonProperty(JSON_PROPERTY_OWNER_ACCOUNT_ID)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getOwnerAccountId() {
         return Optional.ofNullable(m_ownerAccountId);
     }
 
+    /**
+     * Returns a human-readable explanation of why this item was returned (debug / relevance detail), if present.
+     *
+     * @return the optional explanation
+     */
     @JsonProperty(JSON_PROPERTY_EXPLANATION)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getExplanation() {
         return Optional.ofNullable(m_explanation);
     }
 
+    /**
+     * Returns the names of Elasticsearch queries this item matched, if present.
+     *
+     * @return the optional matched query names
+     */
     @JsonProperty(JSON_PROPERTY_MATCHED_QUERIES)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String[]> getMatchedQueries() {
         return Optional.ofNullable(m_matchedQueries).map(qs -> Arrays.copyOf(qs, qs.length));
     }
 
+    /**
+     * Returns the relevance score assigned by the search engine, if present.
+     *
+     * @return the optional score
+     */
     @JsonProperty(JSON_PROPERTY_SCORE)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Float> getScore() {
         return Optional.ofNullable(m_score);
     }
 
+    /**
+     * Returns the number of kudos given to this item by the community, if present.
+     *
+     * @return the optional kudos count
+     */
     @JsonProperty(JSON_PROPERTY_KUDOS)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Integer> getKudosCount() {
         return Optional.ofNullable(m_kudosCount);
     }
 
+    /**
+     * Returns whether this item is in a private space.
+     *
+     * @return {@code true} if the item is in a private space
+     */
     @JsonProperty(JSON_PROPERTY_PRIVATE)
     public Boolean isPrivate() {
         return m_private;

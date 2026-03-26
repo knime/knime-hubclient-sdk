@@ -62,7 +62,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchItemNode extends SearchItem {
 
     static final String TYPE = "Node";
@@ -109,24 +108,44 @@ public final class SearchItemNode extends SearchItem {
         return SearchItemType.NODE;
     }
 
+    /**
+     * Returns the icon metadata for this node, if available.
+     *
+     * @return the optional icon
+     */
     @JsonProperty(JSON_PROPERTY_ICON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Icon> getIcon() {
         return Optional.ofNullable(m_icon);
     }
 
+    /**
+     * Returns the OSGi feature symbolic name of the extension that contributes this node, if present.
+     *
+     * @return the optional feature symbolic name
+     */
     @JsonProperty(JSON_PROPERTY_FEATURE_SYMBOLIC_NAME)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getFeatureSymbolicName() {
         return Optional.ofNullable(m_featureSymbolicName);
     }
 
+    /**
+     * Returns the tags associated with this node. The list is potentially empty when present.
+     *
+     * @return the optional list of tags, or empty if the service did not include this field
+     */
     @JsonProperty(JSON_PROPERTY_TAGS)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<List<String>> getTags() {
         return Optional.ofNullable(m_tags);
     }
 
+    /**
+     * Returns the keywords associated with this node. The list is potentially empty when present.
+     *
+     * @return the optional list of keywords, or empty if the service did not include this field
+     */
     @JsonProperty(JSON_PROPERTY_KEYWORDS)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<List<String>> getKeywords() {

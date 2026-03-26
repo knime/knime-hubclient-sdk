@@ -62,7 +62,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchItemWorkflow extends SearchItem {
 
     static final String TYPE = "Workflow";
@@ -119,34 +118,64 @@ public final class SearchItemWorkflow extends SearchItem {
         return SearchItemType.WORKFLOW;
     }
 
+    /**
+     * Returns the tags associated with this workflow. The list may be empty but is never {@code null}.
+     *
+     * @return the list of tags
+     */
     @JsonProperty(JSON_PROPERTY_TAGS)
     public List<String> getTags() {
         return m_tags;
     }
 
+    /**
+     * Returns the number of times this workflow has been downloaded, if present.
+     *
+     * @return the optional download count
+     */
     @JsonProperty(JSON_PROPERTY_DOWNLOAD_COUNT)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Integer> getDownloadCount() {
         return Optional.ofNullable(m_downloadCount);
     }
 
+    /**
+     * Returns whether this workflow has a published version.
+     *
+     * @return {@code true} if the workflow is versioned
+     */
     @JsonProperty(JSON_PROPERTY_IS_VERSIONED)
     public boolean isVersioned() {
         return m_isVersioned;
     }
 
+    /**
+     * Returns the version number of this workflow, if it has been versioned.
+     *
+     * @return the optional version number
+     */
     @JsonProperty(JSON_PROPERTY_VERSION)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Integer> getVersion() {
         return Optional.ofNullable(m_version);
     }
 
+    /**
+     * Returns the ISO-8601 timestamp at which this workflow was versioned, if present.
+     *
+     * @return the optional version creation timestamp
+     */
     @JsonProperty(JSON_PROPERTY_VERSION_CREATED_ON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getVersionCreatedOn() {
         return Optional.ofNullable(m_versionCreatedOn);
     }
 
+    /**
+     * Returns the ISO-8601 timestamp of the last edit of this workflow, if present.
+     *
+     * @return the optional last-edited timestamp
+     */
     @JsonProperty(JSON_PROPERTY_LAST_EDITED_ON)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getLastEditedOn() {

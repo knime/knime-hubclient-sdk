@@ -61,7 +61,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@SuppressWarnings({"java:S1176", "MissingJavadoc"})
 public final class SearchItemExtension extends SearchItem {
 
     static final String TYPE = "Extension";
@@ -98,12 +97,22 @@ public final class SearchItemExtension extends SearchItem {
         return SearchItemType.EXTENSION;
     }
 
+    /**
+     * Returns the vendor of this extension (e.g., {@code KNIME AG}), if present.
+     *
+     * @return the optional vendor name
+     */
     @JsonProperty(JSON_PROPERTY_VENDOR)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<String> getVendor() {
         return Optional.ofNullable(m_vendor);
     }
 
+    /**
+     * Returns whether this extension is marked as trusted by KNIME, if present.
+     *
+     * @return the optional trusted flag
+     */
     @JsonProperty(JSON_PROPERTY_TRUSTED)
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     public Optional<Boolean> isTrusted() {
