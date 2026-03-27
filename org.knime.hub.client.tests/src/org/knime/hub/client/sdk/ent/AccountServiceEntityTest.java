@@ -65,6 +65,7 @@ import org.knime.hub.client.sdk.ent.account.Billboard;
 import org.knime.hub.client.sdk.ent.account.Billboard.AuthenticationType;
 import org.knime.hub.client.sdk.ent.account.HubInstallationAccount;
 import org.knime.hub.client.sdk.ent.account.Member.MemberType;
+import org.knime.hub.client.sdk.ent.account.TeamAccount;
 import org.knime.hub.client.sdk.ent.account.UserAccount;
 import org.knime.hub.client.sdk.testing.TestUtil.EntityFolders;
 
@@ -172,6 +173,14 @@ class AccountServiceEntityTest extends AbstractTest {
         final var team = teams.get(0);
         assertEquals("account:team:f2ace523-5566-4cd7-bb69-9b61fb63b16e", team.getId(), "Unexpected team id");
         assertEquals("Space Explorer Team", team.getName(), "Unexpected team name");
+
+        accountIdentity = load(EntityFolders.ACCOUNT_ENTITIES,
+            "accountIdentityTeam.json", AccountIdentity.class);
+        var teamAccountIdentity = (TeamAccount)accountIdentity;
+        assertEquals("account:team:b22d2848-a7f3-4a4f-ab80-aef024513b2f",
+            teamAccountIdentity.getId(), "Unexpected account ID");
+        assertEquals(AccountIdentityType.TEAM, teamAccountIdentity.getType(), "Unexpected account type");
+        assertEquals("Development", teamAccountIdentity.getName(), "Unexpected account name");
     }
 
     @Test
