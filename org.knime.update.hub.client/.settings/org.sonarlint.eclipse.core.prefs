@@ -1,7 +1,4 @@
 autoEnabled=false
-bindingSuggestionsDisabled=false
+bindingSuggestionsDisabled=true
 eclipse.preferences.version=1
-idePrefixKey=
-projectKey=knime_knime-hubclient-sdk
-serverId=SonarCloud
-sqPrefixKey=
+indexingBasedOnEclipsePlugIns=true
