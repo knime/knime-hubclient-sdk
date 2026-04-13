@@ -23,6 +23,7 @@ package org.knime.hub.client.sdk.transfer;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -44,6 +45,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.annotation.NotOwning;
+import org.eclipse.jdt.annotation.Owning;
 import org.knime.core.node.util.CheckUtils;
 import org.knime.core.node.util.ClassUtils;
 import org.knime.core.util.ThreadLocalHTTPAuthenticator;
@@ -64,6 +66,7 @@ import org.knime.hub.client.sdk.ent.catalog.RepositoryItem.RepositoryItemType;
 import org.knime.hub.client.sdk.ent.catalog.Sized;
 import org.knime.hub.client.sdk.ent.catalog.Workflow;
 import org.knime.hub.client.sdk.ent.catalog.WorkflowGroup;
+import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.BranchingExecMonitor;
 import org.knime.hub.client.sdk.transfer.ConcurrentExecMonitor.LeafExecMonitor;
 import org.slf4j.Logger;
@@ -238,20 +241,41 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         final Map<IPath, Result<Optional<Path>, FailureValue>> downloaded;
         try (final var poller = ConcurrentExecMonitor.startProgressPoller(Duration.ofMillis(200))) {
-            final var splitter = beginMultiProgress(progMon, "Downloading items...", poller, (status, transferRate) -> {
-                final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
-                        .formatted(status.numDone(), resources.itemsToDownload().size(), 100.0 * status.totalProgress(),
+            final BranchingExecMonitor splitter;
+            if (resources.numDownloads() == 1) {
+                // Single item: show part-level progress in the subtitle.
+                final var singleItem = resources.itemsToDownload().stream() //
+                    .filter(d -> !d.item().isFolder()).findFirst().orElseThrow();
+                final var pathStr =
+                    ConcurrentExecMonitor.shortenedPath(singleItem.pathInTarget().toString(), MAX_PATH_LENGTH_IN_MESSAGE);
+                splitter = beginMultiProgress(progMon, "Downloading '%s'...".formatted(pathStr), poller,
+                    (status, transferRate) -> {
+                        final var firstLine = "Downloading '%s': %d parts transferred (%.1f%%, %s/sec)" //
+                            .formatted(pathStr, status.numDone(), 100.0 * status.totalProgress(),
+                                ConcurrentExecMonitor.bytesToHuman(transferRate));
+                        progMon.setTaskName(firstLine);
+                        progMon.subTask(status.active().stream() //
+                            .map(e -> " \u2022 %s of %s".formatted(ConcurrentExecMonitor.percentage(e.getValue()),
+                                e.getKey())) //
+                            .collect(Collectors.joining("\n")));
+                    });
+            } else {
+                splitter = beginMultiProgress(progMon, "Downloading items...", poller, (status, transferRate) -> {
+                    final var firstLine = "Downloading: %d/%d items transferred (%.1f%%, %s/sec)" //
+                        .formatted(status.numDone(), resources.numDownloads(), 100.0 * status.totalProgress(),
                             ConcurrentExecMonitor.bytesToHuman(transferRate));
-                progMon.setTaskName(firstLine);
-                progMon.subTask(status.active().stream() //
-                    .map(e -> " \u2022 %s of '%s'".formatted(ConcurrentExecMonitor.percentage(e.getValue()),
-                        ConcurrentExecMonitor.shortenedPath(e.getKey(), MAX_PATH_LENGTH_IN_MESSAGE))) //
-                    .collect(Collectors.joining("\n")));
-            });
+                    progMon.setTaskName(firstLine);
+                    progMon.subTask(status.active().stream() //
+                        .map(e -> " \u2022 %s of '%s'".formatted(ConcurrentExecMonitor.percentage(e.getValue()),
+                            ConcurrentExecMonitor.shortenedPath(e.getKey(), MAX_PATH_LENGTH_IN_MESSAGE))) //
+                        .collect(Collectors.joining("\n")));
+                });
+            }
             final var totalSize = resources.totalSize();
             final var downloadJobs =
                 submitDownloadJobs(resources.supportsArtifactDownload(), resources.itemsToDownload(),
-                    totalSize.isPresent(), tempFileSupplier, totalSize.orElse(resources.numDownloads()), splitter);
+                    totalSize.isPresent(), tempFileSupplier, totalSize.orElse(resources.numDownloads()), splitter,
+                    resources.numDownloads() == 1);
 
             downloaded = awaitDownloads(downloadJobs, progMon::isCanceled);
         }
@@ -269,13 +293,19 @@ public final class HubDownloader extends AbstractHubTransfer {
 
     private Map<IPath, Future<Result<Path, FailureValue>>> submitDownloadJobs(final boolean supportsArtifactDownload,
         final List<DownloadInfo> downloadInfos, final boolean allSizesKnown, final TempFileSupplier tempFileSupplier,
-        final double maxProgress, final BranchingExecMonitor splitter) {
+        final double maxProgress, final BranchingExecMonitor splitter, final boolean isSingleItem) {
         final var downloadJobs = new LinkedHashMap<IPath, Future<Result<Path, FailureValue>>>();
         for (final var download : downloadInfos) {
             final var hubItem = download.item();
             if (!hubItem.isFolder()) {
-                final var itemSize = allSizesKnown ? download.size().getAsLong() : 1;
-                final var monitor = splitter.createLeafChild(hubItem.path().toString(), itemSize / maxProgress);
+                final ConcurrentExecMonitor monitor;
+                if (isSingleItem) {
+                    // Pass the branching monitor directly so that part-level progress is visible.
+                    monitor = splitter;
+                } else {
+                    final var itemSize = allSizesKnown ? download.size().getAsLong() : 1;
+                    monitor = splitter.createLeafChild(hubItem.path().toString(), itemSize / maxProgress);
+                }
                 downloadJobs.put(download.pathInTarget(), HUB_ITEM_TRANSFER_POOL.submit( //
                     new DownloadItemTask(download, tempFileSupplier, monitor, supportsArtifactDownload)));
             }
@@ -360,21 +390,25 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private final DownloadInfo m_download;
         private final TempFileSupplier m_tempFileSupplier;
-        private final LeafExecMonitor m_monitor;
+        private final ConcurrentExecMonitor m_monitor;
         private final boolean m_supportsArtifactDownload;
+        private final FilePartDownloader m_partDownloader;
 
         DownloadItemTask(final DownloadInfo download, final TempFileSupplier tempFileSupplier,
-            final LeafExecMonitor monitor, final boolean supportsArtifactDownload) {
+            final ConcurrentExecMonitor monitor, final boolean supportsArtifactDownload) {
             m_download = download;
             m_tempFileSupplier = tempFileSupplier;
             m_monitor = monitor;
             m_supportsArtifactDownload = supportsArtifactDownload;
+            m_partDownloader = new FilePartDownloader(m_catalogClient.getApiClient());
         }
 
         @Override
         public Result<Path, FailureValue> call() throws CancelationException, CouldNotAuthorizeException {
             // set a very small non-zero value to signal that the download job has started
-            m_monitor.setProgress(Double.MIN_VALUE);
+            if (m_monitor instanceof LeafExecMonitor leaf) {
+                leaf.setProgress(Double.MIN_VALUE);
+            }
             final AtomicReference<Path> tempFile;
             try {
                 tempFile = new AtomicReference<>(m_tempFileSupplier.createTempFile("KNIMEHubItem", ".download", false));
@@ -415,11 +449,13 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private Result<Path, FailureValue> performDownload(final AtomicReference<Path> tempFile)
             throws IOException, CancelationException {
+            final LeafExecMonitor seqMonitor = m_monitor instanceof BranchingExecMonitor branching
+                ? branching.createLeafChild("Download", 1.0) : (LeafExecMonitor)m_monitor;
             final var response = m_catalogClient.downloadItemById(m_download.id().id(), null, MediaType.WILDCARD_TYPE,
                 m_clientHeaders, (in, contentLength) -> {
                     // prefer size from the HTTP request if available, fall back to Catalog information otherwise
                     final var numBytes = contentLength.orElse(m_download.size().orElse(-1));
-                    writeStreamToFileWithProgress(in, numBytes, tempFile.get(), m_monitor);
+                    writeStreamToFileWithProgress(in, numBytes, tempFile.get(), seqMonitor);
                     return tempFile.getAndSet(null);
                 });
             return response.result().mapFailure(problem -> FailureValue.fromRFC9457(FailureType.DOWNLOAD_ITEM_FAILED,
@@ -428,12 +464,47 @@ public final class HubDownloader extends AbstractHubTransfer {
 
         private Result<Path, FailureValue> performArtifactDownload(final AtomicReference<Path> tempFile)
             throws IOException, CancelationException {
-            try (final var downloadStream = m_catalogClient.createArtifactDownloadStream(m_download.id(), null,
-                m_clientHeaders, m_monitor.cancelChecker())) {
-                // prefer size from the HTTP request if available, fall back to Catalog information otherwise
-                final var numBytes = downloadStream.getContentLength().orElse(m_download.size().orElse(-1));
-                writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), m_monitor);
+            final var downloadUrl =
+                ArtifactDownloadStream.resolveDownloadUrl(m_catalogClient, m_clientHeaders, m_download.id(), null,
+                    m_monitor.cancelChecker());
+
+            // Probe for byte-range support and attempt parallel download if the file is large enough.
+            final var cap = m_partDownloader.probeRanges(downloadUrl);
+            if (cap.supported() && cap.totalSize() >= FilePartDownloader.MIN_PARALLEL_SIZE) {
+                LOGGER.atDebug() //
+                    .addArgument(m_download.item().path()) //
+                    .addArgument(cap.totalSize()) //
+                    .log("Downloading '{}' ({} bytes) in parallel using byte ranges");
+                final Result<Void, FailureValue> result;
+                if (m_monitor instanceof BranchingExecMonitor branching) {
+                    result = m_partDownloader.downloadInParallel(downloadUrl, cap.totalSize(), tempFile.get(),
+                        branching);
+                } else {
+                    result = m_partDownloader.downloadInParallel(downloadUrl, cap.totalSize(), tempFile.get(),
+                        (LeafExecMonitor)m_monitor);
+                }
+                if (result instanceof Result.Failure<?, FailureValue> failure) {
+                    return Result.failure(failure.failure());
+                }
                 return Result.success(tempFile.getAndSet(null));
+            }
+
+            // Fall back to sequential streaming download.
+            final LeafExecMonitor seqMonitor = m_monitor instanceof BranchingExecMonitor branching
+                ? branching.createLeafChild("Download", 1.0) : (LeafExecMonitor)m_monitor;
+            try (final var downloadStream = openSequentialStream(downloadUrl)) {
+                final var numBytes = downloadStream.getContentLength().orElse(m_download.size().orElse(-1));
+                writeStreamToFileWithProgress(downloadStream, numBytes, tempFile.get(), seqMonitor);
+                return Result.success(tempFile.getAndSet(null));
+            }
+        }
+
+        private @Owning ArtifactDownloadStream openSequentialStream(final URL downloadUrl)
+            throws HubFailureIOException {
+            try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+                final var invocationBuilder =
+                    m_catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
+                return ArtifactDownloadStream.openDownloadStream(invocationBuilder.get());
             }
         }
     }

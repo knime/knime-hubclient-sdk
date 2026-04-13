@@ -770,7 +770,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @deprecated use {@link #serverCopyById(String, IPath, boolean, Map)}
+     * @deprecated use {@link #serverCopyById(String, IPath, boolean, String, Map)}
      */
     @Deprecated
     public ApiResponse<RepositoryItem> serverCopyById(final String id, final String fromRepository,
@@ -842,7 +842,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @deprecated use {@link #serverMoveById(String, IPath, boolean, Map)}
+     * @deprecated use {@link #serverMoveById(String, IPath, boolean, String, Map)}
      */
     @Deprecated
     public ApiResponse<RepositoryItem> serverMoveById(final String id, final String fromRepository,
@@ -944,7 +944,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @deprecated use {@link #serverCopyById(String, IPath, boolean, Map)}
+     * @deprecated use {@link #serverCopyById(String, IPath, boolean, String, Map)}
      */
     @Deprecated
     public ApiResponse<RepositoryItem> serverCopyByPath(final IPath path, final String fromRepository,
@@ -981,7 +981,7 @@ public final class CatalogServiceClient {
      * @return {@link ApiResponse}
      *
      * @throws HubFailureIOException if an I/O error occurred
-     * @deprecated use {@link #serverMoveById(String, IPath, boolean, Map)}
+     * @deprecated use {@link #serverMoveById(String, IPath, boolean, String, Map)}
      */
     @Deprecated
     public ApiResponse<RepositoryItem> serverMoveByPath(final IPath path, final String fromRepository,

@@ -109,10 +109,31 @@ public final class ArtifactDownloadStream extends FilterInputStream {
     public static @Owning ArtifactDownloadStream create(final CatalogServiceClient catalogClient,
         final Map<String, String> clientHeaders, final ItemID itemId, final ItemVersion version,
         final BooleanSupplier cancelChecker) throws HubFailureIOException, CancelationException {
+        final var downloadUrl = resolveDownloadUrl(catalogClient, clientHeaders, itemId, version, cancelChecker);
+        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
+            final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
+            return openDownloadStream(invocationBuilder.get());
+        }
+    }
+
+    /**
+     * Resolves the pre-signed download URL for the given artifact, polling until the artifact is ready if needed.
+     *
+     * @param catalogClient catalog client for initiating the stream
+     * @param clientHeaders headers for Hub API calls
+     * @param itemId ID of the item to download
+     * @param version version of the item to download
+     * @param cancelChecker called to find out whether or not this method should be canceled
+     * @return the pre-signed download URL
+     * @throws HubFailureIOException if the download URL could not be resolved
+     * @throws CancelationException if the user cancelled the operation while waiting for the download to be ready
+     */
+    static URL resolveDownloadUrl(final CatalogServiceClient catalogClient, final Map<String, String> clientHeaders,
+        final ItemID itemId, final ItemVersion version, final BooleanSupplier cancelChecker)
+        throws HubFailureIOException, CancelationException {
         CheckUtils.checkArgumentNotNull(catalogClient);
         CheckUtils.checkArgumentNotNull(itemId);
 
-        // prepare the artifact download
         LOGGER.atDebug() //
             .addArgument(itemId.id()) //
             .log("Preparing download of item with ID: {}");
@@ -131,20 +152,12 @@ public final class ArtifactDownloadStream extends FilterInputStream {
             downloadUrlOpt = success.value().getDownloadUrl();
         }
 
-        // if the download ID is available poll the download status until it's ready
-        final URL downloadUrl;
         if (downloadIdOpt.isPresent()) {
-            downloadUrl = awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadIdOpt.get(), cancelChecker);
-        } else {
-            downloadUrl = downloadUrlOpt.orElseThrow(() -> new HubFailureIOException(
-                FailureValue.withDetails(FailureType.DOWNLOAD_ITEM_PREP_FAILED, "Download initiation failed",
-                "Prepared download response doesn't contain a download ID or URL")));
+            return awaitDownloadReady(catalogClient, clientHeaders, itemId, downloadIdOpt.get(), cancelChecker);
         }
-
-        try (final var supp = ThreadLocalHTTPAuthenticator.suppressAuthenticationPopups()) {
-            final var invocationBuilder = catalogClient.getApiClient().nonApiInvocationBuilder(downloadUrl.toString());
-            return openDownloadStream(invocationBuilder.get());
-        }
+        return downloadUrlOpt.orElseThrow(() -> new HubFailureIOException(
+            FailureValue.withDetails(FailureType.DOWNLOAD_ITEM_PREP_FAILED, "Download initiation failed",
+            "Prepared download response doesn't contain a download ID or URL")));
     }
 
     private static URL awaitDownloadReady(final CatalogServiceClient catalogClient,
@@ -200,7 +213,7 @@ public final class ArtifactDownloadStream extends FilterInputStream {
         };
     }
 
-    private static @Owning ArtifactDownloadStream openDownloadStream(final @Owning Response response)
+    static @Owning ArtifactDownloadStream openDownloadStream(final @Owning Response response)
         throws HubFailureIOException {
         final StatusType statusInfo = response.getStatusInfo();
         if (statusInfo.getFamily() != Family.SUCCESSFUL) {
