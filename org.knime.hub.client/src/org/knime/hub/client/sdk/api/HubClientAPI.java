@@ -70,6 +70,8 @@ public final class HubClientAPI implements AutoCloseable {
 
     private final SearchServiceClient m_searchService;
 
+    private final SuggestionsServiceClient m_suggestionsService;
+
     /**
      * Create the {@link HubClientAPI} given an {@link ApiClient}
      *
@@ -81,6 +83,7 @@ public final class HubClientAPI implements AutoCloseable {
         m_accountService = new AccountServiceClient(m_apiClient);
         m_executionService = new ExecutionServiceClient(apiClient);
         m_searchService = new SearchServiceClient(apiClient);
+        m_suggestionsService = new SuggestionsServiceClient(apiClient);
     }
 
     /**
@@ -128,6 +131,16 @@ public final class HubClientAPI implements AutoCloseable {
      */
     public SearchServiceClient search() {
         return m_searchService;
+    }
+
+    /**
+     * Retrieves the suggestions service client.
+     *
+     * @return {@link SuggestionsServiceClient}
+     * @since 1.4
+     */
+    public SuggestionsServiceClient suggestions() {
+        return m_suggestionsService;
     }
 
     /**

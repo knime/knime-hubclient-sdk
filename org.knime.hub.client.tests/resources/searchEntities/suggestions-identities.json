@@ -1,0 +1,23 @@
+{
+  "users": [
+    {
+      "id": "account:user:8a79fb54-68ec-4261-a43e-5d280ee2f8a2",
+      "name": "takbb",
+      "displayName": "takbb"
+    }
+  ],
+  "teams": [
+    {
+      "id": "account:team:a885bb42-d808-4557-9a7f-9f10c5777739",
+      "name": "Knime Team",
+      "displayName": "Knime Team"
+    }
+  ],
+  "externalGroups": [
+    {
+      "id": "account:group:external:78de2184-a35d-4cf9-af39-30649d6f2db7",
+      "name": "Research Group",
+      "displayName": "Research Group"
+    }
+  ]
+}

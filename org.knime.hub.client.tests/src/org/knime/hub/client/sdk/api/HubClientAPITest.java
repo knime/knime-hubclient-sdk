@@ -48,6 +48,8 @@
 
 package org.knime.hub.client.sdk.api;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -283,8 +285,13 @@ class HubClientAPITest extends AbstractTest {
     }
 
     @AfterAll
-	static void stopServerMock() {
+    static void stopServerMock() {
         terminateServerMockTests();
-	}
+    }
+
+    @Test
+    void testSuggestionsClientIsAvailable() {
+        assertNotNull(getHubClientAPIMock().suggestions());
+    }
 
 }
