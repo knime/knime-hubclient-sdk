@@ -39,7 +39,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
-import org.knime.hub.client.sdk.api.SearchServiceClient.PrivateSearchMode;
+import org.knime.hub.client.sdk.api.SearchServiceClient.SearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
@@ -91,7 +91,7 @@ class SearchServiceClientTest extends AbstractTest {
                 "limit", "5", //
                 "offset", "0", //
                 "sort", "best", //
-                "privateSearchMode", "include" //
+                "searchMode", "scoped" //
             ));
 
         final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
@@ -100,7 +100,7 @@ class SearchServiceClientTest extends AbstractTest {
             5, //
             0, //
             SearchServiceClient.SearchSort.BEST, //
-            PrivateSearchMode.INCLUDE, //
+            SearchMode.SCOPED, //
             List.of(), //
             null, //
             null, //

@@ -81,7 +81,7 @@ public final class SearchServiceClient {
     private static final String QUERY_PARAM_LIMIT = "limit";
     private static final String QUERY_PARAM_OFFSET = "offset";
     private static final String QUERY_PARAM_SORT = "sort";
-    private static final String QUERY_PARAM_PRIVATE_SEARCH_MODE = "privateSearchMode";
+    private static final String QUERY_PARAM_SEARCH_MODE = "searchMode";
     private static final String QUERY_PARAM_DEBUG = "debug";
     private static final String QUERY_PARAM_SCORE_LIMIT = "scoreLimit";
     private static final String QUERY_PARAM_TAG = "tag";
@@ -108,7 +108,7 @@ public final class SearchServiceClient {
      * @param limit number of results to return, {@code null} to use service default
      * @param offset first result offset, {@code null} to use service default
      * @param sort sort mode, {@code null} to use service default
-     * @param privateSearchMode include/exclude/auto private items
+     * @param searchMode global/scoped search scope
      * @param tags optional list of tags (comma separated in query)
      * @param owner optional owner filter
      * @param debug enable debug output
@@ -119,7 +119,7 @@ public final class SearchServiceClient {
      */
     @SuppressWarnings("java:S107") // S107: API signature mirrors search-service parameters
     public ApiResponse<SearchResults> search(final String query, final SearchType type, final Integer limit,
-        final Integer offset, final SearchSort sort, final PrivateSearchMode privateSearchMode,
+        final Integer offset, final SearchSort sort, final SearchMode searchMode,
         final List<String> tags, final String owner, final Boolean debug, final Integer scoreLimit,
         final Map<String, String> additionalHeaders) throws HubFailureIOException {
 
@@ -133,8 +133,8 @@ public final class SearchServiceClient {
             .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
             .withQueryParam(QUERY_PARAM_OFFSET, toString(offset)) //
             .withQueryParam(QUERY_PARAM_SORT, Optional.ofNullable(sort).map(SearchSort::getValue).orElse(null)) //
-            .withQueryParam(QUERY_PARAM_PRIVATE_SEARCH_MODE,
-                Optional.ofNullable(privateSearchMode).map(PrivateSearchMode::getValue).orElse(null)) //
+            .withQueryParam(QUERY_PARAM_SEARCH_MODE,
+                Optional.ofNullable(searchMode).map(SearchMode::getValue).orElse(null)) //
             .withQueryParam(QUERY_PARAM_DEBUG, toString(debug)) //
             .withQueryParam(QUERY_PARAM_SCORE_LIMIT, toString(scoreLimit)) //
             .withQueryParam(tagsToQueryParameter(tags).orElse(null)) //
@@ -229,24 +229,20 @@ public final class SearchServiceClient {
     }
 
     /**
-     * Private search mode flags: include/exclude/auto.
+     * Search scope flags.
      */
-    public enum PrivateSearchMode {
-        /** Include items from private spaces (requires authentication). */
-        INCLUDE("include"),
-        /** Exclude items from private spaces. */
-        EXCLUDE("exclude"),
-        /** Let the service decide based on authentication state. */
-        AUTO("auto");
+    public enum SearchMode {
+        GLOBAL("global"),
+        SCOPED("scoped");
 
         private final String m_value;
 
-        PrivateSearchMode(final String value) {
+        SearchMode(final String value) {
             m_value = value;
         }
 
         /**
-         * Returns the string value sent as the {@code privateSearchMode} query parameter.
+         * Returns the string value sent as the {@code searchMode} query parameter.
          *
          * @return the API value
          */

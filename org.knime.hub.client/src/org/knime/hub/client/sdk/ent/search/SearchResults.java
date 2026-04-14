@@ -123,24 +123,24 @@ public final class SearchResults {
         @JsonProperty(value = JSON_PROPERTY_COUNT_BY_CATEGORY, required = true)
         final SearchResultsCountByCategory countByCategory,
         @JsonProperty(value = JSON_PROPERTY_RESULTS, required = true) final List<SearchItem> results,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TAGS, required = true) final List<String> suggestedTags,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_USERNAMES, required = true) final List<String> suggestedUsernames,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TEAMNAMES, required = true) final List<String> suggestedTeamnames,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS, required = true)
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TAGS) final List<String> suggestedTags,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_USERNAMES) final List<String> suggestedUsernames,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TEAMNAMES) final List<String> suggestedTeamnames,
+        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS)
         final List<AccountSearchItem> suggestedExternalGroups,
-        @JsonProperty(value = JSON_PROPERTY_RELATED_TAGS, required = true) final List<String> relatedTags,
-        @JsonProperty(value = JSON_PROPERTY_RELATED_PATH_TAGS, required = true) final List<String> relatedPathTags,
+        @JsonProperty(value = JSON_PROPERTY_RELATED_TAGS) final List<String> relatedTags,
+        @JsonProperty(value = JSON_PROPERTY_RELATED_PATH_TAGS) final List<String> relatedPathTags,
         @JsonProperty(JSON_PROPERTY_TOOK) final Long took,
         @JsonProperty(JSON_PROPERTY_ES_QUERY) final String esQuery,
         @JsonProperty(JSON_PROPERTY_ES_RESULT) final String esResult) {
         m_countByCategory = countByCategory;
         m_results = results;
-        m_suggestedTags = suggestedTags;
-        m_suggestedUsernames = suggestedUsernames;
-        m_suggestedTeamnames = suggestedTeamnames;
-        m_suggestedExternalGroups = suggestedExternalGroups;
-        m_relatedTags = relatedTags;
-        m_relatedPathTags = relatedPathTags;
+        m_suggestedTags = suggestedTags == null ? List.of() : suggestedTags;
+        m_suggestedUsernames = suggestedUsernames == null ? List.of() : suggestedUsernames;
+        m_suggestedTeamnames = suggestedTeamnames == null ? List.of() : suggestedTeamnames;
+        m_suggestedExternalGroups = suggestedExternalGroups == null ? List.of() : suggestedExternalGroups;
+        m_relatedTags = relatedTags == null ? List.of() : relatedTags;
+        m_relatedPathTags = relatedPathTags == null ? List.of() : relatedPathTags;
         m_took = took;
         m_esQuery = esQuery;
         m_esResult = esResult;

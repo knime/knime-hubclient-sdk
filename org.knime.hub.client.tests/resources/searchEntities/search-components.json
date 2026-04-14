@@ -28,9 +28,6 @@
       "version": 1
     }
   ],
-  "suggestedUsernames": [],
-  "suggestedTeamnames": [],
-  "suggestedExternalGroups": [],
   "countByCategory": {
     "all": 761,
     "nodes": 24,
@@ -39,7 +36,6 @@
     "components": 31,
     "collections": 1
   },
-  "suggestedTags": [],
   "relatedTags": [
     "Workflow Applications",
     "Workflow Application",
