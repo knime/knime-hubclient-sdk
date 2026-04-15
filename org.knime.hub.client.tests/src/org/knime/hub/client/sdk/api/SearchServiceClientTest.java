@@ -118,6 +118,46 @@ class SearchServiceClientTest extends AbstractTest {
             getJsonPathConfig());
     }
 
+    @Test
+    @SuppressWarnings("deprecation")
+    void testSearchMissingOptionalListsDeserializesAsEmptyLists() throws IOException {
+        final var fixture = "search-components-minimal.json";
+        stubSearchResponse( //
+            fixture, //
+            "/search", //
+            Map.of( //
+                "query", "foo", //
+                "type", "component", //
+                "limit", "5", //
+                "offset", "0", //
+                "sort", "best", //
+                "searchMode", "scoped" //
+            ));
+
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
+            "foo", //
+            SearchServiceClient.SearchType.COMPONENT, //
+            5, //
+            0, //
+            SearchServiceClient.SearchSort.BEST, //
+            SearchMode.SCOPED, //
+            List.of(), //
+            null, //
+            null, //
+            null, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        final SearchResults result = response.result().toOptional().orElseThrow();
+        assertEquals(List.of(), result.getSuggestedTags());
+        assertEquals(List.of(), result.getSuggestedUsernames());
+        assertEquals(List.of(), result.getSuggestedTeamnames());
+        assertEquals(List.of(), result.getSuggestedExternalGroups());
+        assertEquals(List.of(), result.getRelatedTags());
+        assertEquals(List.of(), result.getRelatedPathTags());
+    }
+
     @ParameterizedTest
     @MethodSource("legacyPrivateSearchModes")
     void testLegacyPrivateSearchModeCompatibility(final PrivateSearchMode privateSearchMode,

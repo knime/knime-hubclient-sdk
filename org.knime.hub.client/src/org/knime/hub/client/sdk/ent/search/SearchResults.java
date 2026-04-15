@@ -59,9 +59,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Response payload returned by the KNIME Hub search-service ({@code GET /search} and
  * {@code GET /instant-search} endpoints).
  * <p>
- * Contains the ranked list of matched {@link SearchItem}s, per-category hit counts, and
- * supplementary suggestion lists (tags, usernames, team names, external groups) that are only
- * populated for instant-search requests.
+ * Contains the ranked list of matched {@link SearchItem}s and per-category hit counts.
+ * <p>
+ * Suggestion lists are retained for backwards compatibility and may be empty when the backing
+ * endpoint does not provide them.
  * </p>
  *
  * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
@@ -172,6 +173,7 @@ public final class SearchResults {
      * @return the suggested tags
      */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_TAGS)
+    @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTags() {
         return m_suggestedTags;
     }
@@ -182,6 +184,7 @@ public final class SearchResults {
      * @return the suggested usernames
      */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_USERNAMES)
+    @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedUsernames() {
         return m_suggestedUsernames;
     }
@@ -192,6 +195,7 @@ public final class SearchResults {
      * @return the suggested team names
      */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_TEAMNAMES)
+    @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTeamnames() {
         return m_suggestedTeamnames;
     }
@@ -202,6 +206,7 @@ public final class SearchResults {
      * @return the suggested external groups
      */
     @JsonProperty(JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS)
+    @Deprecated(since = "1.3", forRemoval = false)
     public List<AccountSearchItem> getSuggestedExternalGroups() {
         return m_suggestedExternalGroups;
     }

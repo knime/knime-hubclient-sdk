@@ -108,7 +108,9 @@ public final class SearchServiceClient {
      * @param limit number of results to return, {@code null} to use service default
      * @param offset first result offset, {@code null} to use service default
      * @param sort sort mode, {@code null} to use service default
-     * @param searchMode global/scoped search scope
+     * @param searchMode search scope: {@link SearchMode#GLOBAL} for public/global results,
+     *            {@link SearchMode#SCOPED} for results scoped to caller visibility (recommended replacement for
+     *            legacy {@code privateSearchMode=include})
      * @param tags optional list of tags (comma separated in query)
      * @param owner optional owner filter
      * @param debug enable debug output
@@ -247,7 +249,13 @@ public final class SearchServiceClient {
      * Search scope flags.
      */
     public enum SearchMode {
+        /**
+         * Global/public search scope.
+         */
         GLOBAL("global"),
+        /**
+         * Scoped search based on caller visibility (e.g. includes private-accessible items).
+         */
         SCOPED("scoped");
 
         private final String m_value;
