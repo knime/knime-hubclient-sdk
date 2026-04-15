@@ -142,6 +142,21 @@ public final class SearchServiceClient {
             .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
     }
 
+    /**
+     * @deprecated Use {@link #search(String, SearchType, Integer, Integer, SearchSort, SearchMode, List, String,
+     *             Boolean, Integer, Map)} with {@link SearchMode}. The upstream search-service removed
+     *             {@code privateSearchMode} in favor of {@code searchMode}.
+     */
+    @Deprecated(since = "1.3", forRemoval = false)
+    @SuppressWarnings("java:S107") // S107: API signature mirrors search-service parameters
+    public ApiResponse<SearchResults> search(final String query, final SearchType type, final Integer limit,
+        final Integer offset, final SearchSort sort, final PrivateSearchMode privateSearchMode,
+        final List<String> tags, final String owner, final Boolean debug, final Integer scoreLimit,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+        return search(query, type, limit, offset, sort, toSearchMode(privateSearchMode), tags, owner, debug, scoreLimit,
+            additionalHeaders);
+    }
+
 
     private static String toString(final Object value) {
         return value == null ? null : value.toString();
@@ -249,5 +264,28 @@ public final class SearchServiceClient {
         public String getValue() {
             return m_value;
         }
+    }
+
+    /**
+     * Legacy private-search mode flags.
+     *
+     * @deprecated Use {@link SearchMode}. The upstream search-service no longer supports
+     *             {@code privateSearchMode}.
+     */
+    @Deprecated(since = "1.3", forRemoval = false)
+    public enum PrivateSearchMode {
+        INCLUDE,
+        EXCLUDE,
+        AUTO;
+    }
+
+    private static SearchMode toSearchMode(final PrivateSearchMode privateSearchMode) {
+        if (privateSearchMode == null) {
+            return null;
+        }
+        return switch (privateSearchMode) {
+            case INCLUDE -> SearchMode.SCOPED;
+            case EXCLUDE, AUTO -> SearchMode.GLOBAL;
+        };
     }
 }
