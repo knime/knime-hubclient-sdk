@@ -52,6 +52,7 @@ import java.util.Optional;
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -69,6 +70,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonIgnoreProperties({"suggestedTags", "suggestedUsernames", "suggestedTeamnames", "suggestedExternalGroups"})
 public final class SearchResults {
 
     private static final String JSON_PROPERTY_COUNT_BY_CATEGORY = "countByCategory";
@@ -76,18 +78,6 @@ public final class SearchResults {
 
     private static final String JSON_PROPERTY_RESULTS = "results";
     private final List<SearchItem> m_results;
-
-    private static final String JSON_PROPERTY_SUGGESTED_TAGS = "suggestedTags";
-    private final List<String> m_suggestedTags;
-
-    private static final String JSON_PROPERTY_SUGGESTED_USERNAMES = "suggestedUsernames";
-    private final List<String> m_suggestedUsernames;
-
-    private static final String JSON_PROPERTY_SUGGESTED_TEAMNAMES = "suggestedTeamnames";
-    private final List<String> m_suggestedTeamnames;
-
-    private static final String JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS = "suggestedExternalGroups";
-    private final List<AccountSearchItem> m_suggestedExternalGroups;
 
     private static final String JSON_PROPERTY_RELATED_TAGS = "relatedTags";
     private final List<String> m_relatedTags;
@@ -109,10 +99,6 @@ public final class SearchResults {
      *
      * @param countByCategory the hit counts broken down by item category
      * @param results the list of matched search items in ranked order
-     * @param suggestedTags tags that match the search query (instant-search only)
-     * @param suggestedUsernames usernames that match the search query (instant-search only)
-     * @param suggestedTeamnames team names that match the search query (instant-search only)
-     * @param suggestedExternalGroups external groups that match the search query (instant-search only)
      * @param relatedTags tags that appear in the tag lists of matched documents
      * @param relatedPathTags tags that appear in the path-tag lists of matched documents
      * @param took the time taken by the search engine to execute the query in milliseconds, if present
@@ -124,11 +110,6 @@ public final class SearchResults {
         @JsonProperty(value = JSON_PROPERTY_COUNT_BY_CATEGORY, required = true)
         final SearchResultsCountByCategory countByCategory,
         @JsonProperty(value = JSON_PROPERTY_RESULTS, required = true) final List<SearchItem> results,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TAGS) final List<String> suggestedTags,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_USERNAMES) final List<String> suggestedUsernames,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_TEAMNAMES) final List<String> suggestedTeamnames,
-        @JsonProperty(value = JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS)
-        final List<AccountSearchItem> suggestedExternalGroups,
         @JsonProperty(value = JSON_PROPERTY_RELATED_TAGS) final List<String> relatedTags,
         @JsonProperty(value = JSON_PROPERTY_RELATED_PATH_TAGS) final List<String> relatedPathTags,
         @JsonProperty(JSON_PROPERTY_TOOK) final Long took,
@@ -136,15 +117,22 @@ public final class SearchResults {
         @JsonProperty(JSON_PROPERTY_ES_RESULT) final String esResult) {
         m_countByCategory = countByCategory;
         m_results = results;
-        m_suggestedTags = suggestedTags == null ? List.of() : suggestedTags;
-        m_suggestedUsernames = suggestedUsernames == null ? List.of() : suggestedUsernames;
-        m_suggestedTeamnames = suggestedTeamnames == null ? List.of() : suggestedTeamnames;
-        m_suggestedExternalGroups = suggestedExternalGroups == null ? List.of() : suggestedExternalGroups;
         m_relatedTags = relatedTags == null ? List.of() : relatedTags;
         m_relatedPathTags = relatedPathTags == null ? List.of() : relatedPathTags;
         m_took = took;
         m_esQuery = esQuery;
         m_esResult = esResult;
+    }
+
+    /**
+     * @deprecated Kept for source compatibility with callers that still pass legacy suggestion lists.
+     */
+    @Deprecated(since = "1.3", forRemoval = false)
+    public SearchResults(final SearchResultsCountByCategory countByCategory, final List<SearchItem> results,
+        final List<String> suggestedTags, final List<String> suggestedUsernames, final List<String> suggestedTeamnames,
+        final List<AccountSearchItem> suggestedExternalGroups, final List<String> relatedTags,
+        final List<String> relatedPathTags, final Long took, final String esQuery, final String esResult) {
+        this(countByCategory, results, relatedTags, relatedPathTags, took, esQuery, esResult);
     }
 
     /**
@@ -169,46 +157,46 @@ public final class SearchResults {
 
     /**
      * Returns tags that match the search query (instant-search only).
+     * Always returns an empty list.
      *
      * @return the suggested tags
      */
-    @JsonProperty(JSON_PROPERTY_SUGGESTED_TAGS)
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTags() {
-        return m_suggestedTags;
+        return List.of();
     }
 
     /**
      * Returns usernames that match the search query (instant-search only).
+     * Always returns an empty list.
      *
      * @return the suggested usernames
      */
-    @JsonProperty(JSON_PROPERTY_SUGGESTED_USERNAMES)
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedUsernames() {
-        return m_suggestedUsernames;
+        return List.of();
     }
 
     /**
      * Returns team names that match the search query (instant-search only).
+     * Always returns an empty list.
      *
      * @return the suggested team names
      */
-    @JsonProperty(JSON_PROPERTY_SUGGESTED_TEAMNAMES)
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTeamnames() {
-        return m_suggestedTeamnames;
+        return List.of();
     }
 
     /**
      * Returns external groups that match the search query (instant-search only).
+     * Always returns an empty list.
      *
      * @return the suggested external groups
      */
-    @JsonProperty(JSON_PROPERTY_SUGGESTED_EXTERNAL_GROUPS)
     @Deprecated(since = "1.3", forRemoval = false)
     public List<AccountSearchItem> getSuggestedExternalGroups() {
-        return m_suggestedExternalGroups;
+        return List.of();
     }
 
     /**
@@ -275,10 +263,6 @@ public final class SearchResults {
         var that = (SearchResults)o;
         return Objects.equals(m_countByCategory, that.m_countByCategory)
             && Objects.equals(m_results, that.m_results)
-            && Objects.equals(m_suggestedTags, that.m_suggestedTags)
-            && Objects.equals(m_suggestedUsernames, that.m_suggestedUsernames)
-            && Objects.equals(m_suggestedTeamnames, that.m_suggestedTeamnames)
-            && Objects.equals(m_suggestedExternalGroups, that.m_suggestedExternalGroups)
             && Objects.equals(m_relatedTags, that.m_relatedTags)
             && Objects.equals(m_relatedPathTags, that.m_relatedPathTags)
             && Objects.equals(m_took, that.m_took)
@@ -288,8 +272,8 @@ public final class SearchResults {
 
     @Override
     public int hashCode() {
-        return Objects.hash(m_countByCategory, m_results, m_suggestedTags, m_suggestedUsernames, m_suggestedTeamnames,
-            m_suggestedExternalGroups, m_relatedTags, m_relatedPathTags, m_took, m_esQuery, m_esResult);
+        return Objects.hash(m_countByCategory, m_results, m_relatedTags, m_relatedPathTags, m_took, m_esQuery,
+            m_esResult);
     }
 
     @Override
