@@ -156,7 +156,7 @@ public final class SearchResults {
     }
 
     /**
-     * Returns tags that match the search query (instant-search only).
+     * Returns tags that match the search query. This used to be part of the response and was removed.
      * Always returns an empty list.
      *
      * @return the suggested tags
@@ -167,7 +167,7 @@ public final class SearchResults {
     }
 
     /**
-     * Returns usernames that match the search query (instant-search only).
+     * Returns usernames that match the search query. This used to be part of the response and was removed.
      * Always returns an empty list.
      *
      * @return the suggested usernames
@@ -178,7 +178,7 @@ public final class SearchResults {
     }
 
     /**
-     * Returns team names that match the search query (instant-search only).
+     * Returns team names that match the search query. This used to be part of the response and was removed.
      * Always returns an empty list.
      *
      * @return the suggested team names
@@ -189,7 +189,7 @@ public final class SearchResults {
     }
 
     /**
-     * Returns external groups that match the search query (instant-search only).
+     * Returns external groups that match the search query. This used to be part of the response and was removed.
      * Always returns an empty list.
      *
      * @return the suggested external groups
