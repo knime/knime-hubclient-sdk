@@ -96,16 +96,11 @@ public final class SuggestionsServiceClient {
      * @param outPort object class of required output port, mutually exclusive with {@code inPort}
      * @param additionalHeaders additional headers to forward
      * @return {@link ApiResponse} containing {@link ComponentSuggestions}
-     * @throws IllegalArgumentException if both {@code inPort} and {@code outPort} are non-empty
      * @throws HubFailureIOException if the request fails
      */
     public ApiResponse<ComponentSuggestions> suggestComponents(final String query, final Integer limit,
         final String inPort, final String outPort, final Map<String, String> additionalHeaders)
         throws HubFailureIOException {
-
-        if (isNonEmpty(inPort) && isNonEmpty(outPort)) {
-            throw new IllegalArgumentException("'inPort' and 'outPort' are mutually exclusive");
-        }
 
         final var requestPath = IPath.forPosix(COMPONENT_SUGGESTIONS_API_PATH);
 
@@ -143,9 +138,5 @@ public final class SuggestionsServiceClient {
 
     private static String toString(final Object value) {
         return value == null ? null : value.toString();
-    }
-
-    private static boolean isNonEmpty(final String value) {
-        return value != null && !value.isEmpty();
     }
 }
