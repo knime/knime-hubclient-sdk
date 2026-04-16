@@ -52,7 +52,6 @@ import java.util.Optional;
 import org.knime.hub.client.sdk.ent.util.EntityUtil;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -70,7 +69,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @since 1.1
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonIgnoreProperties({"suggestedTags", "suggestedUsernames", "suggestedTeamnames", "suggestedExternalGroups"})
 public final class SearchResults {
 
     private static final String JSON_PROPERTY_COUNT_BY_CATEGORY = "countByCategory";
