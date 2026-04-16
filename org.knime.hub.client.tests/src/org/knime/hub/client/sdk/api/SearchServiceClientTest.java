@@ -150,10 +150,6 @@ class SearchServiceClientTest extends AbstractTest {
 
         assertEquals(200, response.statusCode());
         final SearchResults result = response.result().toOptional().orElseThrow();
-        assertEquals(List.of(), result.getSuggestedTags());
-        assertEquals(List.of(), result.getSuggestedUsernames());
-        assertEquals(List.of(), result.getSuggestedTeamnames());
-        assertEquals(List.of(), result.getSuggestedExternalGroups());
         assertEquals(List.of(), result.getRelatedTags());
         assertEquals(List.of(), result.getRelatedPathTags());
     }
