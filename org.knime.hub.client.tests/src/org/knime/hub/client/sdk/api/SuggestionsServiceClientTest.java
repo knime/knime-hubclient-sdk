@@ -136,6 +136,26 @@ class SuggestionsServiceClientTest extends AbstractTest {
         assertEquals("components must not be null", exception.getMessage());
     }
 
+    @Test
+    void testIdentitySuggestionsRejectsNullUsers() {
+        final var exception = assertThrows(NullPointerException.class, () -> new IdentitySuggestions(null, List.of(), List.of()));
+        assertEquals("users must not be null", exception.getMessage());
+    }
+
+    @Test
+    void testIdentitySuggestionsRejectsNullTeams() {
+        final var exception =
+            assertThrows(NullPointerException.class, () -> new IdentitySuggestions(List.of(), null, List.of()));
+        assertEquals("teams must not be null", exception.getMessage());
+    }
+
+    @Test
+    void testIdentitySuggestionsRejectsNullExternalGroups() {
+        final var exception =
+            assertThrows(NullPointerException.class, () -> new IdentitySuggestions(List.of(), List.of(), null));
+        assertEquals("externalGroups must not be null", exception.getMessage());
+    }
+
     private static <T> JsonNode stubSuggestionsResponse(final String testFileName, final String urlPath,
         final Map<String, String> queryParams, final Class<T> entityType) throws IOException {
         final var filePath =

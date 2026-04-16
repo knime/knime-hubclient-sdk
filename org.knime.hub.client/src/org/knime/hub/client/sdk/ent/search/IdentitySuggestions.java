@@ -83,9 +83,9 @@ public final class IdentitySuggestions {
         @JsonProperty(value = JSON_PROPERTY_USERS, required = true) final List<AccountSearchItem> users,
         @JsonProperty(value = JSON_PROPERTY_TEAMS, required = true) final List<AccountSearchItem> teams,
         @JsonProperty(value = JSON_PROPERTY_EXTERNAL_GROUPS, required = true) final List<AccountSearchItem> externalGroups) {
-        m_users = users == null ? List.of() : users;
-        m_teams = teams == null ? List.of() : teams;
-        m_externalGroups = externalGroups == null ? List.of() : externalGroups;
+        m_users = Objects.requireNonNull(users, JSON_PROPERTY_USERS + " must not be null");
+        m_teams = Objects.requireNonNull(teams, JSON_PROPERTY_TEAMS + " must not be null");
+        m_externalGroups = Objects.requireNonNull(externalGroups, JSON_PROPERTY_EXTERNAL_GROUPS + " must not be null");
     }
 
     /**
