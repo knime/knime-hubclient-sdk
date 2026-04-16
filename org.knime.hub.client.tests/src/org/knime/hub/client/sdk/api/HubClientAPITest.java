@@ -290,8 +290,8 @@ class HubClientAPITest extends AbstractTest {
     }
 
     @Test
-    void testSuggestionsClientIsAvailable() {
-        assertNotNull(getHubClientAPIMock().suggestions());
+    void testSearchClientIsAvailable() {
+        assertNotNull(getHubClientAPIMock().search());
     }
 
 }
