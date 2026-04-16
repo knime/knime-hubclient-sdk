@@ -131,6 +131,13 @@ class SuggestionsServiceClientTest extends AbstractTest {
     }
 
     @Test
+    void testSuggestComponentsRejectsBothInPortAndOutPort() {
+        final var exception = assertThrows(IllegalArgumentException.class,
+            () -> SUGGESTIONS_CLIENT.suggestComponents("foo", 5, "in", "out", Map.of()));
+        assertEquals("'inPort' and 'outPort' are mutually exclusive", exception.getMessage());
+    }
+
+    @Test
     void testComponentSuggestionsRejectsNullComponents() {
         final var exception = assertThrows(NullPointerException.class, () -> new ComponentSuggestions(null));
         assertEquals("components must not be null", exception.getMessage());
