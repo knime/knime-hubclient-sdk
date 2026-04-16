@@ -57,6 +57,8 @@ import org.knime.hub.client.sdk.ApiClient;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.HTTPQueryParameter;
 import org.knime.hub.client.sdk.HubFailureIOException;
+import org.knime.hub.client.sdk.ent.search.ComponentSuggestions;
+import org.knime.hub.client.sdk.ent.search.IdentitySuggestions;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 
 import jakarta.ws.rs.core.GenericType;
@@ -75,6 +77,8 @@ import jakarta.ws.rs.core.MediaType;
 public final class SearchServiceClient {
 
     private static final String SEARCH_API_PATH = "search";
+    private static final String COMPONENT_SUGGESTIONS_API_PATH = "suggestions/components";
+    private static final String IDENTITY_SUGGESTIONS_API_PATH = "suggestions/identities";
 
     private static final String QUERY_PARAM_QUERY = "query";
     private static final String QUERY_PARAM_TYPE = "type";
@@ -86,8 +90,12 @@ public final class SearchServiceClient {
     private static final String QUERY_PARAM_SCORE_LIMIT = "scoreLimit";
     private static final String QUERY_PARAM_TAG = "tag";
     private static final String QUERY_PARAM_OWNER = "owner";
+    private static final String QUERY_PARAM_IN_PORT = "inPort";
+    private static final String QUERY_PARAM_OUT_PORT = "outPort";
 
     private static final GenericType<SearchResults> SEARCH_RESULTS = new GenericType<>() {};
+    private static final GenericType<ComponentSuggestions> COMPONENT_SUGGESTIONS = new GenericType<>() {};
+    private static final GenericType<IdentitySuggestions> IDENTITY_SUGGESTIONS = new GenericType<>() {};
 
     private final @NotOwning ApiClient m_apiClient;
 
@@ -140,6 +148,57 @@ public final class SearchServiceClient {
             .withQueryParam(tagsToQueryParameter(tags).orElse(null)) //
             .withQueryParam(QUERY_PARAM_OWNER, owner) //
             .invokeAPI(requestPath, ApiClient.Method.GET, null, SEARCH_RESULTS);
+    }
+
+    /**
+     * Executes a component suggestions request against the Hub search-service.
+     *
+     * @param query search text
+     * @param limit number of suggestions to return, {@code null} to use service default
+     * @param inPort object class of required input port, mutually exclusive with {@code outPort}
+     * @param outPort object class of required output port, mutually exclusive with {@code inPort}
+     * @param additionalHeaders additional headers to forward
+     * @return {@link ApiResponse} containing {@link ComponentSuggestions}
+     * @throws HubFailureIOException if the request fails
+     * @since 1.4
+     */
+    public ApiResponse<ComponentSuggestions> suggestComponents(final String query, final Integer limit,
+        final String inPort, final String outPort, final Map<String, String> additionalHeaders)
+        throws HubFailureIOException {
+
+        final var requestPath = IPath.forPosix(COMPONENT_SUGGESTIONS_API_PATH);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_QUERY, query) //
+            .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
+            .withQueryParam(QUERY_PARAM_IN_PORT, inPort) //
+            .withQueryParam(QUERY_PARAM_OUT_PORT, outPort) //
+            .invokeAPI(requestPath, ApiClient.Method.GET, null, COMPONENT_SUGGESTIONS);
+    }
+
+    /**
+     * Executes an identity suggestions request against the Hub search-service.
+     *
+     * @param query search text
+     * @param limit number of suggestions to return, {@code null} to use service default
+     * @param additionalHeaders additional headers to forward
+     * @return {@link ApiResponse} containing {@link IdentitySuggestions}
+     * @throws HubFailureIOException if the request fails
+     * @since 1.4
+     */
+    public ApiResponse<IdentitySuggestions> suggestIdentities(final String query, final Integer limit,
+        final Map<String, String> additionalHeaders) throws HubFailureIOException {
+
+        final var requestPath = IPath.forPosix(IDENTITY_SUGGESTIONS_API_PATH);
+
+        return m_apiClient.createApiRequest() //
+            .withAcceptHeaders(MediaType.APPLICATION_JSON_TYPE, ApiClient.APPLICATION_PROBLEM_JSON_TYPE) //
+            .withHeaders(additionalHeaders) //
+            .withQueryParam(QUERY_PARAM_QUERY, query) //
+            .withQueryParam(QUERY_PARAM_LIMIT, toString(limit)) //
+            .invokeAPI(requestPath, ApiClient.Method.GET, null, IDENTITY_SUGGESTIONS);
     }
 
 

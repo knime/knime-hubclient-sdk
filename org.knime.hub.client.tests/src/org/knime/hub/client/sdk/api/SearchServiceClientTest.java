@@ -28,6 +28,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.util.List;
@@ -40,6 +41,8 @@ import org.junit.jupiter.api.Test;
 import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.api.SearchServiceClient.PrivateSearchMode;
+import org.knime.hub.client.sdk.ent.search.ComponentSuggestions;
+import org.knime.hub.client.sdk.ent.search.IdentitySuggestions;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
@@ -66,6 +69,25 @@ class SearchServiceClientTest extends AbstractTest {
         "$['results'][*]['downloadCount']", //
         "$['results'][*]['icon']", //
         "$['relatedTags']" //
+    );
+
+    private static final List<String> COMPONENT_SUGGESTIONS_JSON_PATHS = List.of( //
+        "$['components'][*]['itemType']", //
+        "$['components'][*]['id']", //
+        "$['components'][*]['title']", //
+        "$['components'][*]['isVersioned']", //
+        "$['components'][*]['version']", //
+        "$['components'][*]['downloadCount']", //
+        "$['components'][*]['icon']" //
+    );
+
+    private static final List<String> IDENTITY_SUGGESTIONS_JSON_PATHS = List.of( //
+        "$['users'][*]['id']", //
+        "$['users'][*]['name']", //
+        "$['teams'][*]['id']", //
+        "$['teams'][*]['name']", //
+        "$['externalGroups'][*]['id']", //
+        "$['externalGroups'][*]['name']" //
     );
 
     @BeforeAll
@@ -113,13 +135,90 @@ class SearchServiceClientTest extends AbstractTest {
             getJsonPathConfig());
     }
 
+    @Test
+    void testSuggestComponentsDeserializesComponentHits() throws IOException {
+        final JsonNode expectedResponse = stubResponse( //
+            "suggestions-components.json", //
+            "/suggestions/components", //
+            Map.of( //
+                "query", "foo", //
+                "limit", "5", //
+                "inPort", "org.knime.TablePortObject" //
+            ),
+            ComponentSuggestions.class);
+
+        final ApiResponse<ComponentSuggestions> response = SEARCH_CLIENT.suggestComponents( //
+            "foo", //
+            5, //
+            "org.knime.TablePortObject", //
+            null, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SUGGESTIONS_JSON_PATHS, getMapper(),
+            getJsonPathConfig());
+    }
+
+    @Test
+    void testSuggestIdentitiesDeserializesIdentityHits() throws IOException {
+        final JsonNode expectedResponse = stubResponse( //
+            "suggestions-identities.json", //
+            "/suggestions/identities", //
+            Map.of( //
+                "query", "te", //
+                "limit", "2" //
+            ),
+            IdentitySuggestions.class);
+
+        final ApiResponse<IdentitySuggestions> response = SEARCH_CLIENT.suggestIdentities( //
+            "te", //
+            2, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        TestUtil.assertJSONProperties(response, expectedResponse, IDENTITY_SUGGESTIONS_JSON_PATHS, getMapper(),
+            getJsonPathConfig());
+    }
+
+    @Test
+    void testComponentSuggestionsRejectsNullComponents() {
+        final var exception = assertThrows(NullPointerException.class, () -> new ComponentSuggestions(null));
+        assertEquals("components must not be null", exception.getMessage());
+    }
+
+    @Test
+    void testIdentitySuggestionsRejectsNullUsers() {
+        final var exception = assertThrows(NullPointerException.class, () -> new IdentitySuggestions(null, List.of(), List.of()));
+        assertEquals("users must not be null", exception.getMessage());
+    }
+
+    @Test
+    void testIdentitySuggestionsRejectsNullTeams() {
+        final var exception = assertThrows(NullPointerException.class, () -> new IdentitySuggestions(List.of(), null, List.of()));
+        assertEquals("teams must not be null", exception.getMessage());
+    }
+
+    @Test
+    void testIdentitySuggestionsRejectsNullExternalGroups() {
+        final var exception =
+            assertThrows(NullPointerException.class, () -> new IdentitySuggestions(List.of(), List.of(), null));
+        assertEquals("externalGroups must not be null", exception.getMessage());
+    }
+
     private static JsonNode stubSearchResponse(final String testFileName, final String urlPath,
         final Map<String, String> queryParams) throws IOException {
+        return stubResponse(testFileName, urlPath, queryParams, SearchResults.class);
+    }
+
+    private static <T> JsonNode stubResponse(final String testFileName, final String urlPath,
+        final Map<String, String> queryParams, final Class<T> entityType) throws IOException {
         final var filePath =
             IPath.forPosix(TestUtil.RESOURCE_FOLDER_NAME).append("searchEntities").append(testFileName);
         final var resourceUrl = TestUtil.resolveToURL(filePath);
         final var jsonBody = TestUtil.readResourceToString(resourceUrl);
-        final var jsonNode = getMapper().valueToTree(getMapper().readValue(jsonBody, SearchResults.class));
+        final var jsonNode = getMapper().valueToTree(getMapper().readValue(jsonBody, entityType));
 
         var mapping = get(urlPathEqualTo(urlPath));
         queryParams.forEach((k, v) -> mapping.withQueryParam(k, equalTo(v)));

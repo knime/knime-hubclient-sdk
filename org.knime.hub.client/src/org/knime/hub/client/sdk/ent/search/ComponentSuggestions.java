@@ -1,7 +1,8 @@
 /*
  * ------------------------------------------------------------------------
+ *
  *  Copyright by KNIME AG, Zurich, Switzerland
- *  Website: http://www.knime.com; Email: contact@knime.com
+ *  Website: http://www.knime.org; Email: contact@knime.org
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License, Version 3, as
@@ -40,101 +41,72 @@
  *  propagated with or for interoperation with KNIME.  The owner of a Node
  *  may freely choose the license terms applicable to such Node, including
  *  when such Node is propagated with or for interoperation with KNIME.
- * -------------------------------------------------------------------
- *
- * History
- *   Nov 6, 2024 (magnus): created
+ * ---------------------------------------------------------------------
  */
+package org.knime.hub.client.sdk.ent.search;
 
-package org.knime.hub.client.sdk.api;
+import java.util.List;
+import java.util.Objects;
 
-import org.eclipse.jdt.annotation.NotOwning;
-import org.eclipse.jdt.annotation.Owning;
-import org.knime.hub.client.sdk.ApiClient;
+import org.knime.hub.client.sdk.ent.util.EntityUtil;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Hub Client API for KNIME Hub.
+ * Response payload returned by {@code GET /suggestions/components}.
  *
- * @author Magnus Gohm, KNIME AG, Konstanz, Germany
+ * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
+ * @since 1.4
  */
-public final class HubClientAPI implements AutoCloseable {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public final class ComponentSuggestions {
 
-    private final @Owning ApiClient m_apiClient;
+    private static final String JSON_PROPERTY_COMPONENTS = "components";
 
-    private final CatalogServiceClient m_catalog;
-
-    private final AccountServiceClient m_accountService;
-
-    private final ExecutionServiceClient m_executionService;
-
-    private final SearchServiceClient m_searchService;
+    private final List<SearchItemComponent> m_components;
 
     /**
-     * Create the {@link HubClientAPI} given an {@link ApiClient}
+     * Component suggestions returned by the KNIME Hub search service.
      *
-     * @param apiClient {@link ApiClient}
+     * @param components list of matching components
      */
-    public HubClientAPI(final @Owning ApiClient apiClient) {
-        m_apiClient = apiClient;
-        m_catalog = new CatalogServiceClient(m_apiClient);
-        m_accountService = new AccountServiceClient(m_apiClient);
-        m_executionService = new ExecutionServiceClient(apiClient);
-        m_searchService = new SearchServiceClient(apiClient);
+    @JsonCreator
+    public ComponentSuggestions(
+        @JsonProperty(value = JSON_PROPERTY_COMPONENTS, required = true) final List<SearchItemComponent> components) {
+        m_components = Objects.requireNonNull(components, JSON_PROPERTY_COMPONENTS + " must not be null");
     }
 
     /**
-     * Retrieves the associated {@link ApiClient}.
+     * Returns the list of suggested components.
      *
-     * @return {@link ApiClient}
+     * @return suggested components
      */
-    public @NotOwning ApiClient getApiClient() {
-        return m_apiClient;
+    @JsonProperty(JSON_PROPERTY_COMPONENTS)
+    public List<SearchItemComponent> getComponents() {
+        return m_components;
     }
 
-    /**
-     * Retrieves the catalog client.
-     *
-     * @return {@link CatalogServiceClient}
-     */
-    public CatalogServiceClient catalog() {
-        return m_catalog;
-    }
-
-    /**
-     * Retrieves the account service client.
-     *
-     * @return {@link AccountServiceClient}
-     */
-    public AccountServiceClient account() {
-        return m_accountService;
-    }
-
-    /**
-     * Retrieves the execution service client.
-     *
-     * @return {@link ExecutionServiceClient}
-     * @since 0.2
-     */
-    public ExecutionServiceClient execution() {
-        return m_executionService;
-    }
-
-    /**
-     * Retrieves the search service client.
-     *
-     * @return {@link SearchServiceClient}
-     * @since 1.1
-     */
-    public SearchServiceClient search() {
-        return m_searchService;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void close() {
-        m_apiClient.close();
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        var that = (ComponentSuggestions)o;
+        return Objects.equals(m_components, that.m_components);
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(m_components);
+    }
+
+    @Override
+    public String toString() {
+        return EntityUtil.toString(this);
+    }
 }
