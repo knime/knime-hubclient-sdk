@@ -62,8 +62,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * <p>
  * Contains the ranked list of matched {@link SearchItem}s and per-category hit counts.
  * <p>
- * Suggestion lists are retained for backwards compatibility and may be empty when the backing
- * endpoint does not provide them.
+ * Suggestion fields are no longer part of the endpoint response.
+ * Deprecated suggestion accessors are retained for source compatibility and always return empty lists.
  * </p>
  *
  * @author Benjamin Moser, KNIME GmbH, Konstanz, Germany
@@ -156,10 +156,10 @@ public final class SearchResults {
     }
 
     /**
-     * Returns tags that match the search query. This used to be part of the response and was removed.
-     * Always returns an empty list.
+     * Legacy compatibility accessor for tags that matched the search query in older response payloads.
+     * The field is no longer returned by the endpoint.
      *
-     * @return the suggested tags
+     * @return an empty list
      */
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTags() {
@@ -167,10 +167,10 @@ public final class SearchResults {
     }
 
     /**
-     * Returns usernames that match the search query. This used to be part of the response and was removed.
-     * Always returns an empty list.
+     * Legacy compatibility accessor for usernames that matched the search query in older response payloads.
+     * The field is no longer returned by the endpoint.
      *
-     * @return the suggested usernames
+     * @return an empty list
      */
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedUsernames() {
@@ -178,10 +178,10 @@ public final class SearchResults {
     }
 
     /**
-     * Returns team names that match the search query. This used to be part of the response and was removed.
-     * Always returns an empty list.
+     * Legacy compatibility accessor for team names that matched the search query in older response payloads.
+     * The field is no longer returned by the endpoint.
      *
-     * @return the suggested team names
+     * @return an empty list
      */
     @Deprecated(since = "1.3", forRemoval = false)
     public List<String> getSuggestedTeamnames() {
@@ -189,10 +189,10 @@ public final class SearchResults {
     }
 
     /**
-     * Returns external groups that match the search query. This used to be part of the response and was removed.
-     * Always returns an empty list.
+     * Legacy compatibility accessor for external groups that matched the search query in older response payloads.
+     * The field is no longer returned by the endpoint.
      *
-     * @return the suggested external groups
+     * @return an empty list
      */
     @Deprecated(since = "1.3", forRemoval = false)
     public List<AccountSearchItem> getSuggestedExternalGroups() {
