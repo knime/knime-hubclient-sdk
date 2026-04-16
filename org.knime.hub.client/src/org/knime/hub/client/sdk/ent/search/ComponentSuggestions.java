@@ -75,7 +75,7 @@ public final class ComponentSuggestions {
     @JsonCreator
     public ComponentSuggestions(
         @JsonProperty(value = JSON_PROPERTY_COMPONENTS, required = true) final List<SearchItemComponent> components) {
-        m_components = components == null ? List.of() : components;
+        m_components = Objects.requireNonNull(components, JSON_PROPERTY_COMPONENTS + " must not be null");
     }
 
     /**

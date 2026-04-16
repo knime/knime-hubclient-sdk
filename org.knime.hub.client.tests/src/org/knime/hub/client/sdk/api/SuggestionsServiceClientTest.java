@@ -25,6 +25,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.util.List;
@@ -127,6 +128,12 @@ class SuggestionsServiceClientTest extends AbstractTest {
         assertEquals(200, response.statusCode());
         TestUtil.assertJSONProperties(response, expectedResponse, IDENTITY_SUGGESTIONS_JSON_PATHS, getMapper(),
             getJsonPathConfig());
+    }
+
+    @Test
+    void testComponentSuggestionsRejectsNullComponents() {
+        final var exception = assertThrows(NullPointerException.class, () -> new ComponentSuggestions(null));
+        assertEquals("components must not be null", exception.getMessage());
     }
 
     private static <T> JsonNode stubSuggestionsResponse(final String testFileName, final String urlPath,
