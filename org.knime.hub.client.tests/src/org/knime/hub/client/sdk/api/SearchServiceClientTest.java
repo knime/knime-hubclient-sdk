@@ -32,14 +32,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.eclipse.core.runtime.IPath;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.knime.hub.client.sdk.AbstractTest;
 import org.knime.hub.client.sdk.ApiResponse;
 import org.knime.hub.client.sdk.api.SearchServiceClient.PrivateSearchMode;
+import org.knime.hub.client.sdk.api.SearchServiceClient.SearchMode;
 import org.knime.hub.client.sdk.ent.search.SearchResults;
 import org.knime.hub.client.sdk.testing.TestUtil;
 
@@ -91,7 +96,7 @@ class SearchServiceClientTest extends AbstractTest {
                 "limit", "5", //
                 "offset", "0", //
                 "sort", "best", //
-                "privateSearchMode", "include" //
+                "searchMode", "scoped" //
             ));
 
         final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
@@ -100,7 +105,79 @@ class SearchServiceClientTest extends AbstractTest {
             5, //
             0, //
             SearchServiceClient.SearchSort.BEST, //
-            PrivateSearchMode.INCLUDE, //
+            SearchMode.SCOPED, //
+            List.of(), //
+            null, //
+            null, //
+            null, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        TestUtil.assertJSONProperties(response, expectedResponse, COMPONENT_SEARCH_JSON_PATHS, getMapper(),
+            getJsonPathConfig());
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void testSearchMissingOptionalListsDeserializesAsEmptyLists() throws IOException {
+        final var fixture = "search-components-minimal.json";
+        stubSearchResponse( //
+            fixture, //
+            "/search", //
+            Map.of( //
+                "query", "foo", //
+                "type", "component", //
+                "limit", "5", //
+                "offset", "0", //
+                "sort", "best", //
+                "searchMode", "scoped" //
+            ));
+
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
+            "foo", //
+            SearchServiceClient.SearchType.COMPONENT, //
+            5, //
+            0, //
+            SearchServiceClient.SearchSort.BEST, //
+            SearchMode.SCOPED, //
+            List.of(), //
+            null, //
+            null, //
+            null, //
+            Map.of() //
+        );
+
+        assertEquals(200, response.statusCode());
+        final SearchResults result = response.result().toOptional().orElseThrow();
+        assertEquals(List.of(), result.getRelatedTags());
+        assertEquals(List.of(), result.getRelatedPathTags());
+    }
+
+    @ParameterizedTest
+    @MethodSource("legacyPrivateSearchModes")
+    void testLegacyPrivateSearchModeCompatibility(final PrivateSearchMode privateSearchMode,
+        final String expectedSearchModeParam) throws IOException {
+        final var fixture = "search-components.json";
+        final JsonNode expectedResponse = stubSearchResponse( //
+            fixture, //
+            "/search", //
+            Map.of( //
+                "query", "foo", //
+                "type", "component", //
+                "limit", "5", //
+                "offset", "0", //
+                "sort", "best", //
+                "searchMode", expectedSearchModeParam //
+            ));
+
+        final ApiResponse<SearchResults> response = SEARCH_CLIENT.search( //
+            "foo", //
+            SearchServiceClient.SearchType.COMPONENT, //
+            5, //
+            0, //
+            SearchServiceClient.SearchSort.BEST, //
+            privateSearchMode, //
             List.of(), //
             null, //
             null, //
@@ -130,6 +207,11 @@ class SearchServiceClientTest extends AbstractTest {
             .withBody(jsonBody)));
 
         return jsonNode;
+    }
+
+    private static Stream<Arguments> legacyPrivateSearchModes() {
+        return Stream.of(Arguments.of(PrivateSearchMode.INCLUDE, "scoped"), Arguments.of(PrivateSearchMode.EXCLUDE, "global"),
+            Arguments.of(PrivateSearchMode.AUTO, "global"));
     }
 
 }

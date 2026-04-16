@@ -35,18 +35,5 @@
     "extensions": 35,
     "components": 31,
     "collections": 1
-  },
-  "relatedTags": [
-    "Workflow Applications",
-    "Workflow Application",
-    "Checker Components",
-    "AI",
-    "REST",
-    "GenAI",
-    "Workflow Validation",
-    "Action Component",
-    "ChEMBL",
-    "Chemistry"
-  ],
-  "relatedPathTags": []
+  }
 }
